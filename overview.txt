@@ -1,0 +1,18 @@
+
+The system comprises four primary modules, specified as follows:
+
+COLLECT
+
+Collect data from existing protein structures (PDB) and store in a database as dihedral angles, bond angles and bond lengths.  Evaluate variance in bond angles and lengths to generate reasonable default values.
+
+BUILD
+
+Read dihedral angles, bond angles and bond lengths for any specific PDB entry and generate a structure identical to the original file (not necessarily same coordinates)
+
+MOVE
+
+Generate multidimensional countour plots for dihedral angles collected from protein structures, specific to residue pairs for backbone dihedral angles.  Use these data to enumerate reasonable dihedral angle changes given an initial residue configuration.
+
+EVALUATE
+
+Partition space around atoms and use the voxel cells as inputs to a neural net which will score local tertiary relationships according to examples observed in the PDB.
