@@ -1,0 +1,28 @@
+HEADER    ARGININE 39 FROM 7RSA          10-JUN-88            7RSA              
+TITLE     STRUCTURE OF PHOSPHATE-FREE RIBONUCLEASE A REFINED AT 1.26 ANGSTROMS  
+COMPND    MOL_ID: 1;                                                            
+ATOM    601  N   ARG A  39      19.889   7.279   2.457  1.00 10.95           N  
+ATOM    602  CA  ARG A  39      20.841   6.198   2.738  1.00  9.98           C  
+ATOM    603  C   ARG A  39      21.378   6.382   4.168  1.00  9.58           C  
+ATOM    604  O   ARG A  39      21.212   7.431   4.737  1.00 10.36           O  
+ATOM    605  CB  ARG A  39      22.036   6.323   1.747  1.00 13.90           C  
+ATOM    606  CG  ARG A  39      22.820   7.630   1.934  1.00 19.47           C  
+ATOM    607  CD  ARG A  39      23.627   8.111   0.806  1.00 26.71           C  
+ATOM    608  NE  ARG A  39      24.574   9.166   1.261  1.00 32.87           N  
+ATOM    609  CZ  ARG A  39      25.744   8.970   1.875  1.00 34.99           C  
+ATOM    610  NH1 ARG A  39      26.189   7.780   2.276  1.00 35.76           N  
+ATOM    611  NH2 ARG A  39      26.545  10.033   2.061  1.00 36.36           N  
+ATOM    612  H   ARG A  39      19.886   8.092   3.030  1.00 11.70           H  
+ATOM    613  HA  ARG A  39      20.424   5.250   2.607  1.00 10.24           H  
+ATOM    614  HB2 ARG A  39      22.663   5.480   1.877  1.00 14.10           H  
+ATOM    615  HB3 ARG A  39      21.633   6.236   0.752  1.00 14.46           H  
+ATOM    616  HG2 ARG A  39      22.193   8.413   2.261  1.00 19.66           H  
+ATOM    617  HG3 ARG A  39      23.475   7.493   2.792  1.00 19.74           H  
+ATOM    618  HD2 ARG A  39      24.123   7.368   0.270  1.00 26.73           H  
+ATOM    619  HD3 ARG A  39      22.965   8.592   0.103  1.00 26.58           H  
+ATOM    620  HE  ARG A  39      24.350  10.123   1.010  1.00 33.21           H  
+ATOM    621 HH11 ARG A  39      25.638   6.940   2.149  1.00 35.74           H  
+ATOM    622 HH12 ARG A  39      27.097   7.701   2.715  1.00 35.45           H  
+ATOM    623 HH21 ARG A  39      26.269  10.960   1.784  1.00 35.79           H  
+ATOM    624 HH22 ARG A  39      27.439   9.902   2.515  1.00 35.59           H  
+TER     625      ARG A  39
