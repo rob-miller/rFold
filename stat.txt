@@ -1,0 +1,69 @@
+
+03 nov 2015
+   - Met with Julie Makani regarding plans and desired projects; abstract requested
+   - first draft abstract
+
+04 nov 2015
+   - abstract submitted to Julie Makani and copied to Keith Dunker
+   - get PDB and Pisces mirrors updated on Synology NAS, bounce crond
+
+08 nov 2015
+   - expand abstract for Julie to hve background, objectives, methods, anticipated outcomes
+
+09 nov 2015
+   - submit abstract 2 to Julie
+   - compile dssp on mac - does not do side chains
+   - fire still 32 bit, need to reinstall linux - appears 64bit luaJIT ok now
+
+10 nov 2015
+   - fire set up as 64 bit
+   - installed torch
+   - tensorflow released, installed
+   
+12 nov 2015
+   - dssp chi1 implemented but not checked.  based on http://www.zucic.org/garlic/commands/dihedrals.html ( http://www.msg.ucsf.edu/local/programs/garlic/commands/dihedrals.html )
+
+13 nov 2015
+   - dssp chi2, chi3, chi4, chi5 implemented
+   - checked on 7rsa arg 39, seems ok for 0 degree definitions
+   -- next is deciding output format, feed to buildprot
+   - got buildprot compiled on mac, new Makefile
+   -- backbone only
+
+14 nov 2015
+   - lay out data structure ideas atom->angles
+   - list some use cases
+
+17 nov 2015
+   - read dill paper on kinematic loop closure
+   -- suspect main benefit may be description of peptide plane rotation
+   
+19 nov 2015
+   - get disgro paper and software - later than dill, C++
+   
+20 nov 2015
+   - start notes on manipulators and evaluators
+   
+21 nov 2015
+   - more notes on manipulators and evaluators
+   
+24 nov 2015
+   - investigate ballview - bal writes trajectory files but does not appear to visualise?
+   - get vmd - reads gromacs trajectory files
+
+27 nov 2011
+   - reading about GPUs and convolutional neural networks - http://timdettmers.com/2014/08/14/which-gpu-for-deep-learning/ and others especially on this site
+
+28 nov 2015
+   - more in-depth convolutional nets :  http://cs231n.github.io/convolutional-networks/ -- focused on images, but description much more amenable to residue environments
+
+29 nov 2015
+   - thinking about outputs as classification, e.g. 20 aas for c-alpha, specific side chain dihedrals
+   - also possibly each 3-atom plane in dihedral and then put rotation bond along one axis, rotate +/- about that axis few degrees for training
+   -- not clear how this would sample all conformations ... but it must, just without kinematics - but if just clock 1 degree or so at a time, or 1 degree if see gradient from 1 degree to 2 degrees; evaluate all positions then move
+   - reading on torch7, tensorflows; nothing clear yet about architecture that would alllow separate output layers e.g. one for each class (because worry that bad for res X might be ok for res Y - e.g. gly - and output training only for res X).
+   
+30 nov 2015
+   - for rotations of dihedral planes, add system to rotate back the next angle or two to minimse displacement of levered atom
+   - also add statistics on each dihedral to (primarily) make it so don't adjust omega angles outside observed ranges
+   

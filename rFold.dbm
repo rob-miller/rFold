@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+CAUTION: Do not modify this file unless you know what you are doing.
+         Unexpected results may occur if the code is changed deliberately.
+-->
+<dbmodel pgmodeler-ver="0.8.2-beta" last-position="0,0" last-zoom="1.2"
+	 default-schema="public" default-owner="postgres">
+<database name="rFold">
+</database>
+
+<schema name="public" fill-color="#e1e1e1" sql-disabled="true">
+</schema>
+
+<table name="pdb_chain">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="78.6667" y="273.667"/>
+	<column name="pdb_no" not-null="true">
+		<type name="serial"/>
+	</column>
+	<column name="pdbid">
+		<type name="varchar"/>
+	</column>
+	<column name="chain">
+		<type name="varchar"/>
+	</column>
+	<column name="filename">
+		<type name="varchar"/>
+	</column>
+	<constraint name="pdb_chain_pk" type="pk-constr" table="public.pdb_chain">
+		<columns names="pdb_no" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<index name="pdb_chain_pdb_ndx" table="public.pdb_chain"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="pdbid"/>
+		</idxelement>
+</index>
+
+<table name="residue">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="302.5" y="209.167"/>
+	<column name="res_id" not-null="true">
+		<type name="serial"/>
+	</column>
+	<column name="res">
+		<type name="char"/>
+	</column>
+	<column name="pre_res">
+		<type name="char"/>
+	</column>
+	<column name="post_res">
+		<type name="char"/>
+	</column>
+	<column name="res_ndx">
+		<type name="smallint"/>
+	</column>
+	<column name="res_pos">
+		<type name="varchar"/>
+	</column>
+	<column name="pdb_no">
+		<type name="bigint"/>
+	</column>
+	<constraint name="residue_pk" type="pk-constr" table="public.residue">
+		<columns names="res_id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<index name="residue_ndx_res_resndx" table="public.residue"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="res"/>
+		</idxelement>
+		<idxelement use-sorting="true" nulls-first="false" asc-order="true">
+			<column name="res_ndx"/>
+		</idxelement>
+</index>
+
+<index name="residue_ndx_pdb_no" table="public.residue"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="pdb_no"/>
+		</idxelement>
+</index>
+
+<table name="dihedral_angle_class">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="738.333" y="131.667"/>
+	<column name="code" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="name">
+		<type name="varchar"/>
+	</column>
+	<column name="atom1">
+		<type name="varchar"/>
+	</column>
+	<column name="atom2">
+		<type name="varchar"/>
+	</column>
+	<column name="atom3">
+		<type name="varchar"/>
+	</column>
+	<column name="atom4">
+		<type name="varchar"/>
+	</column>
+	<constraint name="dihedral_angle_class_pk" type="pk-constr" table="public.dihedral_angle_class">
+		<columns names="code" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="bond_angle_class">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="738.333" y="250.833"/>
+	<column name="code" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="atom1">
+		<type name="varchar"/>
+	</column>
+	<column name="atom2">
+		<type name="varchar"/>
+	</column>
+	<column name="atom3">
+		<type name="varchar"/>
+	</column>
+	<constraint name="bond_angle_class_pk" type="pk-constr" table="public.bond_angle_class">
+		<columns names="code" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="bond_class">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="736.667" y="354.167"/>
+	<column name="code" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="atom1">
+		<type name="varchar"/>
+	</column>
+	<column name="atom2">
+		<type name="varchar"/>
+	</column>
+	<constraint name="bond_class_pk" type="pk-constr" table="public.bond_class">
+		<columns names="code" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="dihedral">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="491.667" y="124.167"/>
+	<column name="res_id" not-null="true">
+		<type name="bigint"/>
+	</column>
+	<column name="code" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="angle">
+		<type name="double precision"/>
+	</column>
+	<constraint name="dihedral_pk" type="pk-constr" table="public.dihedral">
+		<columns names="res_id,code" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<index name="dihedral_ndx_res_id" table="public.dihedral"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="res_id"/>
+		</idxelement>
+</index>
+
+<table name="angle">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="493.333" y="238.333"/>
+	<column name="res_id" not-null="true">
+		<type name="bigint"/>
+	</column>
+	<column name="code" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="angle">
+		<type name="double precision"/>
+	</column>
+	<constraint name="angle_pk" type="pk-constr" table="public.angle">
+		<columns names="res_id,code" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<index name="angle_ndx_res_id" table="public.angle"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="res_id"/>
+		</idxelement>
+</index>
+
+<table name="bond">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="493.333" y="343.333"/>
+	<column name="res_id" not-null="true">
+		<type name="bigint"/>
+	</column>
+	<column name="code" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="length">
+		<type name="double precision"/>
+	</column>
+	<constraint name="bond_pk" type="pk-constr" table="public.bond">
+		<columns names="res_id,code" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<index name="bond_ndx_res_id" table="public.bond"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="res_id"/>
+		</idxelement>
+</index>
+
+<constraint name="residue_fk_pdbno" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.pdb_chain" table="public.residue">
+	<columns names="pdb_no" ref-type="src-columns"/>
+	<columns names="pdb_no" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="dihedral_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.residue" table="public.dihedral">
+	<columns names="res_id" ref-type="src-columns"/>
+	<columns names="res_id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="dihedral_fk_class" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral_angle_class" table="public.dihedral">
+	<columns names="code" ref-type="src-columns"/>
+	<columns names="code" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="angle_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.residue" table="public.angle">
+	<columns names="res_id" ref-type="src-columns"/>
+	<columns names="res_id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="angle_fk_class" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_angle_class" table="public.angle">
+	<columns names="code" ref-type="src-columns"/>
+	<columns names="code" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="bond_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.residue" table="public.bond">
+	<columns names="res_id" ref-type="src-columns"/>
+	<columns names="res_id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="bond_fk_class" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_class" table="public.bond">
+	<columns names="code" ref-type="src-columns"/>
+	<columns names="code" ref-type="dst-columns"/>
+</constraint>
+
+<relationship name="rel_residue_pdb_chain" type="relfk"
+	 src-table="public.residue"
+	 dst-table="public.pdb_chain"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_dihedral_residue" type="relfk"
+	 src-table="public.dihedral"
+	 dst-table="public.residue"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_dihedral_dihedral_angle_class" type="relfk"
+	 src-table="public.dihedral"
+	 dst-table="public.dihedral_angle_class"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_dihedral_cp_residue" type="relfk"
+	 src-table="public.angle"
+	 dst-table="public.residue"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_dihedral_cp_bond_angle_class" type="relfk"
+	 src-table="public.angle"
+	 dst-table="public.bond_angle_class"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_angle_cp_residue" type="relfk"
+	 src-table="public.bond"
+	 dst-table="public.residue"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_angle_cp_bond_class" type="relfk"
+	 src-table="public.bond"
+	 dst-table="public.bond_class"
+	 src-required="false" dst-required="false"/>
+
+</dbmodel>
