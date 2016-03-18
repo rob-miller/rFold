@@ -286,12 +286,6 @@ void MAtom::WritePDB(ostream& os) const
 		   mLoc.mX % mLoc.mY % mLoc.mZ % mOccupancy % mTempFactor % mElement % charge) << endl;
 }
 
-void MAtom::WriteId(ostream& os) const {
-  MResidueType res = MapResidue(mResName);  // expensive because MAtom does not know its MResidue
-  char code = kResidueInfo[res].code;
-  os << code << mResSeq << mName;
-}
-
 const MResidueInfo kResidueInfo[] = {
 	{ kUnknownResidue,	'X', "UNK" },
 	{ kAlanine,			'A', "ALA" },
@@ -434,17 +428,6 @@ MResidue::MResidue(uint32 inNumber,
 	  
 	  mCB.mLoc += xx * sx + yy * sy;
 
-          char str[32];
-          sprintf(str,"                 ");
-          sprintf(str,"%8.3lf",mCB.mLoc.mX);
-          sscanf(str,"%lf",&(mCB.mLoc.mX));
-          sprintf(str,"                 ");
-          sprintf(str,"%8.3lf",mCB.mLoc.mY);
-          sscanf(str,"%lf",&(mCB.mLoc.mY));
-          sprintf(str,"                 ");
-          sprintf(str,"%8.3lf",mCB.mLoc.mZ);
-          sscanf(str,"%lf",&(mCB.mLoc.mZ));
-
 	}
 
 
@@ -470,18 +453,11 @@ MResidue::MResidue(uint32 inNumber,
 	mCenter.mZ = (mBox[0].mZ + mBox[1].mZ) / 2;
 
 	if (VERBOSE > 3) {
-        //if (1) {
 		cerr << "Created residue " << mN.mResName << endl;
-                if (mPrev != nullptr) {
-                  // prev-c -> n
-                }
-                // n-ca, ca-c, c-o
-                
                 foreach (const MAtom& atom, mSideChain)
                   cerr << atom.mName << " ";
                 cerr << Chi1() << " " << Chi2() << " " << Chi3() << " " << Chi4() << " " << Chi5() << endl;
         }
-
 }
 
 MResidue::MResidue(uint32 inNumber, char inTypeCode, MResidue* inPrevious)
@@ -604,26 +580,20 @@ double MResidue::Psi() const
 double MResidue::Omega() const
 {
 	double result = 360;
-	if (mPrev != nullptr and NoChainBreak(mPrev,this))
-		result = DihedralAngle(mPrev->GetCAlpha(), mPrev->GetC(), GetN(), GetCAlpha());
+	if (mNext != nullptr and NoChainBreak(this, mNext))
+		result = DihedralAngle(GetCAlpha(), GetC(), mNext->GetN(), mNext->GetCAlpha());
 	return result;
 }
 
 
 const MAtom* MResidue::GetSC(const std::string& atomName) const {
-  /*
   std::vector<const MAtom>::iterator it;
-  for (it = mSideChain.begin(); it != mSideChain.end(); it++) {
+  for (it = mSideChain.begin();
+      it != mSideChain.end();
+      it++) {
     if (it->TestAtomName(atomName))
       return &(*it);
   }
-  */
-  
-  for (std::size_t i = 0; i != mSideChain.size(); ++i){
-    if (mSideChain[i].TestAtomName(atomName))
-      return &(mSideChain[i]);
-  }
-  
   return (MAtom*) 0;
 }
 
@@ -1026,245 +996,6 @@ void MResidue::WritePDB(ostream& os)
 	for_each(mSideChain.begin(), mSideChain.end(), boost::bind(&MAtom::WritePDB, _1, boost::ref(os)));
 }
 
-void writeDistAngleDist(ostream& os, const MAtom& a1, const MAtom& a2, const MAtom& a3) {
-  double d0 = Distance(a1,a2);
-  double d1 = Distance(a2,a3);
-  double d2 = Distance(a1,a3);
-  double angle = acos( ((d0*d0) + (d1*d1) - (d2*d2)) / (2*d0*d1) ) * 180 / kPI;
-  
-  boost::format internalDDA("%8.4lf %8.4lf %8.4lf");
-  os << ( internalDDA % d0 % angle % d1 );
-}
-
-void writeInternal3AtomLine(ostream& os, std::string pdbId, const MAtom& a1, const MAtom& a2, const MAtom& a3) {
-  os << pdbId << ' ' << a1.mChainID << ' ';
-  a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ' ';
-  writeDistAngleDist(os,a1,a2,a3);
-  /*
-  os << " a1= " << a1.mLoc.mX << ' ' << a1.mLoc.mY << ' ' << a1.mLoc.mZ;
-  os << " a2= " << a2.mLoc.mX << ' ' << a2.mLoc.mY << ' ' << a2.mLoc.mZ;
-  os << " a3= " << a3.mLoc.mX << ' ' << a3.mLoc.mY << ' ' << a3.mLoc.mZ;
-  */
-  os << endl;  
-}
-
-void writeInternal4AtomLine(ostream& os, std::string pdbId, const MAtom& a1, const MAtom& a2, const MAtom& a3, const MAtom& a4) {
-  double val = DihedralAngle(a1,a2,a3,a4)
-  os << pdbId << ' ' << a1.mChainID << ' ';
-  a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ':'; a4.WriteId(os); os << ' ' << val << endl;
-}
-
-void MResidue::WriteInternal(ostream& os, std::string pdbId)
-{
-
-  if (nullptr != mPrev and NoChainBreak(mPrev,this)) {
-    writeInternal3AtomLine(os, pdbId, mPrev->GetC(), mN, mCA);
-  }
-  
-  writeInternal3AtomLine(os, pdbId, mN, mCA, mC);
-  
-  if (nullptr != mNext and NoChainBreak(this, mNext)) {
-    writeInternal3AtomLine(os, pdbId, mCA, mC, mNext->GetN());
-  }
-
-  if (nullptr != mPrev and NoChainBreak(mPrev,this)) {
-    writeInternal4AtomLine(os, pdbId, mPrev->GetCAlpha(), mPrev->GetC(), mN, mCA);  // omega
-    writeInternal4AtomLine(os, pdbId, mPrev->GetC(), mN, mCA, mC);  // phi
-  }  
-  if (nullptr != mNext and NoChainBreak(this, mNext)) {
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mC, mNext->GetN());  // psi
-  }
-
-  writeInternal3AtomLine(os, pdbId, mCA, mC, mO);
-  writeInternal4AtomLine(os, pdbId, mN, mCA, mC, mO);
-  
-  writeInternal3AtomLine(os, pdbId, mCB, mCA, mC);
-  writeInternal4AtomLine(os, pdbId, mO, mC, mCA, mCB);
-
-  switch(mType) {
-  case kGlycine:
-  case kAlanine:
-    break;
-  case kValine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG1"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG1"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG2"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG2"));
-    break
-  case kLeucine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    break;
-  case kIsoleucine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG1"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG1"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG2"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG2"));
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG1"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG1"), GetSC("CD"));   // chi2
-    break
-  case kMethionine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("SD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("SD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("SD"), GetSC("CE"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("SD"), GetSC("CE"));   // chi3
-    break;
-  case kPhenylalanine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    break;
-  case kProline:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    break;
-  case kSerine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("OG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("OG"));   // chi1
-    break;
-  case kThreonine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("OG1"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("OG1"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("OG1"), GetSC("CG2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("OG1"), GetSC("CG2"));
-    break;
-  case kCysteine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("SG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("SG"));   // chi1
-    break;
-  case kAsparagine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("OD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("OD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("ND2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("ND2"));
-    break;
-  case kGlutamine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("OE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("OE1"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("NE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("NE2")); 
-    break;
-  case kTyrosine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CE1"), GetSC("CZ"), GetSC("OH"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD1"), GetSC("CE1"), GetSC("CZ"), GetSC("OH"));
-    break;
-  case kTryptophan:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"),GetSC("NE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"),GetSC("NE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("CE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"),GetSC("CE2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("CE3"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"),GetSC("CE3"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CD2"),GetSC("CE2"),GetSC("CZ2"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("CE2"),GetSC("CZ2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CE2"),GetSC("CZ2"),GetSC("CH2"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD2"),GetSC("CE2"),GetSC("CZ2"),GetSC("CH2"));
-    break;
-  case kAspartaticAcid:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("OD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("OD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("OD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("OD2"));
-    break;
-  case kGlutamicAcid:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("OE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("OE1"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("OE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("OE2")); 
-    break;    
-  case kHistidine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("ND1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("ND1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("ND1"),GetSC("CE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("ND1"),GetSC("CE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("NE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"),GetSC("NE2"));
-    break;    
-  case kLysine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("CE"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("CE"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CD"), GetSC("CE"), GetSC("NZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("CE"), GetSC("NZ"));   // chi4
-    break;
-  case kArginine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("NE"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("NE"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CD"), GetSC("NE"), GetSC("CZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("NE"), GetSC("CZ"));   // chi4
-    writeInternal3AtomLine(os, pdbId, GetSC("NE"), GetSC("CZ"), GetSC("NH1"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD"), GetSC("NE"), GetSC("CZ"), GetSC("NH1"));   // chi5
-    writeInternal3AtomLine(os, pdbId, GetSC("NE"), GetSC("CZ"), GetSC("NH2"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD"), GetSC("NE"), GetSC("CZ"), GetSC("NH2"));   // chi5
-    break;
-  default:
-    cerr<< "bad mType: " << mType << "\n";
-    assert(0);
-    break;
-  }
-  
-  os << "--" << endl;  
-  
-}
-
 // --------------------------------------------------------------------
 
 MChain::MChain(const MChain& chain)
@@ -1326,11 +1057,6 @@ void MChain::WritePDB(ostream& os)
 	MResidue* last = mResidues.back();
 	
 	os << (ter % (last->GetCAlpha().mSerial + 1) % kResidueInfo[last->GetType()].name % mChainID % last->GetNumber() % ' ') << endl;
-}
-
-void MChain::WriteInternal(ostream& os, std::string pdbId)
-{
-  for_each(mResidues.begin(), mResidues.end(), boost::bind(&MResidue::WriteInternal, _1, boost::ref(os), pdbId));
 }
 
 MResidue* MChain::GetResidueBySeqNumber(uint16 inSeqNumber, const string& inInsertionCode)
@@ -2555,10 +2281,4 @@ void MProtein::WritePDB(ostream& os)
 {
 	foreach (MChain* chain, mChains)
 		chain->WritePDB(os);
-}
-
-void MProtein::WriteInternal(ostream& os)
-{
-	foreach (MChain* chain, mChains)
-          chain->WriteInternal(os, mID);
 }

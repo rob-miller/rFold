@@ -40,7 +40,7 @@ DEFINES				+= NDEBUG
 CFLAGS				+= -O3
 endif
 
-CFLAGS				+= $(DEFINES:%=-D%)
+CFLAGS				+= $(DEFINES:%=-D%) 
 
 DIST_NAME			= dssp-$(VERSION)
 
@@ -62,6 +62,7 @@ $(OBJ_DIR):
 
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@ echo compiling $@
+	@ echo $(CXX) -MD -c -o $@ $< $(CFLAGS)
 	@ $(CXX) -MD -c -o $@ $< $(CFLAGS)
 
 clean:

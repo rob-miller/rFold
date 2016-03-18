@@ -67,3 +67,46 @@
    - for rotations of dihedral planes, add system to rotate back the next angle or two to minimse displacement of levered atom
    - also add statistics on each dihedral to (primarily) make it so don't adjust omega angles outside observed ranges
    
+03 feb 2016
+   - have been working on collect module, designing build
+   - remember to run on fire !  installed lua-postgres with:
+   luarocks install luadbi-postgresql POSTGRES_INCDIR=/usr/include/postgresql
+   luarocks install luasql-postgres PGSQL_INCDIR=/usr/include/postgresql/
+   - think lua on fire now talking to postgres on fire
+   - wrote bin/rfsync on fire, uses unison
+   -- not happy, new plan is:
+   proj/rFold -- on fire, mount from nova
+   proj/rFold-nova -- on nova, rfsync will unison here.
+
+01 mar 2016
+   - added routines to rtmDSSP to print internal coordinates for each residue to Cbeta (no side chain yet) -- bond lengths, angles, dihedrals.
+   -- should now be able to read into db and then try to reproduce 3d coordinates -- all in DSSP output
+
+02 mar 2016
+   - work on lua parser for rtm dssp output with internal coordinates
+   
+03 mar 2016
+   - finish up lua parser for rtm dssp output with internal coordinates
+   - start on buildprot ...
+   - install 'numeric lua', however not as documented or indicated in messages -- needed:
+   -- luarocks make numlua-0.3-1.rockspec HDF5_INCDIR="/usr/include/hdf5/serial/" HDF5_LIBDIR="/usr/lib/x86_64-linux-gnu/hdf5/serial"
+   -- oops had to fix numlua.h, add:
+   #if LUA_VERSION_NUM <= 501
+   +#define lua_number2int(i,n) ((i)=(int)(n))
+   --- as per github
+   
+06 mar 2016
+   - past few days on buildprot (bp1.lua)
+   - seems straightforward porting of coordSpace work from past to now
+   - changed dssp to putput O coordinates as well, but current work does not handle sidechains beyond cb
+
+08 mar 2016
+   - finished initial implementation bp1.c for backbone and c-beta; many positions work, some errors
+
+09 mar 2016
+   - cleared errors, all generated dihedrals match 4th atom to x.0e-05 -- not translated back to chain, so not cumulative
+
+13 mar 2016
+   - implement but not test generation of side chain internal coordinates in rtmDSSP
+   
+   

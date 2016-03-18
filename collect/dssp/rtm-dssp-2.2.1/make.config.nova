@@ -1,0 +1,6 @@
+# Set local options for make here
+BOOST_LIB_SUFFIX = -mt
+BOOST_LIB_DIR    = /usr/local/Cellar/boost/1.60.0_1/lib
+BOOST_INC_DIR    = /usr/local/Cellar/boost/1.60.0_1/include
+#BOOST_LIB_DIR    = /usr/local/Cellar/boost/1.58.0/lib
+#BOOST_INC_DIR    = /usr/local/Cellar/boost/1.58.0/include

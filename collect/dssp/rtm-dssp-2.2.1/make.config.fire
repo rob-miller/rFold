@@ -1,0 +1,4 @@
+# Set local options for make here
+#BOOST_LIB_SUFFIX = -mt
+BOOST_LIB_DIR    = /usr/lib/x86_64-linux-gnu/
+BOOST_INC_DIR    = /usr/include/boost

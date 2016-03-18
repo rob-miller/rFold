@@ -31,7 +31,7 @@ string ResidueToDSSPLine(const MResidue& residue)
 
         // - rtm -
         
-  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO  KAPPA ALPHA  PHI   PSI   OMG    X-N   Y-N   Z-N   X-CA   Y-CA   Z-CA   X-C   Y-C   Z-C   X-CB   Y-CB   Z-CB  B-CA
+  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO  KAPPA ALPHA  PHI   PSI   OMG    X-N   Y-N   Z-N   X-CA   Y-CA   Z-CA   X-C   Y-C   Z-C   X-CB   Y-CB   Z-CB   X-O   Y-O   Z-O  B-CA
 //  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO  KAPPA ALPHA  PHI   PSI   OMG    X-CA   Y-CA   Z-CA   X-CB   Y-CB   Z-CB   X-N   Y-N   Z-N  B-CA
 //  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO  KAPPA ALPHA  PHI   PSI   OMG    X-CA   Y-CA   Z-CA   X-CB   Y-CB   Z-CB  B-CA
 //  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO  KAPPA ALPHA  PHI   PSI   OMG    X-CA   Y-CA   Z-CA   X-CB   Y-CB   Z-CB 
@@ -39,7 +39,8 @@ string ResidueToDSSPLine(const MResidue& residue)
 
  */
 	boost::format kDSSPResidueLine(
-	"%5.5d%5.5d%1.1s%1.1s %c  %c %c%c%c%c%c%c%c%4.4d%4.4d%c%4.4d %11s%11s%11s%11s  %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f");
+	"%5.5d%5.5d%1.1s%1.1s %c  %c %c%c%c%c%c%c%c%4.4d%4.4d%c%4.4d %11s%11s%11s%11s  %6.3f %6.1f %6.1f %9.4f %9.4f %9.4f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f");
+	//"%5.5d%5.5d%1.1s%1.1s %c  %c %c%c%c%c%c%c%c%4.4d%4.4d%c%4.4d %11s%11s%11s%11s  %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f");
 	// "%5.5d%5.5d%1.1s%1.1s %c  %c %c%c%c%c%c%c%c%4.4d%4.4d%c%4.4d %11s%11s%11s%11s  %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f");
 	// "%5.5d%5.5d%1.1s%1.1s %c  %c %c%c%c%c%c%c%c%4.4d%4.4d%c%4.4d %11s%11s%11s%11s  %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f");
 	// "%5.5d%5.5d%1.1s%1.1s %c  %c %c%c%c%c%c%c%c%4.4d%4.4d%c%4.4d %11s%11s%11s%11s  %6.3f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f");
@@ -49,6 +50,7 @@ string ResidueToDSSPLine(const MResidue& residue)
 	const MAtom& cb = residue.GetCBeta();
 	const MAtom& N = residue.GetN();
 	const MAtom& C = residue.GetC();
+	const MAtom& O = residue.GetO();
 	
 	char code = kResidueInfo[residue.GetType()].code;
 	if (residue.GetType() == kCysteine and residue.GetSSBridgeNr() != 0)
@@ -138,6 +140,7 @@ string ResidueToDSSPLine(const MResidue& residue)
 		ca.mLoc.mX % ca.mLoc.mY % ca.mLoc.mZ %
 		C.mLoc.mX % C.mLoc.mY % C.mLoc.mZ %
 		cb.mLoc.mX % cb.mLoc.mY % cb.mLoc.mZ %
+		O.mLoc.mX % O.mLoc.mY % O.mLoc.mZ %
                 ca.mTempFactor 
 		).str();
 }
@@ -244,7 +247,7 @@ void WriteDSSP(MProtein& protein, ostream& os)
 	//boost::format kDSSPResidueLine(
 	//	"%5.5d        !%c             0   0    0      0, 0.0     0, 0.0     0, 0.0     0, 0.0   0.000  360.0  360.0  360.0  360.0  360.0    0.0    0.0    0.0    0.0    0.0    0.0    0.0");
 
-	os << "  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO   KAPPA  ALPHA   PHI    PSI    OMG    X-N    Y-N    Z-N    X-CA   Y-CA   Z-CA   X-C    Y-C    Z-C    X-CB   Y-CB   Z-CB   B-CA" << endl;
+	os << "  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO   KAPPA  ALPHA   PHI    PSI    OMG    X-N    Y-N    Z-N    X-CA   Y-CA   Z-CA   X-C    Y-C    Z-C    X-CB   Y-CB   Z-CB   X-O    Y-O    Z-O   B-CA" << endl;
 	boost::format kDSSPResidueLine(
 		"%5.5d        !%c             0   0    0      0, 0.0     0, 0.0     0, 0.0     0, 0.0   0.000  360.0  360.0  360.0  360.0  360.0    0.0    0.0    0.0    0.0    0.0    0.0    0.0    0.0    0.0    0.0");
         

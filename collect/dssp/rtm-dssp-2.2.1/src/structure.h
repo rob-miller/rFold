@@ -71,9 +71,10 @@ struct MAtom
 	void		Translate(const MPoint& inTranslation)	{ mLoc += inTranslation; }
 	void		Rotate(const MQuaternion& inRotation)	{ mLoc.Rotate(inRotation); }
 	void		WritePDB(std::ostream& os) const;
-
-				operator const MPoint&() const			{ return mLoc; }
-				operator MPoint&()						{ return mLoc; }
+        void            WriteId(std::ostream& os) const;
+  
+	operator const MPoint&() const			{ return mLoc; }
+	operator MPoint&()						{ return mLoc; }
 };
 
 
@@ -247,6 +248,7 @@ class MResidue
 	void				Rotate(const MQuaternion& inRotation);
 
 	void				WritePDB(std::ostream& os);
+	void				WriteInternal(std::ostream& os, std::string pdbId);
 
 	static double		CalculateHBondEnergy(MResidue& inDonor, MResidue& inAcceptor);
 
@@ -319,6 +321,7 @@ class MChain
 	void				Rotate(const MQuaternion& inRotation);
 
 	void				WritePDB(std::ostream& os);
+	void				WriteInternal(std::ostream& os, std::string pdbId);
 	
 	std::vector<MResidue*>&
 						GetResidues()						{ return mResidues; }
@@ -370,6 +373,7 @@ class MProtein
 	void				Rotate(const MQuaternion& inRotation);
 
 	void				WritePDB(std::ostream& os);
+	void				WriteInternal(std::ostream& os);
 	
 	void				GetPoints(std::vector<MPoint>& outPoints) const;
 

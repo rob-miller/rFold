@@ -145,9 +145,11 @@ int main(int argc, char* argv[])
 			out.push(outfile);
 			
 			WriteDSSP(a, out);
+                        a.WriteInternal(out);
 		}
 		else
 			WriteDSSP(a, cout);
+                        a.WriteInternal(cout);
 	}
 	catch (const exception& e)
 	{
