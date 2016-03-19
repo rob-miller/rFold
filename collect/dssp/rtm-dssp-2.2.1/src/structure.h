@@ -8,6 +8,8 @@
 #include "primitives-3d.h"
 #include "align-2d.h"
 
+#include <boost/optional.hpp>
+
 struct MAtom;
 class MResidue;
 class MChain;
@@ -178,7 +180,7 @@ class MResidue
 	double				Psi() const;
 
         // rtm
-        const MAtom*                          GetSC(const std::string& atomName) const;
+        const MAtom*                    GetSC(const std::string& atomName) const;
 	double				Omega() const;
 	double				Chi1() const;
 	double				Chi2() const;
@@ -253,8 +255,7 @@ class MResidue
 	static double		CalculateHBondEnergy(MResidue& inDonor, MResidue& inAcceptor);
 
 	std::vector<MAtom>&	GetSideChain()				{ return mSideChain; }
-	const std::vector<MAtom>&
-						GetSideChain() const		{ return mSideChain; }
+	const std::vector<MAtom>&	GetSideChain() const		{ return mSideChain; }
 
 	void				GetPoints(std::vector<MPoint>& outPoints) const;
 

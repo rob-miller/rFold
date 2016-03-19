@@ -611,7 +611,7 @@ double MResidue::Omega() const
 
 
 const MAtom* MResidue::GetSC(const std::string& atomName) const {
-  /*
+   /*
   std::vector<const MAtom>::iterator it;
   for (it = mSideChain.begin(); it != mSideChain.end(); it++) {
     if (it->TestAtomName(atomName))
@@ -1049,7 +1049,7 @@ void writeInternal3AtomLine(ostream& os, std::string pdbId, const MAtom& a1, con
 }
 
 void writeInternal4AtomLine(ostream& os, std::string pdbId, const MAtom& a1, const MAtom& a2, const MAtom& a3, const MAtom& a4) {
-  double val = DihedralAngle(a1,a2,a3,a4)
+  double val = DihedralAngle(a1,a2,a3,a4);
   os << pdbId << ' ' << a1.mChainID << ' ';
   a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ':'; a4.WriteId(os); os << ' ' << val << endl;
 }
@@ -1085,176 +1085,407 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
   case kGlycine:
   case kAlanine:
     break;
-  case kValine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG1"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG1"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG2"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG2"));
-    break
-  case kLeucine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
+  case kValine: {
+    const MAtom *cg1 = GetSC("CG1");
+    const MAtom *cg2 = GetSC("CG2");
+    if (cg1) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg1);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg1);   // chi1
+    }
+    if (cg2) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg2);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg2);
+    }
     break;
-  case kIsoleucine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG1"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG1"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG2"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG2"));
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG1"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG1"), GetSC("CD"));   // chi2
-    break
-  case kMethionine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("SD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("SD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("SD"), GetSC("CE"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("SD"), GetSC("CE"));   // chi3
+  }
+  case kLeucine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd1 = GetSC("CD1");
+    const MAtom *cd2 = GetSC("CD2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB,*cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd1);   // chi2
+      }
+      if (cd2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd2);
+      }
+    }
     break;
-  case kPhenylalanine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
+  }
+  case kIsoleucine: {
+    const MAtom *cg1 =  GetSC("CG1");
+    const MAtom *cg2 =  GetSC("CG2");
+    const MAtom *cd =  GetSC("CD");
+
+    if (cg1) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg1);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg1);   // chi1
+      if (cd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg1, *cd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg1, *cd);   // chi2
+      }
+    }
+    if (cg2) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg2);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg2);
+    }
     break;
-  case kProline:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
+  }
+  case kMethionine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *sd =  GetSC("SD");
+    const MAtom *ce =  GetSC("CE");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (sd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *sd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *sd);   // chi2
+        if (ce) {
+          writeInternal3AtomLine(os, pdbId, *cg, *sd, *ce);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *sd, *ce);   // chi3
+        }
+      }
+    }
     break;
-  case kSerine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("OG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("OG"));   // chi1
+  }
+  case kPhenylalanine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd1 =  GetSC("CD1");
+    const MAtom *cd2 =  GetSC("CD2");
+    const MAtom *ce1 =  GetSC("CE1");
+    const MAtom *ce2 =  GetSC("CE2");
+    const MAtom *cz =  GetSC("CZ");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd1);   // chi2
+        if (ce1) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd1, *ce1);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd1, *ce1);
+          if (cz) {
+            writeInternal3AtomLine(os, pdbId, *cd1, *ce1, *cz);
+            writeInternal4AtomLine(os, pdbId, *cg, *cd1, *ce1, *cz);
+          }
+        }
+      }
+      if (cd2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd2);
+        if (ce2) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd2, *ce2);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2, *ce2);
+        }
+      }
+    }
     break;
-  case kThreonine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("OG1"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("OG1"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("OG1"), GetSC("CG2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("OG1"), GetSC("CG2"));
+  }
+  case kProline: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd =  GetSC("CD");
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd);   // chi2
+      }
+    }
     break;
-  case kCysteine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("SG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("SG"));   // chi1
+  }
+  case kSerine: {
+    const MAtom *og =  GetSC("OG");
+    if (og) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB,*og);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB,*og);   // chi1
+    }
     break;
-  case kAsparagine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("OD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("OD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("ND2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("ND2"));
+  }
+  case kThreonine: {
+    const MAtom *og1 =  GetSC("OG1");
+    const MAtom *cg2 =  GetSC("CG2");
+    if (og1) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *og1);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *og1);   // chi1
+      if (cg2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *og1, *cg2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *og1, *cg2);
+      }
+    }
     break;
-  case kGlutamine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("OE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("OE1"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("NE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("NE2")); 
+  }
+  case kCysteine: {
+    const MAtom *sg =  GetSC("SG");
+    if (sg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *sg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *sg);   // chi1
+    }
     break;
-  case kTyrosine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"), GetSC("CE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"), GetSC("CE2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"), GetSC("CE1"), GetSC("CZ"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CE1"), GetSC("CZ"), GetSC("OH"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD1"), GetSC("CE1"), GetSC("CZ"), GetSC("OH"));
+  }
+  case kAsparagine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *od1 =  GetSC("OD1");
+    const MAtom *nd2 =  GetSC("ND2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (od1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *od1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *od1);   // chi2
+      }
+      if (nd2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *nd2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *nd2);
+      }
+    }
     break;
-  case kTryptophan:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD1"),GetSC("NE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD1"),GetSC("NE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("CE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"),GetSC("CE2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("CE3"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"),GetSC("CE3"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CD2"),GetSC("CE2"),GetSC("CZ2"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("CE2"),GetSC("CZ2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CE2"),GetSC("CZ2"),GetSC("CH2"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD2"),GetSC("CE2"),GetSC("CZ2"),GetSC("CH2"));
+  }
+  case kGlutamine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd =  GetSC("CD");
+    const MAtom *oe1 =  GetSC("OE1");
+    const MAtom *ne2 =  GetSC("NE2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd);   // chi2
+        if (oe1) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd, *oe1);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd, *oe1);   // chi3
+        }
+        if (ne2) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd, *ne2);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd, *ne2);
+        }
+      }
+    }
     break;
-  case kAspartaticAcid:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("OD1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("OD1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("OD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("OD2"));
+  }
+  case kTyrosine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd1 =  GetSC("CD1");
+    const MAtom *cd2 =  GetSC("CD2");
+    const MAtom *ce1 =  GetSC("CE1");
+    const MAtom *ce2 =  GetSC("CE2");
+    const MAtom *cz =  GetSC("CZ");
+    const MAtom *oh =  GetSC("OH");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd1);   // chi2
+        if (ce1) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd1, *ce1);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd1, *ce1);
+          if (cz) {
+            writeInternal3AtomLine(os, pdbId, *cd1, *ce1, *cz);
+            writeInternal4AtomLine(os, pdbId, *cg, *cd1, *ce1, *cz);
+            if (oh) {
+              writeInternal3AtomLine(os, pdbId, *ce1, *cz, *oh);
+              writeInternal4AtomLine(os, pdbId, *cd1, *ce1, *cz, *oh);
+            }
+          }
+        }
+      }
+      if (cd2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd2);
+        if (ce2) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd2, *ce2);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2, *ce2);
+        }
+      }
+    }
     break;
-  case kGlutamicAcid:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("OE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("OE1"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("OE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("OE2")); 
-    break;    
-  case kHistidine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("ND1"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("ND1"));   // chi2
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD2"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("ND1"),GetSC("CE1"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("ND1"),GetSC("CE1"));
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD2"),GetSC("NE2"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD2"),GetSC("NE2"));
-    break;    
-  case kLysine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("CE"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("CE"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CD"), GetSC("CE"), GetSC("NZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("CE"), GetSC("NZ"));   // chi4
+  }
+  case kTryptophan: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd1 =  GetSC("CD1");
+    const MAtom *cd2 =  GetSC("CD2");
+    const MAtom *ne1 =  GetSC("NE1");
+    const MAtom *ce2 =  GetSC("CE2");
+    const MAtom *ce3 =  GetSC("CE3");
+    const MAtom *cz2 =  GetSC("CZ2");
+    const MAtom *ch2 =  GetSC("CH2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd1);   // chi2
+        if (ne1) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd1,*ne1);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd1,*ne1);
+        }
+      }
+      if (cd2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd2);
+        if (ce2) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd2,*ce2);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2,*ce2);
+          if (cz2) {
+            writeInternal3AtomLine(os, pdbId, *cd2,*ce2,*cz2);
+            writeInternal4AtomLine(os, pdbId, *cg, *cd2,*ce2,*cz2);
+            if (ch2) {
+              writeInternal3AtomLine(os, pdbId, *ce2,*cz2,*ch2);
+              writeInternal4AtomLine(os, pdbId, *cd2,*ce2,*cz2,*ch2);
+            }
+          }
+        }
+        if (ce3) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd2,*ce3);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2,*ce3);
+        }
+      }
+    }
     break;
-  case kArginine:
-    writeInternal3AtomLine(os, pdbId, mCA, mCB, GetSC("CG"));
-    writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, GetSC("CG"));   // chi1
-    writeInternal3AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"));
-    writeInternal4AtomLine(os, pdbId, mCA, mCB, GetSC("CG"), GetSC("CD"));   // chi2
-    writeInternal3AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("NE"));
-    writeInternal4AtomLine(os, pdbId, mCB, GetSC("CG"), GetSC("CD"), GetSC("NE"));   // chi3
-    writeInternal3AtomLine(os, pdbId, GetSC("CD"), GetSC("NE"), GetSC("CZ"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CG"), GetSC("CD"), GetSC("NE"), GetSC("CZ"));   // chi4
-    writeInternal3AtomLine(os, pdbId, GetSC("NE"), GetSC("CZ"), GetSC("NH1"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD"), GetSC("NE"), GetSC("CZ"), GetSC("NH1"));   // chi5
-    writeInternal3AtomLine(os, pdbId, GetSC("NE"), GetSC("CZ"), GetSC("NH2"));
-    writeInternal4AtomLine(os, pdbId, GetSC("CD"), GetSC("NE"), GetSC("CZ"), GetSC("NH2"));   // chi5
+  }
+  case kAsparticAcid: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *od1 =  GetSC("OD1");
+    const MAtom *od2 =  GetSC("OD2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (od1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *od1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *od1);   // chi2
+      }
+      if (od2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *od2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *od2);
+      }
+    }
     break;
+  }
+  case kGlutamicAcid: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd =  GetSC("CD");
+    const MAtom *oe1 =  GetSC("OE1");
+    const MAtom *oe2 =  GetSC("OE2");
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd);   // chi2
+        if (oe1) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd, *oe1);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd, *oe1);   // chi3
+        }
+        if (oe2) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd, *oe2);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd, *oe2);
+        }
+      }
+    }
+    break;
+  }
+  case kHistidine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *nd1 =  GetSC("ND1");
+    const MAtom *cd2 =  GetSC("CD2");
+    const MAtom *ce1 =  GetSC("CE1");
+    const MAtom *ne2 =  GetSC("NE2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (nd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *nd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *nd1);   // chi2
+        if (ce1) {
+          writeInternal3AtomLine(os, pdbId, *cg, *nd1,*ce1);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *nd1,*ce1);
+        }
+      }
+      if (cd2) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd2);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd2);
+        if (ne2) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd2,*ne2);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2,*ne2);
+        }
+      }
+    }
+    break;
+  }
+  case kLysine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd =  GetSC("CD");
+    const MAtom *ce =  GetSC("CE");
+    const MAtom *nz =  GetSC("NZ");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd);   // chi2
+        if (ce) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd, *ce);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd, *ce);   // chi3
+          if (nz) {
+            writeInternal3AtomLine(os, pdbId, *cd, *ce, *nz);
+            writeInternal4AtomLine(os, pdbId, *cg, *cd, *ce, *nz);   // chi4
+          }
+        }
+      }
+    }
+    break;
+  }
+  case kArginine: {
+    const MAtom *cg =  GetSC("CG");
+    const MAtom *cd =  GetSC("CD");
+    const MAtom *ne =  GetSC("NE");
+    const MAtom *cz =  GetSC("CZ");
+    const MAtom *nh1 =  GetSC("NH1");
+    const MAtom *nh2 =  GetSC("NH2");
+
+    if (cg) {
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg);   // chi1
+      if (cd) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg, *cd);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg, *cd);   // chi2
+        if (ne) {
+          writeInternal3AtomLine(os, pdbId, *cg, *cd, *ne);
+          writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd, *ne);   // chi3
+          if (cz) {
+            writeInternal3AtomLine(os, pdbId, *cd, *ne, *cz);
+            writeInternal4AtomLine(os, pdbId, *cg, *cd, *ne, *cz);   // chi4
+            if (nh1) {
+              writeInternal3AtomLine(os, pdbId, *ne, *cz, *nh1);
+              writeInternal4AtomLine(os, pdbId, *cd, *ne, *cz, *nh1);   // chi5
+              if (nh2) {
+                writeInternal3AtomLine(os, pdbId, *ne, *cz, *nh2);
+                writeInternal4AtomLine(os, pdbId, *cd, *ne, *cz, *nh2);   // chi5
+              }
+            }
+          }
+        }
+      }
+    }
+    break;
+  }
   default:
     cerr<< "bad mType: " << mType << "\n";
     assert(0);
