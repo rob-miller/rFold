@@ -1081,6 +1081,8 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
   writeInternal3AtomLine(os, pdbId, mCB, mCA, mC);
   writeInternal4AtomLine(os, pdbId, mO, mC, mCA, mCB);
 
+  writeInternal3AtomLine(os, pdbId, mN, mCA, mCB);   // redundant because could reference sidechains from O, but chi1 defined from N and may want N-CA-CB available as reference triple for residue coordinate space
+
   switch(mType) {
   case kGlycine:
   case kAlanine:

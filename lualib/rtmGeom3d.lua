@@ -119,3 +119,62 @@ function matrixAreEqual(m1,m2)
    end
    return true
 end
+
+function coordSpace(a1,a2,a3, r)
+   -- return transform matrix placing a1 on XZ plane, a2 at 0,0,0, a3 at 0,0,+Z
+   -- a's need to be 4x1 matrices
+   -- if r then also generate reverse transformation matrix to bring back 
+
+   local dbg=nil
+   if dbg then
+      print(a1:transpose():pretty())
+      print(a2:transpose():pretty())
+      print(a3:transpose():pretty())
+   end
+   
+   local tm = genMt(-a2[1][1], -a2[2][1], -a2[3][1])  -- translation matrix for a2 to origin
+      
+   -- now get a3 to Z-axis
+   local p3 = get41mtx()   -- direct translation of a3 using a2 to origin
+   p3[1][1] = a3[1][1] - a2[1][1]
+   p3[2][1] = a3[2][1] - a2[2][1]
+   p3[3][1] = a3[3][1] - a2[3][1]
+
+   local sc = getSphericalCoordinates(p3)
+
+   if dbg then
+      print(sc:pretty())
+   end
+   
+   local mrz = genMrz(-sc[1][1])  -- rotate translated a3 -theta about Z
+   local mry = genMry(-sc[2][1])  -- rotate translated a3 -phi about Y
+   
+   local mt = mrz * tm
+   mt = mry * mt                  -- mt completes a2-a3 on Z-axis, still need to align a1 with XZ plane
+
+   if dbg then
+      print((mt * a3):pretty())
+   end
+   
+   p3 = mt * a1                   -- p3 not needed, re-use it here
+
+   local sc2 = getSphericalCoordinates(p3)    -- need theta of translated a1
+   local mrz2 = genMrz(-sc2[1][1])            -- rotate a1 -theta about Z to align with X
+
+   mt = mrz2 * mt                 -- mt transforms to specified coordinate space
+
+   if not r then return mt end
+
+   -- generate the reverse transformation
+
+   mrz2 = genMrz(sc2[1][1])            -- rotate a1 theta about Z, reversing alignment with X
+   mry  = genMry(sc[2][1])             -- rotate a3 phi about Y
+   mrz  = genMrz(sc[1][1])             -- rotate a3 theta about Z
+   tm   = genMt(a2[1][1], a2[2][1], a2[3][1])  -- translation matrix for origin to a2
+
+   local mr = mry * mrz2
+   mr = mrz * mr
+   mr = tm * mr
+
+   return mt,mr
+end

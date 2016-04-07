@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
 
 
-function prd (infile)
+function prd (infile, callback)
    local rdt = {}
    rdt['triples']={}
    rdt['quads']={}
@@ -16,18 +16,26 @@ function prd (infile)
          --print(pdbid)
       elseif line:match('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then
          local trip = {}
-         trip['chn'],trip['a1'],trip['a2'],trip['a3'],trip['len1'],trip['angle2'],trip['len3'] = _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
-         rdt['triples'][#rdt['triples']+1] = trip
+         trip['pdbid'],trip['chn'],trip['a1'],trip['a2'],trip['a3'],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
+         if callback then
+            callback(trip)
+         else
+            rdt['triples'][#rdt['triples']+1] = trip
+         end
          --print(pdbid,chn,a1,a2,a3,v1,v2,v3)
       elseif line:match('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+):(%w+)%s+(%S+)%s*$')  then
          local quad={}
-         quad['chn'],quad['a1'],quad['a2'],quad['a3'],quad['a4'],quad['dihedral1'] = _1, _2, _3, _4, _5, tonumber(_6)
-         rdt['quads'][#rdt['quads']+1] = quad
+         quad['pdbid'],quad['chn'],quad['a1'],quad['a2'],quad['a3'],quad['a4'],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
+         if callback then
+            callback(quad)
+         else
+            rdt['quads'][#rdt['quads']+1] = quad
+         end
          --print(pdbid,chn,a1,a2,a3,a4,v1)
       elseif line:match('^%s+(%d+)%s+(%d+)%s(%a?)%s(%a)%s') then
          local dsp = {}
          local ndx
-         dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'] = _1,_2,_3,_4
+         dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'] = tonumber(_1),tonumber(_2),_3,_4
          if (dsp['res'] == dsp['res']:lower()) then    -- cys partner encoding by dssp
             dsp['res'] = 'C'
          end
@@ -41,12 +49,17 @@ function prd (infile)
          dsp['c'] = {}
          dsp['cb'] = {}
          dsp['o'] = {}
-         
+
+         dsp['pdbid'] = pdbid
          dsp['phi'], dsp['psi'], dsp['omg'], dsp['n']['x'], dsp['n']['y'], dsp['n']['z'] = tonumber(_1),tonumber(_2),tonumber(_3),tonumber(_4),tonumber(_5),tonumber(_6)
          dsp['ca']['x'], dsp['ca']['y'], dsp['ca']['z'], dsp['c']['x'], dsp['c']['y'], dsp['c']['z'] = tonumber(_7),tonumber(_8),tonumber(_9),tonumber(_10),tonumber(_11),tonumber(_12)
          dsp['cb']['x'], dsp['cb']['y'], dsp['cb']['z'],dsp['o']['x'], dsp['o']['y'], dsp['o']['z'] = tonumber(_13),tonumber(_14),tonumber(_15),tonumber(_16),tonumber(_17),tonumber(_18)
          dsp['bca'] = tonumber(_19)
-         rdt['dssp'][#rdt['dssp']+1] = dsp
+         if callback then
+            callback(dsp)
+         else
+            rdt['dssp'][#rdt['dssp']+1] = dsp
+         end
          --print(ndx, resn, chn, res, '.'..ss..'.','>'..ss2..'<',phi,psi,omg,zn,zc,bca)
       elseif line:match('^--$') then
       elseif line:match('^==== Secondary') then
@@ -65,6 +78,9 @@ function prd (infile)
       
    end
    io.close()
+   if callback then
+      return pdbid
+   end
    return rdt
 end
 

@@ -75,7 +75,7 @@ function quadInitPos(quad)
    -- print('qip : ' .. genKey(quad['a1'], quad['a2'], quad['a3'],quad['a4']) .. ' ' .. t1key .. ' ' .. t2key .. ' [' ..  quad['a1initial']:transpose():pretty() .. '][' ..  quad['a2initial']:transpose():pretty() .. '][' ..  quad['a3initial']:transpose():pretty() .. '][' ..  quad['a4initial']:transpose():pretty() .. ']')
 
 
-   local mt,mr = coordSpace
+   -- local mt,mr = coordSpace
    
    return quad
 end
@@ -109,10 +109,13 @@ function quadInitPosR(quad)
    return quad
 end
 
-
+--[[
+   -- moved to rtmGeom3d
+   
 function coordSpace(a1,a2,a3, r)
    -- return transform matrix placing a1 on XZ plane, a2 at 0,0,0, a3 at 0,0,+Z
    -- a's need to be 4x1 matrices
+   -- if r then also generate reverse transformation matrix to bring back 
 
    local dbg=nil
    if dbg then
@@ -167,6 +170,7 @@ function coordSpace(a1,a2,a3, r)
 
    return mt,mr
 end
+--]]
 
 function testDihed(dk,p1,p2,p3,p4)
    local m1 = get41mtx()
@@ -180,13 +184,18 @@ function testDihed(dk,p1,p2,p3,p4)
    m3[1][1] = p3['x']; m3[2][1] = p3['y']; m3[3][1] = p3['z']; 
    m4[1][1] = p4['x']; m4[2][1] = p4['y']; m4[3][1] = p4['z']; 
 
+   -- get transform to put p1,p2,p3 into standard coordinate space (and reverse transform)
+   
    mt,mtr = coordSpace(m1,m2,m3,true)
 
+   -- transform dssp coords to standard coord space 
+   
    local m1t = mt * m1
    local m2t = mt * m2
    local m3t = mt * m3
    local m4t = mt * m4
 
+   -- (reverse) transform standard coord space dihedral atoms to match dssp coords
    local quad = quads[ quadMap[dk] ]
 
    local d1r = mtr * quad['a1initial']
@@ -194,24 +203,27 @@ function testDihed(dk,p1,p2,p3,p4)
    local d3r = mtr * quad['a3initial']
    local d4r = mtr * quad['a4initial']
 
+   -- reverse transform the transformed dssp coords back to original positions
    local m1r = mtr * m1t
    local m2r = mtr * m2t
    local m3r = mtr * m3t
    local m4r = mtr * m4t
 
+   -- get distance between transformed dssp atom 4 and generated dihedral atom 4
    
    local dist = getDistance3d(m4t,quad['a4initial']) 
    print(dk .. ' ' .. dist)
   
-   if dist > 1.0e-04 then
-      print(' [' ..  m1:transpose():pretty() .. '][' ..  m2:transpose():pretty() .. '][' ..  m3:transpose():pretty() .. '][' ..  m4:transpose():pretty() .. ']')
-      if not (matrixAreEqual(m1,m1r) and matrixAreEqual(m2,m2r) and matrixAreEqual(m3,m3r) and matrixAreEqual(m4,m4r)) then
+   if dist > 1.0e-04 then  -- if not close enough
+      print(' [' ..  m1:transpose():pretty() .. '][' ..  m2:transpose():pretty() .. '][' ..  m3:transpose():pretty() .. '][' ..  m4:transpose():pretty() .. ']')   -- print dssp coords 
+      if not (matrixAreEqual(m1,m1r) and matrixAreEqual(m2,m2r) and matrixAreEqual(m3,m3r) and matrixAreEqual(m4,m4r)) then             -- if dssp coords transformed back do not match originals, print out
          print('x[' ..  m1r:transpose():pretty() .. '][' ..  m2r:transpose():pretty() .. '][' ..  m3r:transpose():pretty() .. '][' ..  m4r:transpose():pretty() .. ']')
       end
-      print(' [' ..  m1t:transpose():pretty() .. '][' ..  m2t:transpose():pretty() .. '][' ..  m3t:transpose():pretty() .. '][' ..  m4t:transpose():pretty() .. ']')
-      
+      print(' [' ..  m1t:transpose():pretty() .. '][' ..  m2t:transpose():pretty() .. '][' ..  m3t:transpose():pretty() .. '][' ..  m4t:transpose():pretty() .. ']')   -- print dssp coords in standard system
+
+      -- print generated dihedral coords
       print(dk .. ' : ' .. ' [' ..  quad['a1initial']:transpose():pretty() .. '][' ..  quad['a2initial']:transpose():pretty() .. '][' ..  quad['a3initial']:transpose():pretty() .. '][' ..  quad['a4initial']:transpose():pretty() .. ']')
-      print('[' ..  d1r:transpose():pretty() .. '][' ..  d2r:transpose():pretty() .. '][' ..  d3r:transpose():pretty() .. '][' ..  d4r:transpose():pretty() .. ']')
+      print('[' ..  d1r:transpose():pretty() .. '][' ..  d2r:transpose():pretty() .. '][' ..  d3r:transpose():pretty() .. '][' ..  d4r:transpose():pretty() .. ']') -- print generated dihedrals transformed to dssp coordinate space
 
       print('--')
    end

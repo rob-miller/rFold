@@ -107,6 +107,24 @@
    - cleared errors, all generated dihedrals match 4th atom to x.0e-05 -- not translated back to chain, so not cumulative
 
 13 mar 2016
-   - implement but not test generation of side chain internal coordinates in rtmDSSP
+   - write but not test generation of side chain internal coordinates in rtmDSSP
    
+18 mar 2016
+   - re-work generation of side chain internal coordinates to fix compile errors, make more robust to missing atoms
+
+21 mar 2016
+   - get installation working on xub vm, ready for travels next week.
+
+04 apr 2016
+   - during travels only outlined algorithm for buildprot version 2 and studied OO implementations in Lua
+   - installed and debugged Lumen for potential use in parallel processing (for buildprot)
+
+05 apr 2016
+   - initial implementation - just loading - bp2.lua, protein.lua
+
+06 apr 2016
+   - protein.lua importing bp1 steps
+
+07 apr 2016
+   - add redundant n-ca-cb hedron to rtm-dssp output because chi1 defined from N and defined all side chains using chi1 (could have used c-ca-cb already present)
    
