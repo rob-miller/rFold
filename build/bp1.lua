@@ -114,6 +114,7 @@ end
    
 function coordSpace(a1,a2,a3, r)
    -- return transform matrix placing a1 on XZ plane, a2 at 0,0,0, a3 at 0,0,+Z
+   -- if r then also generate reverse transformation matrix to bring back 
    -- a's need to be 4x1 matrices
    -- if r then also generate reverse transformation matrix to bring back 
 
