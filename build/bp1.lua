@@ -52,14 +52,14 @@ end
 
 function quadInitPos(quad)
    -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane, 4th in +Z
-   local t1key = genKey(quad['a1'], quad['a2'], quad['a3'])
+   local t1key = genKey(quad[1], quad[2], quad[3])
    local trip1 = triples[ tripMap[ t1key ] ]
    if not trip1 then return quadInitPosR(quad) end
    --assert(trip1,'failed to locate 1st triple ' .. t1key .. ' a4= ' .. quad['a4'])
 
    local t2key = genKey(quad['a2'], quad['a3'], quad['a4'])
    local trip2 = triples[ tripMap[ t2key ] ]
-   assert(trip2,'failed to locate 2nd triple ' .. t2key .. ' a1= ' .. quad['a1'])
+   assert(trip2,'failed to locate 2nd triple ' .. t2key .. ' a1= ' .. quad[1])
 
    quad['a1initial'] = trip1['a1initial']:copy()
    quad['a2initial'] = trip1['a2initial']:copy()
@@ -82,13 +82,13 @@ end
 
 function quadInitPosR(quad)
    -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane with Z>=0, 4th in +Z -- triples in reverse order from above
-   local t1key = genKey(quad['a3'], quad['a2'], quad['a1'])
+   local t1key = genKey(quad[3], quad[2], quad[1])
    local trip1 = triples[ tripMap[ t1key ] ]
-   assert(trip1,'failed to locate 1st triple ' .. t1key .. ' a4= ' .. quad['a4'])
+   assert(trip1,'failed to locate 1st triple ' .. t1key .. ' a4= ' .. quad[4])
 
    local t2key = genKey(quad['a4'], quad['a3'], quad['a2'])
    local trip2 = triples[ tripMap[ t2key ] ]
-   assert(trip2,'failed to locate 2nd triple ' .. t2key .. ' a1= ' .. quad['a1'])
+   assert(trip2,'failed to locate 2nd triple ' .. t2key .. ' a1= ' .. quad[1])
 
    --print('t1k: ' .. t1key .. '  t2k: ' .. t2key)
    
@@ -290,14 +290,14 @@ triples = dsspdat['triples']
 
 for i,j in ipairs(triples) do
    triples[i] = tripleInitPos(j)
-   tripMap[ genKey(j['a1'],j['a2'],j['a3']) ] = i
+   tripMap[ genKey(j[1],j[2],j[3]) ] = i
 end
 
 quads = dsspdat['quads']
 
 for i,j in ipairs(quads) do
    quads[i] = quadInitPos(j)
-   quadMap[ genKey(j['a1'],j['a2'],j['a3'],j['a4']) ] = i
+   quadMap[ genKey(j[1],j[2],j[3],j[4]) ] = i
 end
 
 dsps = dsspdat['dssp']

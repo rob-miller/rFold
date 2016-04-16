@@ -30,12 +30,19 @@ end
 
 function P.hedron:new (o)
    --o = o or {}
-   assert(o['a3'],'attempt to instantiate hedron without atom 3')
+   assert(o[3],'attempt to instantiate hedron without atom 3')
    setmetatable(o, self)
    self.__index = self
 
-   o['key'] = genKey(o['a1'],o['a2'],o['a3'])
+   o['key'] = genKey(o[1],o[2],o[3])
    o['updated'] = true
+
+   if not o['atoms'] then
+      o['atoms'] = {}
+   end
+   if not o['atomsR'] then
+      o['atomsR'] = {}
+   end
    
    return o
 end
@@ -46,32 +53,32 @@ end
 
 function P.hedron:initPos()
    -- generate coordinates for 3 atoms with specified bond lengths and angle between on XZ plane (Y=0 for all atoms)
-   -- match aacs : a2 = 0,0,0 ; a3 on Z-axis ; a1 on XZ plane
+   -- match aacs : a2 = 0,0,0 ; a3 on Z-axis ; a1 on XZ plane (-Z for angle >90)
    -- reverse coordinates swap : a2 = 0,0,0 ; a1 on Z-axis ; a3 on XZ plane
-   self['a1initial'] = get41mtx()   
-   self['a2initial'] = get41mtx()    -- a2 to 0,0,0
-   self['a3initial'] = get41mtx()
+   self['atoms'][1] = get41mtx()   
+   self['atoms'][2] = get41mtx()    -- a2 to 0,0,0
+   self['atoms'][3] = get41mtx()
 
-   self['a3initial'][3][1] = self['len3']   -- a3 is len3 up from a2 on Z axis, X=Y=0
+   self['atoms'][3][3][1] = self['len3']   -- a3 is len3 up from a2 on Z axis, X=Y=0
 
    --local ar = self['angle2'] * d2r
    local sar = (180.0 - self['angle2']) * d2r    -- angles which add to 180 are supplementary
 
-   self['a1initial'][1][1] = math.sin(sar) * self['len1']      -- a1 X is sin( sar ) * len1
-   self['a1initial'][3][1] = - (math.cos(sar) * self['len1'])  -- a1 Z is -(cos( sar ) * len1) (assume angle2 always obtuse, so a1 is in -Z
+   self['atoms'][1][1][1] = math.sin(sar) * self['len1']      -- a1 X is sin( sar ) * len1
+   self['atoms'][1][3][1] = - (math.cos(sar) * self['len1'])  -- a1 Z is -(cos( sar ) * len1) (assume angle2 always obtuse, so a1 is in -Z
 
    -- same again but a3 at 0,0,0
-   self['a1initialr'] = get41mtx()   
-   self['a2initialr'] = get41mtx()   -- a2 to 0,0,0
-   self['a3initialr'] = get41mtx()    
+   self['atomsR'][1] = get41mtx()   
+   self['atomsR'][2] = get41mtx()   -- a2 to 0,0,0
+   self['atomsR'][3] = get41mtx()    
 
-   self['a1initialr'][3][1] = self['len1']   -- a1r is len1 up from a2 on Z axis, X=Y=0
+   self['atomsR'][1][3][1] = self['len1']   -- a1r is len1 up from a2 on Z axis, X=Y=0
 
    --local ar = self['angle2'] * d2r
    local sar = (180.0 - self['angle2']) * d2r    -- angles which add to 180 are supplementary
 
-   self['a3initialr'][1][1] = math.sin(sar) * self['len3']    -- a3r X is sin( sar ) * len3
-   self['a3initialr'][3][1] = - (math.cos(sar) * self['len3'])  -- a3r Z is -(cos( sar ) * len3)
+   self['atomsR'][3][1][1] = math.sin(sar) * self['len3']    -- a3r X is sin( sar ) * len3
+   self['atomsR'][3][3][1] = - (math.cos(sar) * self['len3'])  -- a3r Z is -(cos( sar ) * len3)
 
    self['updated'] = false
 end
@@ -81,16 +88,35 @@ end
 -- dihedron
 ------------------------------------------------------------------------------------------------
 
+local coordsInitial = 1
+local coordsResidue = 1
+local coordsStructure = 1
+
+local function getAtomName(a)
+   return string.match(a,'^%a%d+(%S+)$')
+end
+
 function P.dihedron:new (o)
    --o = o or {}
-   assert(o['a4'],'attempt to instantiate dihedron without atom 4')
+   assert(o[4],'attempt to instantiate dihedron without atom 4')
 
    setmetatable(o, self)
    self.__index = self
 
-   o['key'] = genKey(o['a1'],o['a2'],o['a3'],o['a4'])
+   o['key'] = genKey(o[1],o[2],o[3],o[4])
+   o['key3'] = genKey(o[1],o[2],o[3])
+   o['key32'] = genKey(o[2],o[3],o[4])
+   
    o['updated'] = true
 
+   if not o['atoms'] then
+      o['atoms'] = {}
+   end
+
+   for i=1,4 do
+      o['atoms'][ i ] =  getAtomName(o[i])
+   end
+   
    return o
 end
 
@@ -100,10 +126,10 @@ end
 
 
 function P.dihedron:initPos()
-   -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane, 4th in +Z
+   -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane (a1 in -Z), 4th in +Z and rotated
    local res = self['res']
 
-   local h1key = genKey(self['a1'], self['a2'], self['a3'])
+   local h1key = genKey(self[1], self[2], self[3])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' searching 1: ' .. h1key)
    
    local hedron1 = res['hedra'][h1key]
@@ -114,19 +140,20 @@ function P.dihedron:initPos()
    self['h1key'] = h1key
    --print(res:tostring() .. ' ' .. self:tostring() .. ' found 1: ' .. hedron1:tostring())
    
-   local h2key = genKey(self['a2'], self['a3'], self['a4'])
+   local h2key = genKey(self[2], self[3], self[4])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' searching 2: ' .. h2key)
 
    local hedron2 = res['hedra'][h2key]
    if not hedron2 and res['prev'] then hedron2 = res['prev']['hedra'][h2key] end
    if not hedron2 and res['next'] then hedron2 = res['next']['hedra'][h2key] end
    if not hedron2 then 
-      assert(nil,'residue ' .. res['res'] .. res['resn'] .. 'failed to locate 2nd hedronle ' .. h2key .. ' a1= ' .. self['a1'])
+      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron ' .. h2key .. ' a1= ' .. self[1])
    end
    self['hedron2'] = hedron2
    self['h2key'] = h2key
    --print(res:tostring() .. ' ' .. self:tostring() .. ' found 2: ' .. hedron2:tostring())
-   
+
+   --[[
    self['a1initial'] = hedron1['a1initial']:copy()
    self['a2initial'] = hedron1['a2initial']:copy()
    self['a3initial'] = hedron1['a3initial']:copy()
@@ -134,56 +161,95 @@ function P.dihedron:initPos()
    self['a4initial'] = hedron2['a3initialr']:copy()
    self['a4initial'][3][1] = self['a4initial'][3][1] * -1                   -- a4 to +Z
    self['a4initial'][3][1] = self['a4initial'][3][1] + hedron2['len1']        -- hedron2 shift up so a2 at 0,0,0
+   --]]
+
+   local initial = {}
+   initial[1] = hedron1['atoms'][1]:copy()
+   initial[2] = hedron1['atoms'][2]:copy()
+   initial[3] = hedron1['atoms'][3]:copy()
+
+   local a4preRotation = hedron2['atomsR'][3]:copy()
+   
+   a4preRotation[3][1] = a4preRotation[3][1] * -1                   -- a4 to +Z
+   a4preRotation[3][1] = a4preRotation[3][1] + hedron2['len1']        -- hedron2 shift up so a2 at 0,0,0
    
    local mrz = genMrz( self['dihedral1'] * d2r )
-   self['a4rot'] = mrz * self['a4initial']                              -- dihedral set
+   initial[4] = mrz * a4preRotation                              -- dihedral set
 
+   initial['names']={}
+   for i=1,4 do
+      initial['names'][i] = getAtomName(self[i])
+   end
+
+   self['atoms'][coordsInitial] = initial                             -- atoms[1] = initial coords;  [2] = residue coordinate system;  [3] = structure coordinate system;  [4]... alternates in structure coordinate system
+   self['a4preRotation'] = a4preRotation
+   
    -- print('qip : ' .. genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:transpose():pretty() .. '][' ..  self['a2initial']:transpose():pretty() .. '][' ..  self['a3initial']:transpose():pretty() .. '][' ..  self['a4initial']:transpose():pretty() .. ']')
 
    self['updated'] = false
 end
 
 function P.dihedron:initPosR()
-   -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane with Z>=0, 4th in +Z -- hedronles in reverse order from above
+   -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane with Z>=0, 4th in +Z -- hedrons in reverse order from above
    local res = self['res']
 
-   local h1key = genKey(self['a3'], self['a2'], self['a1'])
+   local h1key = genKey(self[3], self[2], self[1])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' searching reverse 1: ' .. h1key)
    local hedron1 = res['hedra'][h1key]
    if not hedron1 and res['prev'] then hedron1 = res['prev']['hedra'][h1key] end
    if not hedron1 and res['next'] then hedron1 = res['next']['hedra'][h1key] end
    if not hedron1 then
-      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedronle (R) ' .. h1key .. ' a4= ' .. self['a4'])
+      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedron (R) ' .. h1key .. ' a4= ' .. self['a4'])
    end
 
    self['hedron1'] = hedron1
    self['h1key'] = h1key
    --print(res:tostring() .. ' ' .. self:tostring() .. ' found reverse 1: ' .. hedron1:tostring())
    
-   local h2key = genKey(self['a4'], self['a3'], self['a2'])
+   local h2key = genKey(self[4], self[3], self[2])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' reverse searching 2: ' .. h2key)
    local hedron2 = res['hedra'][h2key]
    if not hedron2 and res['prev'] then hedron2 = res['prev']['hedra'][h2key] end
    if not hedron2 and res['next'] then hedron2 = res['next']['hedra'][h2key] end
    if not hedron2 then 
-      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedronle (R) ' .. h2key .. ' a1= ' .. self['a1'])
+      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron (R) ' .. h2key .. ' a1= ' .. self[1])
    end
    self['hedron2'] = hedron2
    self['h2key'] = h2key
    --print(res:tostring() .. ' ' .. self:tostring() .. ' found reverse 2: ' .. hedron2:tostring())
 
+   --[[
    self['a1initial'] = hedron1['a3initialr']:copy()
    self['a2initial'] = hedron1['a2initialr']:copy()
    self['a3initial'] = hedron1['a1initialr']:copy()
 
-   self['a4initial'] = hedron2['a1initial']:copy()
-   
+   self['a4initial'] = hedron2['a1initial']:copy()   
    self['a4initial'][3][1] = self['a4initial'][3][1] * -1                   -- a4 to +Z
    self['a4initial'][3][1] = self['a4initial'][3][1] + hedron2['len3']        -- hedron2 shift up so a2 at 0,0,0  -- reverse from above so  use len3
-   
+
    local mrz = genMrz( self['dihedral1'] * d2r )
    self['a4rot'] = mrz * self['a4initial']                               -- dihedral set
+   --]]
 
+   local initial = {}
+   initial[1] = hedron1['atomsR'][3]:copy()
+   initial[2] = hedron1['atomsR'][2]:copy()
+   initial[3] = hedron1['atomsR'][1]:copy()
+
+   local a4preRotation = hedron2['atoms'][1]:copy()
+   a4preRotation[3][1] = a4preRotation[3][1] * -1                   -- a4 to +Z
+   a4preRotation[3][1] = a4preRotation[3][1] + hedron2['len3']        -- hedron2 shift up so a2 at 0,0,0
+   
+   local mrz = genMrz( self['dihedral1'] * d2r )
+   initial[4] = mrz * a4preRotation                              -- dihedral set
+
+   initial['names']={}
+   for i=1,4 do
+      initial['names'][i] = getAtomName(self[i])
+   end
+   self['atoms'][coordsInitial] = initial                                   -- atoms[1] = initial coords;  [2] = residue coordinate system;  [3] = structure coordinate system;  [4]... alternates in structure coordinate system
+   self['a4preRotation'] = a4preRotation
+   
    --print('qipR: ' .. genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:pretty() .. '][' ..  self['a2initial']:pretty() .. '][' ..  self['a3initial']:pretty() .. '][' ..  self['a4initial']:pretty() .. ']') 
 
    self['updated'] = false
@@ -193,6 +259,23 @@ end
 ------------------------------------------------------------------------------------------------
 -- residue
 ------------------------------------------------------------------------------------------------
+
+local backboneSort = { N = 1, CA = 2, C = 3, O = 4 }
+local sidechainSort = { CB = 1,
+                        CG = 2, CG1 = 2, OG = 2, OG1 = 2, SG = 2,
+                        CG2 = 3,
+                        CD = 4, CD1 = 4, SD = 4, OD1 = 4, ND1 = 4,
+                        CD2 = 5,  ND2 = 5, OD2 = 5,
+                        CE = 6, NE = 6, CE1 = 6, OE1 = 6, NE1 = 6,
+                        CE2 = 7, OE2 = 7, NE2 = 7,
+                        CE3 = 8,
+                        CZ = 9, CZ2 = 9, NZ = 9,
+                        CH2 = 10, NH1 = 10, OH = 10,
+                        NH2 = 11
+}
+
+local res3 = { G = 'GLY', A = 'ALA', V = 'VAL', L = 'LEU', I = 'ILE', M = 'MET', F = 'PHE', P = 'PRO', S = 'SER', T = 'THR', C = 'CYS', N = 'ASN', Q = 'GLN', Y = 'TYR', W = 'TRP',
+               D = 'ASP', E = 'GLU', H = 'HIS', K = 'LYS', R = 'ARG' }
 
 function P.residue:new (o)
    o = o or {}
@@ -210,6 +293,13 @@ function P.residue:new (o)
    end
    if not o['dihedra'] then
       o['dihedra'] = {}
+   end
+
+   if not o['backbone'] then
+      o['backbone'] = {}
+   end
+   if not o['sidechain'] then
+      o['sidechain'] = {}
    end
 
    return o
@@ -238,10 +328,98 @@ end
 
 function P.residue:linkDihedra()
    local c = 0
-   for k,v in pairs(self['dihedra']) do
-      v['res'] = self
+   local k3i = {}
+   local k32i = {}
+   for k,dihedron in pairs(self['dihedra']) do
+      dihedron['res'] = self          -- each dihedron can find its residue
+      
+      local k3 = dihedron['key3']
+      local k32 = dihedron['key32']
+      --print(dihedron['key'],k3,k32)
+      if not k3i[k3] then
+         k3i[k3] = {}
+      end
+      if not k32i[k32] then
+         k32i[k32] = {}
+      end
+      k3i[k3][ #k3i[k3] +1 ] = dihedron       -- hash to find each dihedron from 1,2,3 and 2,3,4 
+      k32i[k32][ #k32i[k32] +1 ] = dihedron
+
+      for i=1,4 do                            -- PDB format ordered lists of backbone and sidechain atoms in residue
+         local a = dihedron['atoms'][i]
+         local b = backboneSort[ a ]
+         local s = sidechainSort[ a ]
+         if b and not self['backbone'][b] then
+            self['backbone'][b] = { dihedron, i }
+            --print('backbone ' .. a .. ' ' .. b .. ' '..  dihedron:tostring() .. ' ' .. i)
+         elseif s and not self['sidechain'][s] then
+            self['sidechain'][s] = { dihedron, i }
+         elseif not (b or s) then
+            assert(nil, 'cannot identify atom ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
+         end
+      end
    end
+
+   self['key3index'] = k3i
+   self['key32index'] = k32i
 end
+
+function P.residue:toPDB(chain,ndx)
+   print('residue topdb '  .. chain .. ' ' .. ndx)
+   local s
+   local dihedron
+   local position
+   local atomOffset= coordsInitial
+   local atomName
+   local atom
+   local ls
+   for i,a in ipairs(self['backbone']) do
+      if a then
+         ndx = ndx + 1
+         dihedron = a[1]
+         position = a[2]
+         atomName = dihedron['atoms'][coordsInitial]['names'][position]
+         atom = dihedron[atoms][atomOffset][position]
+         ls =  string.format('%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%-2s%2s\n',
+                                'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
+                                ' ', atom[1][1], atom[2][1],atom[3][1],
+                                1.0, 0.0, '    ', string.sub(atomName,1,1),'  ')
+         print(ls)
+         s = s .. ls
+      end
+   end
+   for i,a in ipairs(self['sidechain']) do
+      if a then
+         ndx = ndx + 1
+         dihedron = a[1]
+         position = a[2]
+         atomName = dihedron['atoms'][coordsInitial]['names'][position]
+         atom = dihedron[atoms][atomOffset][position]
+         ls = string.format('%6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%-2s%2s\n',
+                                'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
+                                ' ', atom[1][1], atom[2][1],atom[3][1],
+                                1.0, 0.0, '    ', string.sub(atomName,1,1),'  ')
+         s = s .. ls
+      end
+   end
+
+   return s,ndx
+end
+   
+function P.residue:assemble()
+   --[[
+      start with n ca c = 1st hedron
+      find dihedron1 starting with 1st hedron
+      1:
+      get 2nd hedron
+      find dihedron2 starting with 2nd hedron
+      get mtr for return from coord space for 2nd hedron
+      apply to dihedron2
+      go to 1
+
+   --]]
+end
+
 
 
 
@@ -291,16 +469,13 @@ function P.chain:load(t)
       res['dssp'] = t
    else
       --print('chain:load not dssp')
-      res = self:initRes(getRes(t['a1']))
+      res = self:initRes(getRes(t[1]))
       if t['dihedral1'] then
-         print('dihedron: ' .. res:tostring() .. ' ' .. genKey(t['a1'],t['a2'],t['a3'],t['a4']))
-         res['dihedra'][ genKey(t['a1'],t['a2'],t['a3'],t['a4']) ] = P.dihedron:new(t)
-         --res:countDihedra()
-         --local k = genKey(t['a1'],t['a2'],t['a3'],t['a4'])
-         --print(k .. ' : ' .. tostring(res['dihedra'][k]))
+         --print('dihedron: ' .. res:tostring() .. ' ' .. genKey(t[1],t[2],t[3],t[4]))
+         res['dihedra'][ genKey(t[1],t[2],t[3],t[4]) ] = P.dihedron:new(t)
       elseif t['angle2'] then
-         print('hedron: ' .. res:tostring() .. ' ' ..  genKey(t['a1'],t['a2'],t['a3']))
-         res['hedra'][ genKey(t['a1'],t['a2'],t['a3']) ] = P.hedron:new(t)
+         --print('hedron: ' .. res:tostring() .. ' ' ..  genKey(t[1],t[2],t[3]))
+         res['hedra'][ genKey(t[1],t[2],t[3]) ] = P.hedron:new(t)
       else
          assert(nil,'not recognised: ' .. tostring(t))
       end
@@ -348,7 +523,7 @@ function P.chain:seqStr()
    return s
 end
 
-function P.chain:update3d()
+function P.chain:renderDihedrals()
    for i,r in ipairs(self['residues']) do
       for k,h in pairs(r['hedra']) do
          if h['updated'] then h:initPos() end
@@ -361,7 +536,19 @@ function P.chain:update3d()
    end
 end   
 
+function P.chain:assembleResidues()
+   for i,r in ipairs(self['residues']) do
+      r:assemble()
+   end
+end
 
+function P.chain:toPDB(ndx)
+   print('chain topdb '  .. ndx)
+   for i,v in ipairs(self['residues']) do
+      s,ndx = v:toPDB(self['chain'],ndx)
+   end
+   return s,ndx
+end
 
 ------------------------------------------------------------------------------------------------
 -- protein
@@ -429,9 +616,24 @@ function P.protein:linkResidues()
    end
 end
 
-function P.protein:update3d()
+function P.protein:toPDB()
+   print('protein topdb ')   
+   local s=''
+   local ndx=0
+   for k,v in ipairs(self['chains']) do
+      s = s .. v:toPDB(ndx)
+   end
+end
+
+function P.protein:renderDihedrals()
    for k,v in pairs(self['chains']) do
-      v:update3d()
+      v:renderDihedrals()
+   end
+end
+
+function P.protein:assembleResidues()
+   for k,v in pairs(self['chains']) do
+      v:assembleResidues()
    end
 end
 

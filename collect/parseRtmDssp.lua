@@ -16,7 +16,7 @@ function prd (infile, callback)
          --print(pdbid)
       elseif line:match('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then
          local trip = {}
-         trip['pdbid'],trip['chn'],trip['a1'],trip['a2'],trip['a3'],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
+         trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
          if callback then
             callback(trip)
          else
@@ -25,7 +25,7 @@ function prd (infile, callback)
          --print(pdbid,chn,a1,a2,a3,v1,v2,v3)
       elseif line:match('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+):(%w+)%s+(%S+)%s*$')  then
          local quad={}
-         quad['pdbid'],quad['chn'],quad['a1'],quad['a2'],quad['a3'],quad['a4'],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
+         quad['pdbid'],quad['chn'],quad[1],quad[2],quad[3],quad[4],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
          if callback then
             callback(quad)
          else
