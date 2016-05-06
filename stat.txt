@@ -127,4 +127,9 @@
 
 07 apr 2016
    - add redundant n-ca-cb hedron to rtm-dssp output because chi1 defined from N and defined all side chains using chi1 (could have used c-ca-cb already present)
-   
+
+12 apr 2016
+   - reworking protein.lua a bit to place atom coordinates in dihedron objects
+   - got to printing PDB atom records, but not yet assembling residues or chains from dihedrons
+
+
