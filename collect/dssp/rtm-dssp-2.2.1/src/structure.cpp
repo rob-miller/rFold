@@ -1122,14 +1122,14 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
   case kIsoleucine: {
     const MAtom *cg1 =  GetSC("CG1");
     const MAtom *cg2 =  GetSC("CG2");
-    const MAtom *cd =  GetSC("CD");
+    const MAtom *cd1 =  GetSC("CD1");
 
     if (cg1) {
       writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg1);
       writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg1);   // chi1
-      if (cd) {
-        writeInternal3AtomLine(os, pdbId, mCB, *cg1, *cd);
-        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg1, *cd);   // chi2
+      if (cd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg1, *cd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg1, *cd1);   // chi2
       }
     }
     if (cg2) {

@@ -419,16 +419,39 @@ function P.residue:toPDB(chain,ndx)
    return s,ndx
 end
    
-function P.residue:assemble()
+function P.residue:assemble( atomCoordsIn )
+--[[
+   start with n-ca-c, o-c-ca, n-ca-cb
+   gen triple keys for current residue
+
+   have ordered list of all triple keys (atoms only) starting dihedrals in assembly order ... 2 lists, backbone and sidechain
+   ipairs through lists converting keys to res-num-atom triple keys
+   - cache those lists
+   - eliminate keys tih no dihedrons in current residue
+   be able to set source for 1st N-CA-C coordinates : either initial from residue coordinate space 0,0,0 or spec from previous residue or initial coords from pdb data
+   if not 000 get mtr for init coords, else mtr = identity matrix
+   be able to pass in reference to destination table for atom coordinates (may be resdiue coordinate space, protein coord space, or 
+   can therefore set initial coords for N-CA-C in any case
+   ipairs through triple lists
+    get list of dihedrons for triple
+     if have new coords for all 4 atoms, skip
+     if have coords for 1st 3, use to generate mtr to generate 4th coordinate
+     else must queue to try at end - but hopefully this avoided by correct ordering
+   
+--]]
+
+   
    --[[
    for i,d in pairs(self['dihedra']) do
       print(i,d['key'])
    end
    os.exit()
    --]]
+
+   local atomCoords = atomCoordsIn and atomCoordsIn or {}
    
    local rbase = self['res'] .. self['resn']
-
+   
    local q = deque:new()
    q:push_left(genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C'))
    q:push_left(genKey(rbase .. 'O', rbase .. 'C', rbase .. 'CA'))
@@ -438,6 +461,11 @@ function P.residue:assemble()
       local h1k = q:pop_right()
       local dihedra1 = self['key3index'][h1k]
       print('start h1k ' .. h1k, dihedra1)
+      local t = {}
+      for k in h1k:gmatch([^:]*) do
+         t[#t+1] = k
+      end
+      print(t[1],t[2],t[3])
       if dihedra1 then
          for d1ndx, d1 in ipairs(dihedra1) do
             if not d1['atomCoords'][coordsResidue] then
