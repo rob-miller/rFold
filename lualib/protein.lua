@@ -24,6 +24,16 @@ local function genKey(...)
    return key
 end
 
+local function splitKey(k)
+   if k:match('^(%w+):(%w+):(%w+):(%w+)$') then return { _1, _2, _3, _4 }
+   elseif k:match('^(%w+):(%w+):(%w+)$') then return { _1, _2, _3 }
+   else assert(nil,'splitKey fail on '..k) end
+end
+
+local function splitAtomKey(k)
+   if k:match('^(%a)(%d+)(%S+)$') then return { _1, _2, _3 }
+   else assert(nil,'splitAtomKey fail on '..k) end
+end
 
 ------------------------------------------------------------------------------------------------
 -- hedron
@@ -89,15 +99,6 @@ end
 -- dihedron
 ------------------------------------------------------------------------------------------------
 
-local coordsInitial = 1
-local coordsResidue = 2
-local coordsStructure = 3
-local coordsAltStructure = 4
-
-local function getAtomName(a)
-   return string.match(a,'^%a%d+(%S+)$')
-end
-
 function P.dihedron:new (o)
    --o = o or {}
    assert(o[4],'attempt to instantiate dihedron without atom 4')
@@ -111,16 +112,8 @@ function P.dihedron:new (o)
    
    o['updated'] = true
 
-   if not o['atomNames'] then
-      o['atomNames'] = {}
-   end
-
-   for i=1,4 do
-      o['atomNames'][ i ] =  getAtomName(o[i])
-   end
-   
-   if not o['atomCoords'] then
-      o['atomCoords'] = {}
+   if not o['initialCoords'] then
+      o['initialCoords'] = {}
    end
 
    return o
@@ -128,6 +121,10 @@ end
 
 function P.dihedron:tostring()
    return '4-[' .. self['key'] .. ']'
+end
+
+function P.dihedron:splitAtomKey(pos)
+   return splitAtomKey(self[pos])
 end
 
 
@@ -189,7 +186,7 @@ function P.dihedron:initPos()
    end
    --]]
    
-   self['atomCoords'][coordsInitial] = initial                             -- atoms[1] = initial coords;  [2] = residue coordinate system;  [3] = structure coordinate system;  [4]... alternates in structure coordinate system
+   self['initialCoords'] = initial
 
    self['a4preRotation'] = a4preRotation
    
@@ -259,7 +256,7 @@ function P.dihedron:initPosR()
    end
    --]]
    
-   self['atomCoords'][coordsInitial] = initial                                   -- atoms[1] = initial coords;  [2] = residue coordinate system;  [3] = structure coordinate system;  [4]... alternates in structure coordinate system
+   self['initialCoords'] = initial 
    self['a4preRotation'] = a4preRotation
    
    --print('qipR: ' .. genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:pretty() .. '][' ..  self['a2initial']:pretty() .. '][' ..  self['a3initial']:pretty() .. '][' ..  self['a4initial']:pretty() .. ']') 
@@ -358,16 +355,21 @@ function P.residue:linkDihedra()
       k32i[k32][ #k32i[k32] +1 ] = dihedron
 
       for i=1,4 do                            -- PDB format ordered lists of backbone and sidechain atoms in residue
-         local a = dihedron['atomNames'][i]
-         local b = backboneSort[ a ]
-         local s = sidechainSort[ a ]
-         if b and not self['backbone'][b] then
-            self['backbone'][b] = { dihedron, i }
-            --print('backbone ' .. a .. ' ' .. b .. ' '..  dihedron:tostring() .. ' ' .. i)
-         elseif s and not self['sidechain'][s] then
-            self['sidechain'][s] = { dihedron, i }
-         elseif not (b or s) then
-            assert(nil, 'cannot identify atom ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
+         local al = dihedron:splitAtomKey(i)
+         local r,n,a = al[1],tonumber(al[2]),al[3]
+
+         --print(r,n,a, self['res'],self['resn'], dihedron[i])
+         if r == self['res'] and n == self['resn'] then
+            local b = backboneSort[ a ]
+            local s = sidechainSort[ a ]
+            if b and not self['backbone'][b] then
+               self['backbone'][b] = { dihedron, i }
+               --print('backbone ' .. a .. ' ' .. b .. ' '..  dihedron:tostring() .. ' ' .. i)
+            elseif s and not self['sidechain'][s] then
+               self['sidechain'][s] = { dihedron, i }
+            elseif not (b or s) then
+               assert(nil, 'cannot identify atom ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
+            end
          end
       end
    end
@@ -376,23 +378,23 @@ function P.residue:linkDihedra()
    self['key32index'] = k32i
 end
 
-function P.residue:toPDB(chain,ndx)
+function P.residue:toPDB(chain,ndx, atomCoords)
    --print('residue topdb '  .. chain .. ' ' .. ndx)
    local s = ''
    local dihedron
    local position
-   local atomOffset= coordsResidue --coordsInitial
    local atomName
    local atom
    local ls
-   for i,a in ipairs(self['backbone']) do
+   for i,a in pairs(self['backbone']) do
       if a then
          ndx = ndx + 1
          dihedron = a[1]
          position = a[2]
          --print('res:toPDB chain ' .. chain .. ' ndx ' .. ndx .. ' ' .. dihedron:tostring() .. ' pos ' .. position)
-         atomName = dihedron['atomNames'][position]  -- dihedron['atomCoords'][coordsInitial]['names'][position]
-         atom = dihedron['atomCoords'][atomOffset][position]
+         atomName = dihedron:splitAtomKey(position)[3]   -- dihedron['atomNames'][position]  -- dihedron['atomCoords'][coordsInitial]['names'][position]
+         local akl = splitKey(dihedron['key'])
+         atom = atomCoords[akl[position]] --  dihedron['initialCoords'][position]
          ls =  string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
                              'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
                              ' ', atom[1][1], atom[2][1],atom[3][1],
@@ -401,13 +403,14 @@ function P.residue:toPDB(chain,ndx)
          s = s .. ls
       end
    end
-   for i,a in ipairs(self['sidechain']) do
+   for i,a in pairs(self['sidechain']) do
       if a then
          ndx = ndx + 1
          dihedron = a[1]
          position = a[2]
-         atomName = dihedron['atomNames'][position]  --  dihedron['atomCoords'][coordsInitial]['names'][position]
-         atom = dihedron['atomCoords'][atomOffset][position]
+         atomName = dihedron:splitAtomKey(position)[3] -- dihedron['atomNames'][position]  --  dihedron['atomCoords'][coordsInitial]['names'][position]
+         local akl = splitKey(dihedron['key'])
+         atom = atomCoords[akl[position]] -- dihedron['initialCoords'][position]
          ls = string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
                                 'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
                                 ' ', atom[1][1], atom[2][1],atom[3][1],
@@ -418,120 +421,113 @@ function P.residue:toPDB(chain,ndx)
 
    return s,ndx
 end
-   
-function P.residue:assemble( atomCoordsIn )
---[[
-   start with n-ca-c, o-c-ca, n-ca-cb
-   gen triple keys for current residue
 
-   have ordered list of all triple keys (atoms only) starting dihedrals in assembly order ... 2 lists, backbone and sidechain
-   ipairs through lists converting keys to res-num-atom triple keys
-   - cache those lists
-   - eliminate keys tih no dihedrons in current residue
-   be able to set source for 1st N-CA-C coordinates : either initial from residue coordinate space 0,0,0 or spec from previous residue or initial coords from pdb data
-   if not 000 get mtr for init coords, else mtr = identity matrix
-   be able to pass in reference to destination table for atom coordinates (may be resdiue coordinate space, protein coord space, or 
-   can therefore set initial coords for N-CA-C in any case
-   ipairs through triple lists
-    get list of dihedrons for triple
-     if have new coords for all 4 atoms, skip
-     if have coords for 1st 3, use to generate mtr to generate 4th coordinate
-     else must queue to try at end - but hopefully this avoided by correct ordering
+function P.residue:dsspAtom(atomKey)
+   local atom = get41mtx()
+   local atomName = splitAtomKey(atomKey)[3]:lower()
+   local datom = self['dssp'][atomName]
+   if not datom then
+      assert(nil, 'dsspAtom ' .. atomKey .. ' failed to find ' .. atomName)
+   end
+
+   atom[1][1] = datom['x'] 
+   atom[2][1] = datom['y'] 
+   atom[3][1] = datom['z']
+
+   return atom
+end
+
+function P.residue:NCaCKeySplit()
+   local rbase = self['res'] .. self['resn']
+   --local key = genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
+   --return splitKey(key)
+   return { rbase .. 'N', rbase .. 'CA', rbase .. 'C' }
+end
+
+function P.residue:assemble( atomCoordsIn )
+   --[[
+   for di,d in pairs(self['dihedra']) do
+      print('diheron: ' .. d['key'] .. ' angle: ' .. d['dihedral1'])
+   end
+   --]]
+--[[
+   form queue, start with n-ca-c, o-c-ca, n-ca-cb
+   gen triple keys for current residue
+   if no atomCoordsIn, use initial coords from generating dihedral for n-ca-c initial positions
+
+   while queue not empty
+      get triple key
+      for each dihedral starting with triple key
+         if have coordinates for all 4 atoms already, skip
+         else if have coordinates for 1st 3 atoms
+              compute forward and reverse transform to take 1st 3 atoms to/from dihedron initial coordinate space
+              use reverse transform to get position of 4th atom in current coordinates from dihedron initial coordinates
+         else
+              ordering failed, put triple key at back of queue and hope next time we have 1st 3 atom positions (should not happen)
    
 --]]
 
-   
-   --[[
-   for i,d in pairs(self['dihedra']) do
-      print(i,d['key'])
-   end
-   os.exit()
-   --]]
-
-   local atomCoords = atomCoordsIn and atomCoordsIn or {}
+   local atomCoords = atomCoordsIn
    
    local rbase = self['res'] .. self['resn']
    
    local q = deque:new()
-   q:push_left(genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C'))
+   local NCaCKey = genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
+   q:push_left(NCaCKey)
    q:push_left(genKey(rbase .. 'O', rbase .. 'C', rbase .. 'CA'))
    q:push_left(genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'CB'))
+
+   if not atomCoords then -- if list of initial coords not passed as parameter, use N-CA-C initial coords from creating dihedral
+      atomCoords = {}
+      local dl = self['key3index'][NCaCKey]
+      for di,d in ipairs(dl) do
+         local akl = splitKey( d['key'] )
+         for ai,a in ipairs(akl) do
+            atomCoords[a] = d['initialCoords'][ai]
+         end
+      end
+   end
    
    while not q:is_empty() do
       local h1k = q:pop_right()
-      local dihedra1 = self['key3index'][h1k]
-      print('start h1k ' .. h1k, dihedra1)
-      local t = {}
-      for k in h1k:gmatch([^:]*) do
-         t[#t+1] = k
-      end
-      print(t[1],t[2],t[3])
-      if dihedra1 then
-         for d1ndx, d1 in ipairs(dihedra1) do
-            if not d1['atomCoords'][coordsResidue] then
-               d1['atomCoords'][coordsResidue] = {}
-            end
-            --[[
-            split dihed key -> atomKeys
-            for i=1,4 do
-               
-            --]]
-            local d1key = d1['key']
-            local d1h2key = d1['hedron2']['key'] --d1key:gsub('^%w+:','')
-            print('adding hedron ' .. d1h2key)
-            q:push_left(d1h2key)
-            local dihedra2 = self['key3index'][d1h2key]
-            print(h1k, d1key, d1h2key, dihedra2 )
-            if dihedra2 then
-               for d2ndx, d2 in ipairs(dihedra2) do
-                  print(h1k, d1key, d1h2key, d2['key'],d2['atomCoords'][coordsResidue] )
-                  assert(not d2['atomCoords'][coordsResidue],'d2 already has coordsResidue')
-                  local d1h2a = d1['hedron2']['atoms']
-                  local mt, mtr = coordSpace(d1h2a[1],d1h2a[2],d1h2a[3],true)
-                  local d2CoordsResidue = {}
-                  for aindx, ai in ipairs(d2['atomCoords'][coordsInitial]) do
-                     d2CoordsResidue[aindx] = mtr * ai
-                  end
-                  d2['atomCoords'][coordsResidue] = d2CoordsResidue
-               end
+      local dihedra = self['key3index'][h1k]
+      --print('start h1k ' .. h1k, dihedra)
+      if dihedra then
+         for di, d in ipairs(dihedra) do
+            --print('assemble: ' .. h1k .. ' -> ' .. d['key'])
+            local dh2key = d['hedron2']['key']
+            local akl = splitKey( d['key'] )
+            if atomCoords[akl[1]]
+               and atomCoords[akl[2]]
+               and atomCoords[akl[3]]
+               and atomCoords[akl[4]]
+            then
+               -- skip
+               --print('skipping already done ' .. d['key'] .. ' adding hedron ' .. dh2key)
+               q:push_left(dh2key)
+            elseif atomCoords[akl[1]]
+               and atomCoords[akl[2]]
+               and atomCoords[akl[3]]
+            then
+               local mt, mtr = coordSpace( atomCoords[akl[1]], atomCoords[akl[2]], atomCoords[akl[3]], true )
+               atomCoords[akl[4]] = mtr * d['initialCoords'][4]
+               --print('finished: ' .. d['key'] .. ' adding hedron ' .. dh2key .. ' a4: ' .. akl[4] .. ' -- ' .. atomCoords[akl[4]]:transpose():pretty())
+               q:push_left(dh2key)
+            else
+               print('no coords to start ' .. d['key'])
+               q:push_left(h1k)
             end
          end
       end
    end
 
-   print(self:toPDB('A',1))
-   os.exit()
-   
    --[[
-
-      n-ca-c 1st hedron
-      init list with h1
-
-      while list not empty
-      get h1
-      get dihedrons for h1
-      if no residueCoords,
-        copy initialCoords for dihedrons
-      
-        
-      for h2s in dihedrons
-        get mtr for return from coordsResidue for h2
-        for all dihedra2 starting with h2,
-          coordsResidue = coordsInitial * m2r
-      
-        add h2 to list for processing as h1s
-      
-
-      start with n ca c = 1st hedron
-      find dihedron1 starting with 1st hedron
-      1:
-      get 2nd hedron
-      find dihedron2 starting with 2nd hedron
-      get mtr for return from coord space for 2nd hedron
-      apply to dihedron2
-      go to 1
-
+   for k,a in pairs(atomCoords) do
+      print('assemble final:',k, a:transpose():pretty())
+   end
    --]]
+   
+   return atomCoords
 end
 
 
@@ -549,6 +545,7 @@ function P.chain:new (o)
    if not o['residues'] then
       o['residues'] = {}
    end
+   --o['initNCaC'] = {}
    
    return o
 end
@@ -599,7 +596,7 @@ end
 function P.chain:linkResidues()
    for i,v in ipairs(self['residues']) do
       if i > 1 then v['prev'] = self['residues'][i-1] end
-      if i < #self['residues'] then v['prev'] = self['residues'][i+1] end
+      if i < #self['residues'] then v['next'] = self['residues'][i+1] end
       v:linkDihedra()
    end
 end
@@ -637,7 +634,7 @@ function P.chain:seqStr()
    return s
 end
 
-function P.chain:renderDihedrals()
+function P.chain:renderDihedrons()
    for i,r in ipairs(self['residues']) do
       for k,h in pairs(r['hedra']) do
          if h['updated'] then h:initPos() end
@@ -651,8 +648,29 @@ function P.chain:renderDihedrals()
 end   
 
 function P.chain:assembleResidues()
+   local c=1
+   local ndx=1
    for i,r in ipairs(self['residues']) do
-      r:assemble()
+      local startPos
+      if r['prev'] then
+         startPos={}
+         local rp = r['prev']
+         local akl = r:NCaCKeySplit()
+         for ai,ak in ipairs(akl) do
+            startPos[ak] = rp['atomCoords'][ak]
+            --print('start from previous: ' .. ak .. ' ' .. startPos[ak]:transpose():pretty())
+         end
+      else
+         startPos = self['initNCaC']
+      end
+      r['atomCoords'] = r:assemble(startPos)
+
+      s,ndx = r:toPDB('A',ndx,r['atomCoords'])
+      print(s)
+      print()
+      --c = c+1
+      --if c>4 then os.exit() end
+      
    end
 end
 
@@ -667,6 +685,18 @@ function P.chain:toPDB(ndx)
    return s,ndx
 end
 
+function P.chain:setStartCoords()
+   local r = self['residues'][1]
+   local initCoords
+   if r['dssp'] then
+      initCoords = {}
+      local akl =  r:NCaCKeySplit()
+      for ai,ak in ipairs(akl) do
+         initCoords[ak] = r:dsspAtom(ak)
+      end
+   end
+   self['initNCaC'] = initCoords
+end
 ------------------------------------------------------------------------------------------------
 -- protein
 ------------------------------------------------------------------------------------------------
@@ -745,15 +775,21 @@ function P.protein:toPDB()
    return s
 end
 
-function P.protein:renderDihedrals()
+function P.protein:renderDihedrons()
    for k,v in pairs(self['chains']) do
-      v:renderDihedrals()
+      v:renderDihedrons()
    end
 end
 
 function P.protein:assembleResidues()
    for k,v in pairs(self['chains']) do
       v:assembleResidues()
+   end
+end
+
+function P.protein:setStartCoords()
+   for k,v in pairs(self['chains']) do
+      v:setStartCoords()
    end
 end
 

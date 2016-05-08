@@ -132,4 +132,10 @@
    - reworking protein.lua a bit to place atom coordinates in dihedron objects
    - got to printing PDB atom records, but not yet assembling residues or chains from dihedrons
 
+07 may 2016
+   - can generate 1st residue (7rsa lys 1)  with correct coordinates starting from  n-ca-c coords from pdb file
+
+08 may 2016
+   - can generate all residues PDB for 7rsa and 1mud, currently only off by 0.001 on some axes for atoms in final residues
+
 

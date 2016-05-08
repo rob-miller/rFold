@@ -93,11 +93,9 @@ local prot = pm.protein:new()
 local args = parseCmdLine()
 local pdbid = prd(args[1], function (t) prot:load(t) end)
 prot:linkResidues()
-prot:renderDihedrals()
---print('hello')
---local s = prot:toPDB()
---print(s)
+prot:renderDihedrons()
 
+prot:setStartCoords()
 prot:assembleResidues()
 
 --prot:setInitialPosition(1)
