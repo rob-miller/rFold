@@ -31,7 +31,7 @@ local function splitKey(k)
 end
 
 local function splitAtomKey(k)
-   if k:match('^(%a)(%d+)(%S+)$') then return { _1, _2, _3 }
+   if k:match('^(%d+)(%a)(%w+)$') then return { _1, _2, _3 }
    else assert(nil,'splitAtomKey fail on '..k) end
 end
 
@@ -357,7 +357,7 @@ function P.residue:linkDihedra()
 
       for i=1,4 do                            -- PDB format ordered lists of backbone and sidechain atoms in residue
          local al = dihedron:splitAtomKey(i)
-         local r,n,a = al[1],tonumber(al[2]),al[3]
+         local n,r,a = tonumber(al[1]),al[2],al[3]
 
          --print(r,n,a, self['res'],self['resn'], dihedron[i])
          if r == self['res'] and n == self['resn'] then
@@ -443,7 +443,7 @@ function P.residue:dsspAtom(atomKey)
 end
 
 function P.residue:NCaCKeySplit()
-   local rbase = self['res'] .. self['resn']
+   local rbase = self['resn'] .. self['res']
    --local key = genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
    --return splitKey(key)
    return { rbase .. 'N', rbase .. 'CA', rbase .. 'C' }
@@ -474,7 +474,7 @@ function P.residue:assemble( atomCoordsIn )
 
    local atomCoords = atomCoordsIn
    
-   local rbase = self['res'] .. self['resn']
+   local rbase = self['resn'] .. self['res']
    
    local q = deque:new()
    local NCaCKey = genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
@@ -572,11 +572,11 @@ function P.chain:load(t)
    local res
 
    local function getRes(s)
-      if not s:match('^(%a)(%d+)(%w+)$') then
+      if not s:match('^(%d+)(%a)(%w+)$') then
          assert(nil, 'failed to parse ' .. s .. ' as atom in residue')
       end
       --print('parse: ' .. _1 .. ' ' .. _2 .. ' ' .. _3)
-      return _1, tonumber(_2)
+      return _2, tonumber(_1)
    end
    
    if t['psi'] then

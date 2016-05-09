@@ -289,7 +289,8 @@ void MAtom::WritePDB(ostream& os) const
 void MAtom::WriteId(ostream& os) const {
   MResidueType res = MapResidue(mResName);  // expensive because MAtom does not know its MResidue
   char code = kResidueInfo[res].code;
-  os << code << mResSeq << mName;
+  //os << code << mResSeq << mName;
+  os << mResSeq << code << mName;
 }
 
 const MResidueInfo kResidueInfo[] = {
