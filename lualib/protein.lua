@@ -279,8 +279,9 @@ local sidechainSort = { CB = 1,
                         CE2 = 7, OE2 = 7, NE2 = 7,
                         CE3 = 8,
                         CZ = 9, CZ2 = 9, NZ = 9,
-                        CH2 = 10, NH1 = 10, OH = 10,
-                        NH2 = 11
+                        NH1 = 10, OH = 10, CZ3 = 10, 
+                        CH2 = 11, NH2 = 11,
+                        OXT = 12
 }
 
 local res3 = { G = 'GLY', A = 'ALA', V = 'VAL', L = 'LEU', I = 'ILE', M = 'MET', F = 'PHE', P = 'PRO', S = 'SER', T = 'THR', C = 'CYS', N = 'ASN', Q = 'GLN', Y = 'TYR', W = 'TRP',
@@ -386,6 +387,7 @@ function P.residue:toPDB(chain,ndx, atomCoords)
    local atomName
    local atom
    local ls
+   --print('ndx',ndx)
    for i,a in pairs(self['backbone']) do
       if a then
          ndx = ndx + 1
@@ -403,22 +405,25 @@ function P.residue:toPDB(chain,ndx, atomCoords)
          s = s .. ls
       end
    end
-   for i,a in pairs(self['sidechain']) do
-      if a then
-         ndx = ndx + 1
-         dihedron = a[1]
-         position = a[2]
-         atomName = dihedron:splitAtomKey(position)[3] -- dihedron['atomNames'][position]  --  dihedron['atomCoords'][coordsInitial]['names'][position]
-         local akl = splitKey(dihedron['key'])
-         atom = atomCoords[akl[position]] -- dihedron['initialCoords'][position]
-         ls = string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
-                                'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
-                                ' ', atom[1][1], atom[2][1],atom[3][1],
-                                1.0, 0.0, '    ', string.sub(atomName,1,1),'  ')
-         s = s .. ls
-      end
-   end
 
+      for i = 1,12 do
+         local a = self['sidechain'][i]
+         if a then
+            ndx = ndx + 1
+            dihedron = a[1]
+            position = a[2]
+            atomName = dihedron:splitAtomKey(position)[3] -- dihedron['atomNames'][position]  --  dihedron['atomCoords'][coordsInitial]['names'][position]
+            if not ('CB' == atomName and 'G' == self['res']) then  -- don't put gly cbeta in pdb file
+               local akl = splitKey(dihedron['key'])
+               atom = atomCoords[akl[position]] -- dihedron['initialCoords'][position]
+               ls = string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
+                                  'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
+                                  ' ', atom[1][1], atom[2][1],atom[3][1],
+                                  1.0, 0.0, '    ', string.sub(atomName,1,1),'  ')
+               s = s .. ls
+            end
+         end
+      end
    return s,ndx
 end
 
@@ -649,7 +654,7 @@ end
 
 function P.chain:assembleResidues()
    local c=1
-   local ndx=1
+   local ndx=0
    for i,r in ipairs(self['residues']) do
       local startPos
       if r['prev'] then
@@ -666,8 +671,8 @@ function P.chain:assembleResidues()
       r['atomCoords'] = r:assemble(startPos)
 
       s,ndx = r:toPDB('A',ndx,r['atomCoords'])
-      print(s)
-      print()
+      io.write(s)
+      --print()
       --c = c+1
       --if c>4 then os.exit() end
       
@@ -675,7 +680,7 @@ function P.chain:assembleResidues()
 end
 
 function P.chain:toPDB(ndx)
-   print('chain topdb '  .. ndx)
+   --print('chain topdb '  .. ndx)
    local s = ''
    local ls
    for i,v in ipairs(self['residues']) do
@@ -764,7 +769,7 @@ function P.protein:linkResidues()
 end
 
 function P.protein:toPDB()
-   print('protein topdb ')   
+   --print('protein topdb ')   
    local s=''
    local ndx=0
    local ls

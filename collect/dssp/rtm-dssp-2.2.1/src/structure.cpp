@@ -294,26 +294,26 @@ void MAtom::WriteId(ostream& os) const {
 
 const MResidueInfo kResidueInfo[] = {
 	{ kUnknownResidue,	'X', "UNK" },
-	{ kAlanine,			'A', "ALA" },
+	{ kAlanine,		'A', "ALA" },
 	{ kArginine,		'R', "ARG" },
 	{ kAsparagine,		'N', "ASN" },
 	{ kAsparticAcid,	'D', "ASP" },
 	{ kCysteine,		'C', "CYS" },
 	{ kGlutamicAcid,	'E', "GLU" },
 	{ kGlutamine,		'Q', "GLN" },
-	{ kGlycine,			'G', "GLY" },
+	{ kGlycine,		'G', "GLY" },
 	{ kHistidine,		'H', "HIS" },
 	{ kIsoleucine,		'I', "ILE" },
-	{ kLeucine,			'L', "LEU" },
-	{ kLysine,			'K', "LYS" },
+	{ kLeucine,		'L', "LEU" },
+	{ kLysine,		'K', "LYS" },
 	{ kMethionine,		'M', "MET" },
 	{ kPhenylalanine,	'F', "PHE" },
-	{ kProline,			'P', "PRO" },
-	{ kSerine,			'S', "SER" },
+	{ kProline,		'P', "PRO" },
+	{ kSerine,		'S', "SER" },
 	{ kThreonine,		'T', "THR" },
 	{ kTryptophan,		'W', "TRP" },
 	{ kTyrosine,		'Y', "TYR" },
-	{ kValine,			'V', "VAL" }
+	{ kValine,		'V', "VAL" }
 };
 
 struct MBridge
@@ -392,7 +392,9 @@ MResidue::MResidue(uint32 inNumber,
 			mC = atom;
 		else if (atom.GetName() == "O")
 			mO = atom;
-		else if (atom.GetName() != "OXT" && atom.mResName != "GLY")  // rtm added because OXT going in as CB of GLY
+		//else if (atom.GetName() == "OXT")
+		//	mOXT = atom;
+		else //if (atom.GetName() != "OXT" && atom.mResName != "GLY")  // rtm added because OXT going in as CB of GLY
 			mSideChain.push_back(atom);
 	}
 	
@@ -413,7 +415,7 @@ MResidue::MResidue(uint32 inNumber,
 
 	// rtm: assign or generate the CBeta
 
-	if (0 < mSideChain.size() && (1.7 > Distance(mCA, mSideChain.front())) ) {  // rtm: filter - make it up instead of values beyond 1.7 - 2.53
+	if (0 < mSideChain.size() && (1.7 > Distance(mCA, mSideChain.front())) && mSideChain.front().TestAtomName("CB")) {  // rtm: filter - make it up instead of values beyond 1.7 - 2.53
 	  mCB = mSideChain.front();
 	} else {
 
@@ -1032,7 +1034,7 @@ void writeDistAngleDist(ostream& os, const MAtom& a1, const MAtom& a2, const MAt
   double d2 = Distance(a1,a3);
   double angle = acos( ((d0*d0) + (d1*d1) - (d2*d2)) / (2*d0*d1) ) * 180 / kPI;
   
-  boost::format internalDDA("%8.4lf %8.4lf %8.4lf");
+  boost::format internalDDA("%9.5lf %9.5lf %9.5lf");
   os << ( internalDDA % d0 % angle % d1 );
 }
 
@@ -1051,7 +1053,9 @@ void writeInternal3AtomLine(ostream& os, std::string pdbId, const MAtom& a1, con
 void writeInternal4AtomLine(ostream& os, std::string pdbId, const MAtom& a1, const MAtom& a2, const MAtom& a3, const MAtom& a4) {
   double val = DihedralAngle(a1,a2,a3,a4);
   os << pdbId << ' ' << a1.mChainID << ' ';
-  a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ':'; a4.WriteId(os); os << ' ' << val << endl;
+  a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ':'; a4.WriteId(os);
+  boost::format internalDihed("%9.5lf");
+  os << ' ' << ( internalDihed % val ) << endl;
 }
 
 void MResidue::WriteInternal(ostream& os, std::string pdbId)
@@ -1083,6 +1087,12 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
 
   writeInternal3AtomLine(os, pdbId, mN, mCA, mCB);   // redundant because could reference sidechains from O, but chi1 defined from N and may want N-CA-CB available as reference triple for residue coordinate space
 
+  const MAtom *oxt = GetSC("OXT");  // not sidechain but stashed there
+  if (oxt) {
+    writeInternal3AtomLine(os, pdbId, mCA, mC, *oxt);
+    writeInternal4AtomLine(os, pdbId, mN, mCA, mC, *oxt);
+  }
+  
   switch(mType) {
   case kGlycine:
   case kAlanine:
@@ -1323,6 +1333,7 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
     const MAtom *ce2 =  GetSC("CE2");
     const MAtom *ce3 =  GetSC("CE3");
     const MAtom *cz2 =  GetSC("CZ2");
+    const MAtom *cz3 =  GetSC("CZ3");
     const MAtom *ch2 =  GetSC("CH2");
 
     if (cg) {
@@ -1354,6 +1365,10 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
         if (ce3) {
           writeInternal3AtomLine(os, pdbId, *cg, *cd2,*ce3);
           writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2,*ce3);
+          if (cz3) {
+            writeInternal3AtomLine(os, pdbId, *cd2,*ce3,*cz3);
+            writeInternal4AtomLine(os, pdbId, *cg,*cd2,*ce3,*cz3);
+          }
         }
       }
     }
@@ -1493,7 +1508,7 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
     assert(0);
     break;
   }
-  
+
   os << "--" << endl;  
   
 }
