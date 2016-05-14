@@ -1,0 +1,296 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>rFold reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>rFold</h1>
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Methods">Methods</a></li>
+</ul>
+
+
+<h2>Classes</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../classes/Chain.html">Chain</a></li>
+  <li><a href="../classes/Dihedron.html">Dihedron</a></li>
+  <li><a href="../classes/Hedron.html">Hedron</a></li>
+  <li><strong>Protein</strong></li>
+  <li><a href="../classes/Residue.html">Residue</a></li>
+</ul>
+<h2>Modules</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../modules/geom3d.html">geom3d</a></li>
+  <li><a href="../modules/parsers.html">parsers</a></li>
+  <li><a href="../modules/rfold.html">rfold</a></li>
+  <li><a href="../modules/utils.html">utils</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Class <code>Protein</code></h1>
+<p>protein structure class for rFold</p>
+<p>
+
+</p>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#protein.new">protein.new (o)</a></td>
+	<td class="summary">Protein class object initialiser (not a class method)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#protein.get">protein.get (id)</a></td>
+	<td class="summary">find the Protein with this id or new Protein if it does not exist (not a class method)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#protein.load">protein.load (t)</a></td>
+	<td class="summary">add the passed table data to the protein specified (pdbid) in the table (not a class method - may create new Protein)</td>
+	</tr>
+</table>
+<h2><a href="#Methods">Methods</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Protein:tostring">Protein:tostring ()</a></td>
+	<td class="summary">generate descriptive string for Protein : id, sequence, counts of residues, DSSP entries, hedra and dihedra</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:toPDB">Protein:toPDB ()</a></td>
+	<td class="summary">generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:toPDB() result</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:linkResidues">Protein:linkResidues ()</a></td>
+	<td class="summary">trigger linking of residues, dihedrons and hedrons within chains</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:renderDihedrons">Protein:renderDihedrons ()</a></td>
+	<td class="summary">trigger update of initial atom coordinates (dihedron coordinate space) in each dihedron according to dihedron angle</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:assembleResidues">Protein:assembleResidues ()</a></td>
+	<td class="summary">trigger calculation/update of residue['backbone'] and residue['sidechain'] atom coordinates (protein coordinate space) by sequentially assembling dihedrons</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:setStartCoords">Protein:setStartCoords ()</a></td>
+	<td class="summary">set N, CA, C coordinates (protein coordinate space) for first residue in each chain from DSSP data for residue if available</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "protein.new"></a>
+    <strong>protein.new (o)</strong>
+    </dt>
+    <dd>
+    Protein class object initialiser (not a class method)
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">o</span>
+         table with field 'id' = Brookhaven / RCSB PDB alphanumeric ID or similar
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        minimally initialised Protein object, object added to proteins list
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "protein.get"></a>
+    <strong>protein.get (id)</strong>
+    </dt>
+    <dd>
+    find the Protein with this id or new Protein if it does not exist (not a class method)
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">id</span>
+         Brookhaven / RCSB PDB alphanumeric ID or similar
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        already existing or minimally initialised protein object
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "protein.load"></a>
+    <strong>protein.load (t)</strong>
+    </dt>
+    <dd>
+    add the passed table data to the protein specified (pdbid) in the table (not a class method - may create new Protein)
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">t</span>
+         table with field 'pdbid' and preferably chain identifier field 'chn', passed here as callback from file parser
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Methods"></a>Methods</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Protein:tostring"></a>
+    <strong>Protein:tostring ()</strong>
+    </dt>
+    <dd>
+    generate descriptive string for Protein : id, sequence, counts of residues, DSSP entries, hedra and dihedra
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        descriptive string
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:toPDB"></a>
+    <strong>Protein:toPDB ()</strong>
+    </dt>
+    <dd>
+    generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:toPDB() result
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        string containing PDB format text (complete)
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:linkResidues"></a>
+    <strong>Protein:linkResidues ()</strong>
+    </dt>
+    <dd>
+    trigger linking of residues, dihedrons and hedrons within chains
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:renderDihedrons"></a>
+    <strong>Protein:renderDihedrons ()</strong>
+    </dt>
+    <dd>
+    trigger update of initial atom coordinates (dihedron coordinate space) in each dihedron according to dihedron angle
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:assembleResidues"></a>
+    <strong>Protein:assembleResidues ()</strong>
+    </dt>
+    <dd>
+    trigger calculation/update of residue['backbone'] and residue['sidechain'] atom coordinates (protein coordinate space) by sequentially assembling dihedrons
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:setStartCoords"></a>
+    <strong>Protein:setStartCoords ()</strong>
+    </dt>
+    <dd>
+    set N, CA, C coordinates (protein coordinate space) for first residue in each chain from DSSP data for residue if available
+
+
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
+<i style="float:right;">Last updated 2016-05-12 16:25:05 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

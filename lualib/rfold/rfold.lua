@@ -1,26 +1,30 @@
 
---- protein structure classes for rFold : protein, chain, residue, dihedron, and hedron
+--- core protein structure classes for rFold : protein, chain, residue, dihedron, and hedron
 --
--- **dependencies** : deque (https://github.com/catwell/cw-lua/tree/master/deque)
+-- **external dependencies** : deque (https://github.com/catwell/cw-lua/tree/master/deque)
 --
--- @module protein
+-- @module rfold
 
 local utils = require 'rfold.utils'
 local geom3d = require 'rfold.geom3d'
 local deque = require 'deque'
 
-local protein = {}
+local rfold = {}
 
 local proteins = {}
 
-P.protein = {}
-P.chain = {}
-P.residue = {}
-P.dihedron = {}
-P.hedron = {}
+rfold.protein = {}
+rfold.chain = {}
+rfold.residue = {}
+rfold.dihedron = {}
+rfold.hedron = {}
 
 
-local function genKey(...)
+--- generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s
+--
+-- @param atoms ... tokens of the form (sequence postion)(residue)(atom string) e.g. 224PCB = C-beta of Proline at sequence position 224
+-- @return string key e.g. 1MN:1MCA:1MC:2QN
+function rfold.genKey(...)
    local key = ''
    for i, s in ipairs{...} do
       if '' ~= key then key = key .. ':' end
@@ -29,15 +33,22 @@ local function genKey(...)
    return key
 end
 
-local function splitKey(k)
+--- split 3- (hedron) or 4- (dihedron) element string key into atom token constituents
+--
+-- @param k string key to split
+-- @return table of sequential fields
+function rfold.splitKey(k)
    if k:ematch('^(%w+):(%w+):(%w+):(%w+)$') then return { _1, _2, _3, _4 }
    elseif k:ematch('^(%w+):(%w+):(%w+)$') then return { _1, _2, _3 }
-   else assert(nil,'splitKey fail on '..k) end
+   else assert(nil,'rfold.splitKey fail on '..k) end
 end
 
-local function splitAtomKey(k)
+--- split atom token of form (sequence postion)(residue)(atom string) into constituents
+-- @param k atom token key to split
+-- @return table of constituents in order [1] sequence postion [2] residue [3] atom
+function rfold.splitAtomKey(k)
    if k:ematch('^(%d+)(%a)(%w+)$') then return { _1, _2, _3 }
-   else assert(nil,'splitAtomKey fail on '..k) end
+   else assert(nil,'rfold.splitAtomKey fail on '..k) end
 end
 
 ------------------------------------------------------------------------------------------------
@@ -45,19 +56,20 @@ end
 ------------------------------------------------------------------------------------------------
 
 --- initialiser for hedron class
--- input:
--- @field 1,2,3 atom spec 1
--- @table o
+-- <br><br>
+-- The input object 'o' is a table with expected fields: <br><br>'pdbid' = brookhaven / rcsb PDB id string or similar <br> 'chn' = chain id
+-- <br> [1..3] = atom tokens for 3 bonded atoms forming plane<br> 'len1' = atom1 to atom2 distance<br> 'angle2' = angle formed by 3 atoms<br> 'len3' = atom2 to atom3 distance
+-- <br>
+-- @see splitAtomKey
 -- @param o table as defined above
--- @reeturn initialised hedron object
-trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3']
-function P.hedron:new (o)
+-- @return initialised hedron object
+function rfold.hedron:new (o)
    --o = o or {}
    assert(o[3],'attempt to instantiate hedron without atom 3')
    setmetatable(o, self)
    self.__index = self
 
-   o['key'] = genKey(o[1],o[2],o[3])
+   o['key'] = rfold.genKey(o[1],o[2],o[3])
    o['updated'] = true
 
    if not o['atoms'] then
@@ -70,11 +82,11 @@ function P.hedron:new (o)
    return o
 end
 
-function P.hedron:tostring()
+function rfold.hedron:tostring()
    return '3-[' .. self['key'] .. ']'
 end
 
-function P.hedron:initPos()
+function rfold.hedron:initPos()
    -- generate coordinates for 3 atoms with specified bond lengths and angle between on XZ plane (Y=0 for all atoms)
    -- match aacs : a2 = 0,0,0 ; a3 on Z-axis ; a1 on XZ plane (-Z for angle >90)
    -- reverse coordinates swap : a2 = 0,0,0 ; a1 on Z-axis ; a3 on XZ plane
@@ -107,16 +119,16 @@ end
 -- dihedron
 ------------------------------------------------------------------------------------------------
 
-function P.dihedron:new (o)
+function rfold.dihedron:new (o)
    --o = o or {}
    assert(o[4],'attempt to instantiate dihedron without atom 4')
 
    setmetatable(o, self)
    self.__index = self
 
-   o['key'] = genKey(o[1],o[2],o[3],o[4])
-   o['key3'] = genKey(o[1],o[2],o[3])
-   o['key32'] = genKey(o[2],o[3],o[4])
+   o['key'] = rfold.genKey(o[1],o[2],o[3],o[4])
+   o['key3'] = rfold.genKey(o[1],o[2],o[3])
+   o['key32'] = rfold.genKey(o[2],o[3],o[4])
    
    o['updated'] = true
 
@@ -127,20 +139,20 @@ function P.dihedron:new (o)
    return o
 end
 
-function P.dihedron:tostring()
+function rfold.dihedron:tostring()
    return '4-[' .. self['key'] .. ']'
 end
 
-function P.dihedron:splitAtomKey(pos)
-   return splitAtomKey(self[pos])
+function rfold.dihedron:rfold.splitAtomKey(pos)
+   return rfold.splitAtomKey(self[pos])
 end
 
 
-function P.dihedron:initPos()
+function rfold.dihedron:initPos()
    -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane (a1 in -Z), 4th in +Z and rotated
    local res = self['res']
 
-   local h1key = genKey(self[1], self[2], self[3])
+   local h1key = rfold.genKey(self[1], self[2], self[3])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' searching 1: ' .. h1key)
    
    local hedron1 = res['hedra'][h1key]
@@ -151,7 +163,7 @@ function P.dihedron:initPos()
    self['h1key'] = h1key
    --print(res:tostring() .. ' ' .. self:tostring() .. ' found 1: ' .. hedron1:tostring())
    
-   local h2key = genKey(self[2], self[3], self[4])
+   local h2key = rfold.genKey(self[2], self[3], self[4])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' searching 2: ' .. h2key)
 
    local hedron2 = res['hedra'][h2key]
@@ -198,16 +210,16 @@ function P.dihedron:initPos()
 
    self['a4preRotation'] = a4preRotation
    
-   -- print('qip : ' .. genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:transpose():pretty() .. '][' ..  self['a2initial']:transpose():pretty() .. '][' ..  self['a3initial']:transpose():pretty() .. '][' ..  self['a4initial']:transpose():pretty() .. ']')
+   -- print('qip : ' .. rfold.genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:transpose():pretty() .. '][' ..  self['a2initial']:transpose():pretty() .. '][' ..  self['a3initial']:transpose():pretty() .. '][' ..  self['a4initial']:transpose():pretty() .. ']')
 
    self['updated'] = false
 end
 
-function P.dihedron:initPosR()
+function rfold.dihedron:initPosR()
    -- generate coordinates for 4 atoms with specified dihedral, first 3 on XZ plane with Z>=0, 4th in +Z -- hedrons in reverse order from above
    local res = self['res']
 
-   local h1key = genKey(self[3], self[2], self[1])
+   local h1key = rfold.genKey(self[3], self[2], self[1])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' searching reverse 1: ' .. h1key)
    local hedron1 = res['hedra'][h1key]
    if not hedron1 and res['prev'] then hedron1 = res['prev']['hedra'][h1key] end
@@ -220,7 +232,7 @@ function P.dihedron:initPosR()
    self['h1key'] = h1key
    --print(res:tostring() .. ' ' .. self:tostring() .. ' found reverse 1: ' .. hedron1:tostring())
    
-   local h2key = genKey(self[4], self[3], self[2])
+   local h2key = rfold.genKey(self[4], self[3], self[2])
    --print(res:tostring() .. ' ' .. self:tostring() .. ' reverse searching 2: ' .. h2key)
    local hedron2 = res['hedra'][h2key]
    if not hedron2 and res['prev'] then hedron2 = res['prev']['hedra'][h2key] end
@@ -267,7 +279,7 @@ function P.dihedron:initPosR()
    self['initialCoords'] = initial 
    self['a4preRotation'] = a4preRotation
    
-   --print('qipR: ' .. genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:pretty() .. '][' ..  self['a2initial']:pretty() .. '][' ..  self['a3initial']:pretty() .. '][' ..  self['a4initial']:pretty() .. ']') 
+   --print('qipR: ' .. rfold.genKey(self['a1'], self['a2'], self['a3'],self['a4']) .. ' ' .. h1key .. ' ' .. h2key .. ' [' ..  self['a1initial']:pretty() .. '][' ..  self['a2initial']:pretty() .. '][' ..  self['a3initial']:pretty() .. '][' ..  self['a4initial']:pretty() .. ']') 
 
    self['updated'] = false
 end
@@ -295,7 +307,7 @@ local sidechainSort = { CB = 1,
 local res3 = { G = 'GLY', A = 'ALA', V = 'VAL', L = 'LEU', I = 'ILE', M = 'MET', F = 'PHE', P = 'PRO', S = 'SER', T = 'THR', C = 'CYS', N = 'ASN', Q = 'GLN', Y = 'TYR', W = 'TRP',
                D = 'ASP', E = 'GLU', H = 'HIS', K = 'LYS', R = 'ARG' }
 
-function P.residue:new (o)
+function rfold.residue:new (o)
    o = o or {}
    setmetatable(o, self)
    self.__index = self
@@ -323,11 +335,11 @@ function P.residue:new (o)
    return o
 end
 
-function P.residue:tostring()
+function rfold.residue:tostring()
    return self['res'] .. self['resn']
 end
 
-function P.residue:countHedra()
+function rfold.residue:countHedra()
    local c = 0
    for k,v in pairs(self['hedra']) do
       c = c+1
@@ -335,7 +347,7 @@ function P.residue:countHedra()
    return c
 end
 
-function P.residue:countDihedra()
+function rfold.residue:countDihedra()
    local c = 0
    for k,v in pairs(self['dihedra']) do
       --print('  ' .. k)
@@ -348,7 +360,7 @@ end
    linkDihedra()
    
 --]]
-function P.residue:linkDihedra()
+function rfold.residue:linkDihedra()
    local c = 0
    local k3i = {}
    local k32i = {}
@@ -371,7 +383,7 @@ function P.residue:linkDihedra()
       --]]
       
       for i=1,4 do                            -- PDB format ordered lists of backbone and sidechain atoms in residue
-         local al = dihedron:splitAtomKey(i)
+         local al = dihedron:rfold.splitAtomKey(i)
          local n,r,a = tonumber(al[1]),al[2],al[3]
 
          --print(r,n,a, self['res'],self['resn'], dihedron[i])
@@ -394,7 +406,7 @@ function P.residue:linkDihedra()
    --self['key32index'] = k32i
 end
 
-function P.residue:toPDB(chain,ndx, atomCoords)
+function rfold.residue:toPDB(chain,ndx, atomCoords)
    --print('residue topdb '  .. chain .. ' ' .. ndx)
    local s = ''
    local dihedron
@@ -409,8 +421,8 @@ function P.residue:toPDB(chain,ndx, atomCoords)
          dihedron = a[1]
          position = a[2]
          --print('res:toPDB chain ' .. chain .. ' ndx ' .. ndx .. ' ' .. dihedron:tostring() .. ' pos ' .. position)
-         atomName = dihedron:splitAtomKey(position)[3]   -- dihedron['atomNames'][position]  -- dihedron['atomCoords'][coordsInitial]['names'][position]
-         local akl = splitKey(dihedron['key'])
+         atomName = dihedron:rfold.splitAtomKey(position)[3]   -- dihedron['atomNames'][position]  -- dihedron['atomCoords'][coordsInitial]['names'][position]
+         local akl = rfold.splitKey(dihedron['key'])
          atom = atomCoords[akl[position]] --  dihedron['initialCoords'][position]
          ls =  string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
                              'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
@@ -427,9 +439,9 @@ function P.residue:toPDB(chain,ndx, atomCoords)
             ndx = ndx + 1
             dihedron = a[1]
             position = a[2]
-            atomName = dihedron:splitAtomKey(position)[3] -- dihedron['atomNames'][position]  --  dihedron['atomCoords'][coordsInitial]['names'][position]
+            atomName = dihedron:rfold.splitAtomKey(position)[3] -- dihedron['atomNames'][position]  --  dihedron['atomCoords'][coordsInitial]['names'][position]
             if not ('CB' == atomName and 'G' == self['res']) then  -- don't put gly cbeta in pdb file
-               local akl = splitKey(dihedron['key'])
+               local akl = rfold.splitKey(dihedron['key'])
                atom = atomCoords[akl[position]] -- dihedron['initialCoords'][position]
                ls = string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
                                   'ATOM  ',ndx,atomName,' ',res3[self['res']], chain, self['resn'],
@@ -442,9 +454,9 @@ function P.residue:toPDB(chain,ndx, atomCoords)
    return s,ndx
 end
 
-function P.residue:dsspAtom(atomKey)
+function rfold.residue:dsspAtom(atomKey)
    local atom = geom3d.get41mtx()
-   local atomName = splitAtomKey(atomKey)[3]:lower()
+   local atomName = rfold.splitAtomKey(atomKey)[3]:lower()
    local datom = self['dssp'][atomName]
    if not datom then
       assert(nil, 'dsspAtom ' .. atomKey .. ' failed to find ' .. atomName)
@@ -457,14 +469,14 @@ function P.residue:dsspAtom(atomKey)
    return atom
 end
 
-function P.residue:NCaCKeySplit()
+function rfold.residue:NCaCKeySplit()
    local rbase = self['resn'] .. self['res']
-   --local key = genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
-   --return splitKey(key)
+   --local key = rfold.genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
+   --return rfold.splitKey(key)
    return { rbase .. 'N', rbase .. 'CA', rbase .. 'C' }
 end
 
-function P.residue:assemble( atomCoordsIn )
+function rfold.residue:assemble( atomCoordsIn )
    --[[
    for di,d in pairs(self['dihedra']) do
       print('diheron: ' .. d['key'] .. ' angle: ' .. d['dihedral1'])
@@ -492,16 +504,16 @@ function P.residue:assemble( atomCoordsIn )
    local rbase = self['resn'] .. self['res']
    
    local q = deque:new()
-   local NCaCKey = genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
+   local NCaCKey = rfold.genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
    q:push_left(NCaCKey)
-   q:push_left(genKey(rbase .. 'O', rbase .. 'C', rbase .. 'CA'))
-   q:push_left(genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'CB'))
+   q:push_left(rfold.genKey(rbase .. 'O', rbase .. 'C', rbase .. 'CA'))
+   q:push_left(rfold.genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'CB'))
 
    if not atomCoords then -- if list of initial coords not passed as parameter, use N-CA-C initial coords from creating dihedral
       atomCoords = {}
       local dl = self['key3index'][NCaCKey]
       for di,d in ipairs(dl) do
-         local akl = splitKey( d['key'] )
+         local akl = rfold.splitKey( d['key'] )
          for ai,a in ipairs(akl) do
             atomCoords[a] = d['initialCoords'][ai]
          end
@@ -516,7 +528,7 @@ function P.residue:assemble( atomCoordsIn )
          for di, d in ipairs(dihedra) do
             --print('assemble: ' .. h1k .. ' -> ' .. d['key'])
             local dh2key = d['hedron2']['key']
-            local akl = splitKey( d['key'] )
+            local akl = rfold.splitKey( d['key'] )
             if atomCoords[akl[1]]
                and atomCoords[akl[2]]
                and atomCoords[akl[3]]
@@ -557,7 +569,7 @@ end
 -- chain
 ------------------------------------------------------------------------------------------------
 
-function P.chain:new (o)
+function rfold.chain:new (o)
    o = o or {}
    setmetatable(o, self)
    self.__index = self
@@ -570,9 +582,9 @@ function P.chain:new (o)
    return o
 end
 
-function P.chain:initRes( ires, iresn )
+function rfold.chain:initRes( ires, iresn )
    if not self['residues'][iresn] then
-      self['residues'][iresn] = P.residue:new{ resn = iresn, res = ires }
+      self['residues'][iresn] = rfold.residue:new{ resn = iresn, res = ires }
       --print('new residue ' .. ires .. ' ' .. iresn)
    else
       --print(' found residue ' .. ires .. ' ' .. iresn)
@@ -583,7 +595,7 @@ function P.chain:initRes( ires, iresn )
    return self['residues'][iresn]
 end
 
-function P.chain:load(t)
+function rfold.chain:load(t)
    local res
 
    local function getRes(s)
@@ -602,18 +614,18 @@ function P.chain:load(t)
       --print('chain:load not dssp ' .. t[1])
       res = self:initRes(getRes(t[1]))
       if t['dihedral1'] then
-         --print('dihedron: ' .. res:tostring() .. ' ' .. genKey(t[1],t[2],t[3],t[4]))
-         res['dihedra'][ genKey(t[1],t[2],t[3],t[4]) ] = P.dihedron:new(t)
+         --print('dihedron: ' .. res:tostring() .. ' ' .. rfold.genKey(t[1],t[2],t[3],t[4]))
+         res['dihedra'][ rfold.genKey(t[1],t[2],t[3],t[4]) ] = rfold.dihedron:new(t)
       elseif t['angle2'] then
-         --print('hedron: ' .. res:tostring() .. ' ' ..  genKey(t[1],t[2],t[3]))
-         res['hedra'][ genKey(t[1],t[2],t[3]) ] = P.hedron:new(t)
+         --print('hedron: ' .. res:tostring() .. ' ' ..  rfold.genKey(t[1],t[2],t[3]))
+         res['hedra'][ rfold.genKey(t[1],t[2],t[3]) ] = rfold.hedron:new(t)
       else
          assert(nil,'not recognised: ' .. tostring(t))
       end
    end
 end
 
-function P.chain:linkResidues()
+function rfold.chain:linkResidues()
    for i,v in ipairs(self['residues']) do
       if i > 1 then v['prev'] = self['residues'][i-1] end
       if i < #self['residues'] then v['next'] = self['residues'][i+1] end
@@ -621,7 +633,7 @@ function P.chain:linkResidues()
    end
 end
 
-function P.chain:countHedra()
+function rfold.chain:countHedra()
    local c=0
    for i,v in ipairs(self['residues']) do
       c = c + v:countHedra()
@@ -629,7 +641,7 @@ function P.chain:countHedra()
    return c
 end
 
-function P.chain:countDihedra()
+function rfold.chain:countDihedra()
    local c=0
    for i,v in ipairs(self['residues']) do
       --print(v['res'] .. ' ' .. v['resn'])
@@ -638,7 +650,7 @@ function P.chain:countDihedra()
    return c
 end
 
-function P.chain:countDSSPs()
+function rfold.chain:countDSSPs()
    local c=0
    for i,v in ipairs(self['residues']) do
       if v['dssp'] then c = c + 1 end
@@ -646,7 +658,7 @@ function P.chain:countDSSPs()
    return c
 end
 
-function P.chain:seqStr()
+function rfold.chain:seqStr()
    local s=''
    for i,v in ipairs(self['residues']) do
       s = s .. v['res']
@@ -654,7 +666,7 @@ function P.chain:seqStr()
    return s
 end
 
-function P.chain:renderDihedrons()
+function rfold.chain:renderDihedrons()
    for i,r in ipairs(self['residues']) do
       for k,h in pairs(r['hedra']) do
          if h['updated'] then h:initPos() end
@@ -667,7 +679,7 @@ function P.chain:renderDihedrons()
    end
 end   
 
-function P.chain:assembleResidues()
+function rfold.chain:assembleResidues()
    local c=1
    local ndx=0
    for i,r in ipairs(self['residues']) do
@@ -694,7 +706,7 @@ function P.chain:assembleResidues()
    end
 end
 
-function P.chain:toPDB(ndx)
+function rfold.chain:toPDB(ndx)
    --print('chain topdb '  .. ndx)
    local s = ''
    local ls
@@ -705,7 +717,7 @@ function P.chain:toPDB(ndx)
    return s,ndx
 end
 
-function P.chain:setStartCoords()
+function rfold.chain:setStartCoords()
    local r = self['residues'][1]
    local initCoords
    if r['dssp'] then
@@ -723,7 +735,7 @@ end
 ------------------------------------------------------------------------------------------------
 
 
-function P.protein:new (o)
+function rfold.protein:new (o)
    if o and o['id'] and proteins[o['id']] then
       return proteins[o['id']]
    end
@@ -739,16 +751,16 @@ function P.protein:new (o)
 end
 
 --[[
-function P.protein:get(id)  -- get the protein with this id or init if it does not exist
+function rfold.protein:get(id)  -- get the protein with this id or init if it does not exist
    if id then
-      return P.protein:new{ id = id }
+      return rfold.protein:new{ id = id }
    end
    
-   return P.protein:new()
+   return rfold.protein:new()
 end
 --]]
 
-function P.protein:load (t)
+function rfold.protein:load (t)
    if not t['pdbid'] then
       assert(nil,'protein:load - no pdbid for ' .. tostring(t))
    end
@@ -762,7 +774,7 @@ function P.protein:load (t)
 
    local chn = t['chn'] or ''
    if not self['chains'][chn] then
-      self['chains'][chn] = P.chain:new{ id = chn }
+      self['chains'][chn] = rfold.chain:new{ id = chn }
       --print('protein:load new chain ' .. chn)
    else
       --print('protein:load found chain ' .. chn)
@@ -770,7 +782,7 @@ function P.protein:load (t)
    self['chains'][chn]:load(t)
 end
 
-function P.protein:tostring()
+function rfold.protein:tostring()
    local s = ''
    for k,v in pairs(self['chains']) do
       s = self.id .. ' ' .. k .. ' ' .. v:seqStr() .. '\n'
@@ -779,13 +791,13 @@ function P.protein:tostring()
    return s
 end
 
-function P.protein:linkResidues()
+function rfold.protein:linkResidues()
    for k,v in pairs(self['chains']) do
       v:linkResidues()
    end
 end
 
-function P.protein:toPDB()
+function rfold.protein:toPDB()
    --print('protein topdb ')   
    local s=''
    local ndx=0
@@ -797,23 +809,23 @@ function P.protein:toPDB()
    return s
 end
 
-function P.protein:renderDihedrons()
+function rfold.protein:renderDihedrons()
    for k,v in pairs(self['chains']) do
       v:renderDihedrons()
    end
 end
 
-function P.protein:assembleResidues()
+function rfold.protein:assembleResidues()
    for k,v in pairs(self['chains']) do
       v:assembleResidues()
    end
 end
 
-function P.protein:setStartCoords()
+function rfold.protein:setStartCoords()
    for k,v in pairs(self['chains']) do
       v:setStartCoords()
    end
 end
 
    
-return P
+return rfold

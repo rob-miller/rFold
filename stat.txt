@@ -138,4 +138,23 @@
 08 may 2016
    - can generate all residues PDB for 7rsa and 1mud, currently only off by 0.001 on some axes for atoms in final residues
 
+09 may 2016
+   - increased dssp measurement outputs to 5 decimal places, plus fixes to tyr and trp sidechains, add oxt, remove gly c-beta from pdb output -- now get exact match for all atom records for 1mud (225 residues)
+   
+10 may 2016
+   - review and cleanup with eye to release
+   -- install penlight, ldoc (dependencies luafilesystem, markdown)
 
+11 may 2016
+   - refactoring and documenting files to be more appropriate for distribution
+   -- think just hedron and dihedron classes left
+
+12 may 2016
+   - finished all classes for documentation, not running yet
+
+13 may 2016
+   - working on getting code working again
+
+14 may 2016
+   - can generate 1mud pdb file again
+   

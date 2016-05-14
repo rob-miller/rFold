@@ -1,0 +1,290 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>rFold reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>rFold</h1>
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../modules/geom3d.html">geom3d</a></li>
+  <li><a href="../modules/parsers.html">parsers</a></li>
+  <li><strong>rfold</strong></li>
+  <li><a href="../modules/utils.html">utils</a></li>
+</ul>
+<h2>Classes</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../classes/Chain.html">Chain</a></li>
+  <li><a href="../classes/Dihedron.html">Dihedron</a></li>
+  <li><a href="../classes/Hedron.html">Hedron</a></li>
+  <li><a href="../classes/Protein.html">Protein</a></li>
+  <li><a href="../classes/Residue.html">Residue</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>rfold</code></h1>
+<p>core protein structure classes for rFold : protein, chain, residue, dihedron, and hedron</p>
+<p> <strong>external dependencies</strong> : deque (https://github.com/catwell/cw-lua/tree/master/deque)</p>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#genKey">genKey (atoms)</a></td>
+	<td class="summary">generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#splitKey">splitKey (k)</a></td>
+	<td class="summary">split 3- (hedron) or 4- (dihedron) element string key into atom token constituents</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#splitAtomKey">splitAtomKey (k)</a></td>
+	<td class="summary">split atom token of form (sequence postion)(residue)(atom string) into constituents</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#rfold.hedron:new">rfold.hedron:new (o)</a></td>
+	<td class="summary">initialiser for hedron class
+ <br><br>
+ The input object 'o' is a table with expected fields: <br><br>'pdbid' = brookhaven / rcsb PDB id string or similar <br> 'chn' = chain id
+ <br> [1..3] = atom tokens for 3 bonded atoms forming plane<br> 'len1' = atom1 to atom2 distance<br> 'angle2' = angle formed by 3 atoms<br> 'len3' = atom2 to atom3 distance
+ <br></td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#rfold.dihedron:new">rfold.dihedron:new (o)</a></td>
+	<td class="summary">dihedron</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#rfold.chain:new">rfold.chain:new (o)</a></td>
+	<td class="summary">chain</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#rfold.protein:new">rfold.protein:new (o)</a></td>
+	<td class="summary">protein</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "genKey"></a>
+    <strong>genKey (atoms)</strong>
+    </dt>
+    <dd>
+    generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">atoms</span>
+         ... tokens of the form (sequence postion)(residue)(atom string) e.g. 224PCB = C-beta of Proline at sequence position 224
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        string key e.g. 1MN:1MCA:1MC:2QN
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "splitKey"></a>
+    <strong>splitKey (k)</strong>
+    </dt>
+    <dd>
+    split 3- (hedron) or 4- (dihedron) element string key into atom token constituents
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">k</span>
+         string key to split
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        table of sequential fields
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "splitAtomKey"></a>
+    <strong>splitAtomKey (k)</strong>
+    </dt>
+    <dd>
+    split atom token of form (sequence postion)(residue)(atom string) into constituents
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">k</span>
+         atom token key to split
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        table of constituents in order [1] sequence postion [2] residue [3] atom
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "rfold.hedron:new"></a>
+    <strong>rfold.hedron:new (o)</strong>
+    </dt>
+    <dd>
+    initialiser for hedron class
+ <br><br>
+ The input object 'o' is a table with expected fields: <br><br>'pdbid' = brookhaven / rcsb PDB id string or similar <br> 'chn' = chain id
+ <br> [1..3] = atom tokens for 3 bonded atoms forming plane<br> 'len1' = atom1 to atom2 distance<br> 'angle2' = angle formed by 3 atoms<br> 'len3' = atom2 to atom3 distance
+ <br>
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">o</span>
+         table as defined above
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        initialised hedron object
+    </ol>
+
+
+    <h3>See also:</h3>
+    <ul>
+         <a href="../modules/rfold.html#splitAtomKey">splitAtomKey</a>
+    </ul>
+
+
+</dd>
+    <dt>
+    <a name = "rfold.dihedron:new"></a>
+    <strong>rfold.dihedron:new (o)</strong>
+    </dt>
+    <dd>
+    dihedron
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">o</span>
+        o = o or {}
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "rfold.chain:new"></a>
+    <strong>rfold.chain:new (o)</strong>
+    </dt>
+    <dd>
+    chain
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">o</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "rfold.protein:new"></a>
+    <strong>rfold.protein:new (o)</strong>
+    </dt>
+    <dd>
+    protein
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">o</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
+<i style="float:right;">Last updated 2016-05-12 16:25:05 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

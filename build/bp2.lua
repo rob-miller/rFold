@@ -1,9 +1,6 @@
 #!/usr/bin/env luajit
 
-require 'rtmLualib'
-require 'parseCmdLine'
-require 'parseRtmDssp'
-require 'rtmGeom3d'
+parsers = require 'rfold.parsers'
 
 --[[
 
@@ -86,17 +83,19 @@ require 'rtmGeom3d'
 --]]
 
 
-local pm = require "protein"
+local pm = require "rfold.protein"
 
-local prot = pm.protein:new()
 
-local args = parseCmdLine()
-local pdbid = prd(args[1], function (t) prot:load(t) end)
+local args = parsers.parseCmdLine()
+local pdbid = parsers.prd(args[1], function (t) pm.load(t) end)
+local prot = pm.get(pdbid)
 prot:linkResidues()
 prot:renderDihedrons()
 
 prot:setStartCoords()
 prot:assembleResidues()
+
+print(prot:toPDB())
 
 --prot:setInitialPosition(1)
 --prot:assembleChains()

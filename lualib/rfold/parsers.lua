@@ -1,16 +1,65 @@
-#!/usr/bin/env luajit
 
+--- file parsers:
+-- modified DSSP output parser, command line parser, PDB file parser
+-- @module parsers
 
-function string:ematch(pat)
-   local matches = {string.match(self, pat)}    -- call the original match to do the work
-   for i = 1, #matches do                 -- #matches == 0 if no matches
-      _G["_" .. i] = matches[i]          -- assign captures to global variables
+local parsers = {}
+
+local function usage(valid_flags, valid_params)
+   print(arg[0] .. ': command line error')
+   if valid_flags then
+      io.write(' valid flags: ')
+      for f,v in pairs(valid_flags) do io.write( '-' .. f .. ' ') end
+      print()
    end
-   return unpack(matches)                 -- return original results
+   if valid_params then
+      io.write(' valid parameters: ')
+      for p,v in pairs(valid_params) do io.write( '-' .. p .. '=  ') end
+      print()
+   end
+end
+
+--- parse specified flags and parameters from command line, pass remaining args through
+--
+-- ./parseCmdLine.lua -p1=hello -f1 -f1 fee fie fo fum
+-- @param valid_flags { ['f1'] = true, ['f2'] = true }
+-- @param valid_params { ['p1'] = true, ['p2'] = true }
+-- @return table with 'param' values as specified, 'flag' values counting number of times flag seen, and remaining args in sequential numbered slots 
+function parsers.parseCmdLine (valid_flags, valid_params)
+   local args = {}
+
+   for i=1,#arg do
+      if string.match(arg[i],'^-') then
+         if string.match(arg[i],'=') then
+            local key, val
+            key, val = string.match(arg[i],'^-(%S+)=(%S+)$')
+            if not (valid_params and valid_params[ key ]) then
+               usage(valid_flags, valid_params)
+               assert(nil, 'parameter -' .. key .. ' value ' .. val .. ' not recognised')
+            end
+            args[ key ] = val
+         else
+            flag = string.match(arg[i],'^-(%S+)$')
+            if not (valid_flags and valid_flags[ flag ]) then
+               usage(valid_flags, valid_params)
+               assert(nil, 'flag -' .. flag .. ' not recognised')
+            end
+            args[flag] = (args[flag] or 0)+1
+         end
+      else
+         args[#args +1] = arg[i]
+      end
+   end
+
+   return args
 end
 
 
-function prd (infile, callback)
+--- parse rfold modified DSSP output file
+-- @param infile DSSP output
+-- @param callback (optional) call with table containing parsed fields for DSSP data lines, hedron length-angle-length lines, or dihedron angle lines
+-- @return pdbid if callback specified, else sequential list of tables as for 'callback' above in order read
+function parsers.prd (infile, callback)
    local rdt = {}
    rdt['triples']={}
    rdt['quads']={}
@@ -19,9 +68,14 @@ function prd (infile, callback)
    if infile then io.input(infile) end
    for line in io.lines() do
       --print(line)
-      if line:ematch('^HEADER ') then
-         pdbid = string.ematch(line,'(%S+)%s+%.$')
-         rdt['pdbid'] = pdbid
+      if line:match('^HEADER ') then
+         pdbid = line:match('(%S+)%s+%.$')
+         local header = line:match('^(.+)'..pdbid..'.+$')
+         if callback then
+            callback({['pdbid'] = pdbid, ['header'] = header })
+         else
+            rdt['pdbid'] = pdbid
+         end
          --print(pdbid)
       elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then
          local trip = {}
@@ -99,3 +153,4 @@ end
 
 --1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
 --         1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6         7         8         9         0         1         2      
+return parsers
