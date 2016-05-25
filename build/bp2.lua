@@ -89,21 +89,22 @@ local pm = require "rfold.protein"
 local args = parsers.parseCmdLine()
 local pdbid = parsers.prd(args[1], function (t) pm.load(t) end)
 local prot = pm.get(pdbid)
-prot:linkResidues()
-prot:renderDihedrons()
 
-prot:setStartCoords()
-prot:assembleResidues()
+if prot:countDihedra() > 0 then  -- did read internal coordinates, so generate PDB
 
-print(prot:toPDB())
+   prot:linkResidues()              -- set prev, next for each residue in each chain; create tables from residue to dihedron positions according to PDB backbone, sidechain atoms
+   prot:renderDihedra()             -- generate hedron and dihedron space coordinates for hedron angle, lengths and dihedron angle
+   
+   prot:setStartCoords()            -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list
+   prot:assembleResidues()          -- assemble overlapping dihedra of each residue to complete atomCoords list, copy coordinates for i+1 N, CA, C to next residue 
+   
+   print(prot:toPDB())              -- output PDB format text
 
---prot:setInitialPosition(1)
---prot:assembleChains()
+else                             -- did read PDB, generate internal coordinates
+   prot:dihedraFromAtoms()          -- calculate bond lengths, bond angles and dihedral angles from input coordinates
+   --prot:renderDihedra()           -- generate hedron and dihedron space coordinates for hedron angle, lengths and dihedron angle (not required to just output internal coordinates)
 
+   prot:setStartCoords()            -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list
+   print(prot:toInternalCoords())   -- output list of hedra and dihedra specifications
+end
 
-
---[[
-print(prot:tostring())
-local p2 = pm.protein:get(pdbid)
-print(p2:tostring())
---]]

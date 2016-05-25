@@ -41,7 +41,6 @@
 <ul class="$(kind=='Topics' and '' or 'nowrap'">
   <li><a href="../modules/geom3d.html">geom3d</a></li>
   <li><a href="../modules/parsers.html">parsers</a></li>
-  <li><a href="../modules/rfold.html">rfold</a></li>
   <li><strong>utils</strong></li>
 </ul>
 <h2>Classes</h2>
@@ -83,12 +82,40 @@
 	<td class="name" nowrap><a href="#splitAtomKey">splitAtomKey (k)</a></td>
 	<td class="summary">split atom token of form (sequence postion)(residue)(atom string) into constituents</td>
 	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#addBase">addBase (base, t)</a></td>
+	<td class="summary">convert table of atom-name-only (from utils.sidechains) to atomKey</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#setAccuracy95">setAccuracy95 (num)</a></td>
+	<td class="summary">round number to value presented for %9.5lf in C</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#setAccuracy83">setAccuracy83 (num)</a></td>
+	<td class="summary">round number to value presented for %8.3lf in C</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#pairsByKeys">pairsByKeys (t, f)</a></td>
+	<td class="summary">sort table by keys, from pil 1st ed 19.3</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#atomString">atomString (ndx, name, res, chain, resn, ax, ay, az, occ, tempFact)</a></td>
+	<td class="summary">generate a PDB ATOM record</td>
+	</tr>
 </table>
 <h2><a href="#Tables">Tables</a></h2>
 <table class="function_list">
 	<tr>
 	<td class="name" nowrap><a href="#res3">res3</a></td>
 	<td class="summary">residue single letter to 3-letter name conversion</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#res1">res1</a></td>
+	<td class="summary">residue 3-letter name to single letter conversion</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#sidechains">sidechains</a></td>
+	<td class="summary">per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file</td>
 	</tr>
 </table>
 
@@ -193,6 +220,164 @@
     <ol>
 
         table of constituents in order [1] sequence postion [2] residue [3] atom
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "addBase"></a>
+    <strong>addBase (base, t)</strong>
+    </dt>
+    <dd>
+    convert table of atom-name-only (from utils.sidechains) to atomKey
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">base</span>
+         <seqpos><residue>
+        </li>
+        <li><span class="parameter">t</span>
+         table of atom names in ipairs from utils.sidechains e.g. { 'CA', 'CB', 'CG1' }
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        new table with atomKeys
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "setAccuracy95"></a>
+    <strong>setAccuracy95 (num)</strong>
+    </dt>
+    <dd>
+    round number to value presented for %9.5lf in C
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">num</span>
+         the initial value
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        the value rounded to 5 decimal places
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "setAccuracy83"></a>
+    <strong>setAccuracy83 (num)</strong>
+    </dt>
+    <dd>
+    round number to value presented for %8.3lf in C
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">num</span>
+         the initial value
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        the value rounded to 3 decimal places
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "pairsByKeys"></a>
+    <strong>pairsByKeys (t, f)</strong>
+    </dt>
+    <dd>
+    sort table by keys, from pil 1st ed 19.3
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">t</span>
+         table of key, value pairs
+        </li>
+        <li><span class="parameter">f</span>
+         optional comparison function
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        iterator for use as 'for name, line in pairsByKeys(lines) do'
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "atomString"></a>
+    <strong>atomString (ndx, name, res, chain, resn, ax, ay, az, occ, tempFact)</strong>
+    </dt>
+    <dd>
+    generate a PDB ATOM record
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ndx</span>
+         index of record
+        </li>
+        <li><span class="parameter">name</span>
+         atom NAME (CA)
+        </li>
+        <li><span class="parameter">res</span>
+         1-letter residue code
+        </li>
+        <li><span class="parameter">chain</span>
+         chain ID
+        </li>
+        <li><span class="parameter">resn</span>
+         residue number
+        </li>
+        <li><span class="parameter">ax</span>
+         atom X coordinate
+        </li>
+        <li><span class="parameter">ay</span>
+         atom Y coordinate
+        </li>
+        <li><span class="parameter">az</span>
+         atom Z coordinate
+        </li>
+        <li><span class="parameter">occ</span>
+         occupancy
+        </li>
+        <li><span class="parameter">tempFact</span>
+         temperature factor (B factor)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        string with text and newline for one ATOM record
     </ol>
 
 
@@ -320,6 +505,155 @@
 
 
 </dd>
+    <dt>
+    <a name = "res1"></a>
+    <strong>res1</strong>
+    </dt>
+    <dd>
+    residue 3-letter name to single letter conversion
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "sidechains"></a>
+    <strong>sidechains</strong>
+    </dt>
+    <dd>
+    per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">CB</span>
+
+
+
+        </li>
+        <li><span class="parameter">CG1</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
 </dl>
 
 
@@ -327,7 +661,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2016-05-14 20:58:11 </i>
+<i style="float:right;">Last updated 2016-05-25 22:23:30 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

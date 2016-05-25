@@ -426,7 +426,7 @@ MResidue::MResidue(uint32 inNumber,
 	  mCB.mName = "CB";
           
           //cout << boost::format("N  %d %s %c %s %s %d  %f %f %f \n") % mN.mSerial % mN.mName % mN.mAltLoc % mN.mResName % mN.mChainID % mN.mResSeq % mN.mLoc.mX % mN.mLoc.mY % mN.mLoc.mZ  << endl;
-                 
+
 	  MPoint nca = mCA - mN ; // GetCAlpha() - GetN();   // vector CA to N
 	  MPoint cca = mCA - mC ; // GetCAlpha() - GetC();   // vector CA to C
 	  MPoint xx = nca + cca;
@@ -434,7 +434,7 @@ MResidue::MResidue(uint32 inNumber,
 
 	  double sx = kCACBDIST * cos(kTETH_ANG) / sqrt(DotProduct(xx,xx));
 	  double sy = kCACBDIST * sin(kTETH_ANG) / sqrt(DotProduct(yy,yy));
-	  
+                    
 	  mCB.mLoc += xx * sx + yy * sy;
 
           char str[32];

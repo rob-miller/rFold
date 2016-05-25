@@ -56,7 +56,7 @@ end
 
 
 --- parse rfold modified DSSP output file
--- @param infile DSSP output
+-- @param infile rfold modified DSSP output or PDB file or lines with hedron or dihedron specifications
 -- @param callback (optional) call with table containing parsed fields for DSSP data lines, hedron length-angle-length lines, or dihedron angle lines
 -- @return pdbid if callback specified, else sequential list of tables as for 'callback' above in order read
 function parsers.prd (infile, callback)
@@ -68,16 +68,26 @@ function parsers.prd (infile, callback)
    if infile then io.input(infile) end
    for line in io.lines() do
       --print(line)
-      if line:match('^HEADER ') then
-         pdbid = line:match('(%S+)%s+%.$')
-         local header = line:match('^(.+)'..pdbid..'.+$')
+      if line:match('^HEADER ') then  -- dssp or pdb
+         pdbid = line:match('(%S+)%s*%.?$')
+         local header = line:match('^(.+' .. pdbid .. ').+$') .. '              '  -- wipe the '.' dssp puts at end
+         --print(pdbid,header)
          if callback then
             callback({['pdbid'] = pdbid, ['header'] = header })
          else
             rdt['pdbid'] = pdbid
+            rdt['header'] = header
          end
          --print(pdbid)
-      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then
+      elseif line:match('^TITLE') then  -- pdb only -- dssp does not pass
+         local title = line
+         if callback then
+            callback({['pdbid'] = pdbid, ['title'] = title })
+         else
+            rdt['title'] = title
+         end
+         --print(pdbid)
+      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec
          local trip = {}
          trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
          if callback then
@@ -86,7 +96,7 @@ function parsers.prd (infile, callback)
             rdt['triples'][#rdt['triples']+1] = trip
          end
          --print(pdbid,chn,a1,a2,a3,v1,v2,v3)
-      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+):(%w+)%s+(%S+)%s*$')  then
+      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+):(%w+)%s+(%S+)%s*$')  then   -- dihedron spec
          local quad={}
          quad['pdbid'],quad['chn'],quad[1],quad[2],quad[3],quad[4],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
          if callback then
@@ -95,7 +105,7 @@ function parsers.prd (infile, callback)
             rdt['quads'][#rdt['quads']+1] = quad
          end
          --print(pdbid,chn,a1,a2,a3,a4,v1)
-      elseif line:ematch('^%s+(%d+)%s+(%d+)%s(%a?)%s(%a)%s') then
+      elseif line:ematch('^%s+(%d+)%s+(%d+)%s(%a?)%s(%a)%s') then    -- modified dssp output
          local dsp = {}
          local ndx
          dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'] = tonumber(_1),tonumber(_2),_3,_4
@@ -124,6 +134,20 @@ function parsers.prd (infile, callback)
             rdt['dssp'][#rdt['dssp']+1] = dsp
          end
          --print(ndx, resn, chn, res, '.'..ss..'.','>'..ss2..'<',phi,psi,omg,zn,zc,bca)
+      elseif line:ematch('^ATOM%s+(%d+)%s*(%w+)%s*(%a%a%a)%s(.)%s*(%d+)%s*(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%a)%s*$') then
+         local pdb = {}
+         pdb['ndx'], pdb['atom'],pdb['res3'],pdb['chn'],pdb['resn'],pdb['x'],pdb['y'],pdb['z'],pdb['occ'],pdb['tempfact'],pdb['elem']
+            = tonumber(_1), _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7), tonumber(_8), tonumber(_9), tonumber(_10), _11
+         --for k,v in pairs(pdb) do print(k,v) end
+         pdb['pdbid'] = pdbid
+         if callback then
+            callback(pdb)
+         else
+            rdt['pdb'][#rdt['pdb']+1] = pdb
+         end
+   
+         -- lines to ignore:
+         -- dssp / pdb
       elseif line:match('^--$') then
       elseif line:match('^==== Secondary') then
       elseif line:match('^REFERENCE ') then
@@ -135,12 +159,42 @@ function parsers.prd (infile, callback)
       elseif line:match(' HISTOGRAMS ') then
       elseif line:match(' PER ') then
       elseif line:match('^%s+#') then
+         -- pdb
+      elseif line:match('^SEQADV') then
+      elseif line:match('^LINK') then
+      elseif line:match('^KEYWDS') then
+      elseif line:match('^EXPDTA') then
+      elseif line:match('^REVDAT') then
+      elseif line:match('^JRNL') then
+      elseif line:match('^REMARK') then
+      elseif line:match('^DBREF') then
+      elseif line:match('^SEQRES') then
+      elseif line:match('^HET ') then
+      elseif line:match('^HETNAM') then
+      elseif line:match('^HETSYN') then
+      elseif line:match('^FORMUL') then
+      elseif line:match('^HELIX') then
+      elseif line:match('^SHEET') then
+      elseif line:match('^SSBOND') then
+      elseif line:match('^CISPEP') then
+      elseif line:match('^SITE') then
+      elseif line:match('^CRYST') then
+      elseif line:match('^ORIGX') then
+      elseif line:match('^SCALE') then
+      elseif line:match('^ANISOU') then
+      elseif line:match('^TER') then
+      elseif line:match('^HETATM') then    -- todo: add support
+      elseif line:match('^CONECT') then
+      elseif line:match('^MASTER') then
+      elseif line:match('^END') then
+         
       else
-         print('reading dssp -- failed to parse: ' .. line)
+         print('failed to parse: ' .. line)
       end
       
    end
    io.close()
+
    if callback then
       return pdbid
    end

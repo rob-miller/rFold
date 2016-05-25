@@ -157,4 +157,8 @@
 
 14 may 2016
    - can generate 1mud pdb file again
-   
+
+25 may 2016
+   - can read PDB file, generate internal coordinates output, read that output in, generate new PDB file, exact match on original PDB file (diff, 1mud 225 residues)
+
+

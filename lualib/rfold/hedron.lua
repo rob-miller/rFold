@@ -45,7 +45,9 @@ end
 --- generate descriptive string for Hedron: 3- followed by 'key' for this Hedron = 3 atom tokens separated by :'s
 -- @return descriptive string
 function Hedron:tostring()
-   return '3-[' .. self['key'] .. ']'
+   local s = '3-[' .. self['key'] .. ']'
+   if (self['len1'] and self['angle2'] and self['len3']) then s = s .. ' ' .. self['len1'] .. ' ' .. self['angle2'] .. ' ' .. self['len3'] end
+   return  s
 end
 
 --- generate hedron space coordinates for 3 atoms with specified bond lengths and angle between on XZ plane (Y=0 for all atoms)
@@ -77,4 +79,21 @@ function Hedron:initPos()
    self['updated'] = false
 end
 
+local function getDistAngleDist(a1,a2,a3)
+   local a1a2 = geom3d.getDistance3d(a1,a2)
+   local a2a3 = geom3d.getDistance3d(a2,a3)
+
+   local a1a3 = geom3d.getDistance3d(a1,a3)
+
+   local a1a2a3 = math.deg( geom3d.getAngleS3(a1a2,a2a3,a1a3) )
+
+   return a1a2,a1a2a3,a2a3
+end
+
+function Hedron:hedronFromAtoms(atomCoords)
+   local a1,a2,a3 = atomCoords[self[1]],atomCoords[self[2]],atomCoords[self[3]]
+   local len1,angle2,len3 = getDistAngleDist(a1,a2,a3)
+   self['len1'],self['angle2'],self['len3'] = utils.setAccuracy95(len1),utils.setAccuracy95(angle2),utils.setAccuracy95(len3)
+end
+      
 return hedron

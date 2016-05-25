@@ -121,16 +121,17 @@ function geom3d.getSphericalCoordinates(m)
    return retm
 end
 
---- calculate distance between two points
--- @param m1 nx1 matrix specifying coordinates for first point in the first dimension, e.g. [1][1] = x, [2][1] = y, [3][1] = z
--- @param m2 nx1 matrix specifying coordinates for second point in the first dimension
+--- calculate distance between two points (1D vectors)
+-- @param m1 nx1 matrix specifying coordinates for first point, e.g. [1][1] = x, [2][1] = y, [3][1] = z
+-- @param m2 nx1 matrix specifying coordinates for second point
 -- @return euclidean distance between m1 and m2
 function geom3d.getDistance3d(m1,m2)
    local s1, s2 = matrix.size(m1,1), matrix.size(m2,1)
    assert(s1 == s2,'matrices not equal in dimension 1')
    local dsum = 0
    for i=1,s1 do
-      dsum = dsum + m1[i][1] - m2[i][1]
+      local v = m1[i][1] - m2[i][1]
+      dsum = dsum + (v * v)
    end
    return math.sqrt(dsum)
 end
@@ -140,6 +141,15 @@ local function nzt(val)
       return false
    end
    return true
+end
+
+--- calculate angle a1a2a3 from lengths of 3 sides of triangle
+-- @param d0 length a1a2
+-- @param d1 length a2a3
+-- @param d2 length a1a3
+-- @return angle a1a2a3 in radians
+function geom3d.getAngleS3(d0,d1,d2)
+   return math.acos( ((d0*d0) + (d1*d1) - (d2*d2)) / (2*d0*d1) )
 end
 
 --- test two matrices for equality
