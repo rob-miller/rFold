@@ -46,7 +46,7 @@ end
 -- @param k atom token key to split
 -- @return table of constituents in order [1] sequence postion [2] residue [3] atom
 function utils.splitAtomKey(k)
-   if k:ematch('^(%d+)(%a)(%w+)$') then return { tonumber(_1), _2, _3 }
+   if k:ematch('^(-?%d+)(%a)(%w+)$') then return { tonumber(_1), _2, _3 }
    else assert(nil,'utils.splitAtomKey fail on '..k) end
 end
 
@@ -110,6 +110,21 @@ function utils.atomString(ndx,name,res,chain,resn,ax,ay,az,occ,tempFact)
    return string.format('%6s%5d  %-3s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f      %4s%2s%2s\n',
                         'ATOM  ', ndx, name,' ', utils.res3[res], chain, resn,' ', ax, ay, az, occ, tempFact, '    ', string.sub(name,1,1),'  ')
 end
+
+--- open a named file, write the passed string, close the file
+-- @param fname name of file to open
+-- @param s string to write
+function utils.writeFile(fname,s)
+   print('open ' .. fname)
+   local file,err = io.open(fname,'w')
+   assert(file,err)
+   file:write(s)
+   file:close()
+end
+
+
+
+---------------------------------------------- tables -------------------------------------------------------------------------------------------------------------
 
 --- residue single letter to 3-letter name conversion
 -- @table res3

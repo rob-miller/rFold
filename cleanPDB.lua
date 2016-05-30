@@ -2,7 +2,7 @@
 
 function filterPdbLine(line)
       if line:match('^HEADER ') then  
-      -- elseif line:match('^TITLE ') then  -- dssp does not pass
+      elseif line:match('^TITLE ') then  -- dssp does not pass but will grab from pdb
       elseif line:match('^TER') then
       elseif line:match('^END') then
       elseif line:match('^ATOM') then

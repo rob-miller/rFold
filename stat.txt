@@ -161,4 +161,11 @@
 25 may 2016
    - can read PDB file, generate internal coordinates output, read that output in, generate new PDB file, exact match on original PDB file (diff, 1mud 225 residues)
 
+28 may 2016
+   - got -t test working both ways for 1mud
 
+30 may 2016
+   - implement support for missing (disordered) residues
+   - works for 3egw 3 chains 1244 / 509 / 224 residues
+   - works for 4lgy 1 chain, 1287 residues, starts at -9, missing sidechains, missing residues, 1 non-standard residue treated as chain break
+   

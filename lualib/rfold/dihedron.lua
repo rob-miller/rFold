@@ -55,8 +55,8 @@ end
 
 local function getHedron(res,key)
    local hedron = res['hedra'][key]
-   if not hedron and res['prev'] then hedron = res['prev']['hedra'][key] end
-   if not hedron and res['next'] then hedron = res['next']['hedra'][key] end
+   if not hedron and res['prev'] and res['prev']['ordered'] then hedron = res['prev']['hedra'][key] end
+   if not hedron and res['next'] and res['next']['ordered'] then hedron = res['next']['hedra'][key] end
    return hedron
 end
 
@@ -105,6 +105,18 @@ function Dihedron:initPos()
    local hedron1 = self['hedron1']
    local hedron2 = self['hedron2']
 
+   local complete = true
+   for i=1,3 do
+      if not hedron1['atoms'][i] then complete=false end
+   end
+   for i=1,3 do
+      if not hedron2['atoms'][i] then complete=false end
+   end
+   if not complete then
+      io.stderr:write('dihedron: hedra missing atoms ' .. self:tostring() .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() .. ' ' .. hedron2:tostring() .. '\n')
+      return
+   end
+      
    local initial = {}
    local a4preRotation
    local a4shift
@@ -174,7 +186,10 @@ function Dihedron:dihedronFromAtoms(atomCoords)
    --local a4preRotation
    
    local a1, a2, a3, a4 = atomCoords[self[1]], atomCoords[self[2]], atomCoords[self[3]], atomCoords[self[4]]
-   --print(self:tostring(),hedron1:tostring(),hedron2:tostring())
+   if not a4 then
+      io.stderr:write('dihedron missing coordinates for a4: ' .. self:tostring() .. ' ' .. hedron1:tostring() .. ' ' .. hedron2:tostring() .. '\n')
+      return
+   end
    local mt = geom3d.coordSpace( a1, a2, a3 )
    local da4 = mt * a4
    self['dihedral1'] = utils.setAccuracy95( math.deg( math.atan2(da4[2][1],da4[1][1]) ) )
@@ -205,6 +220,10 @@ function Dihedron:dihedronFromAtoms(atomCoords)
 
    --print(hedron1:tostring() .. ' ' .. hedron2:tostring() .. ' ' .. self:tostring())
    
+end
+
+function Dihedron:clearInternalCoords()
+   self['dihedral1'] = nil
 end
 
 return dihedron

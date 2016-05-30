@@ -51,6 +51,22 @@ function protein.get(id)
    end
 end
 
+--- change the key for an entry in the protein.proteins table
+-- @param old old key
+-- @param new new key
+function protein.rename(old,new)
+   assert(protein.proteins[old], 'no protein with id ' .. old .. ' loaded')
+   protein.proteins[new] = protein.proteins[old]
+   protein.drop(old)
+end
+
+--- remove an entry from the protein.proteins table so garbage collector can free memory
+-- @param id key to drop from table
+function protein.drop(id)
+   protein.proteins[id] = nil
+end
+
+                      
 --- add the passed table data to the protein specified (pdbid) in the table (not a class method - may create new Protein)
 -- @param t table with field 'pdbid' and preferably chain identifier field 'chn', passed here as callback from file parser
 function protein.load(t)
@@ -74,6 +90,19 @@ function protein.load(t)
       thisProtein['chains'][chn]:load(t)
    end
 end
+
+---- class methods follow ----
+
+--- compute atomCoords for already loaded internal coordinates; wrapper grouping several Protein: class methods
+function Protein:internalToAtomCoords()
+   self:linkResidues()              -- set prev, next for each residue in each chain; create tables from residue to dihedron positions according to PDB backbone, sidechain atoms
+   self:renderDihedra()             -- generate hedron and dihedron space coordinates for hedron angle, lengths and dihedron angle
+   
+   self:assembleResidues()          -- assemble overlapping dihedra of each residue to complete atomCoords list, copy coordinates for i+1 N, CA, C to next residue 
+   
+   --return self:PDB()              -- output PDB format text
+end
+
 
 --- return table of component counts for chains in protein similar to tostring()
 -- @return table of [chain id][residue count, dssp count, dihedron count, hedron count]
@@ -106,22 +135,24 @@ function Protein:tostring()
    return s
 end
 
---- generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:toPDB() result
+--- generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:writePDB() result
 -- @return string containing PDB format text (complete)
-function Protein:toPDB()
+function Protein:writePDB(noRemark)
    --print('protein topdb ')   
    local s= ''
    if self['header'] then s = s .. self['header'] ..'\n' end
    if self['title'] then s = s .. self['title'] ..'\n' end
-   s = s .. string.format('%-80s\n','REMARK   5')
-   s = s .. string.format('%-80s\n','REMARK   5 WARNING')
-   s = s .. string.format('%-80s\n','REMARK   5 ' .. self['id'] .. ':   ' .. 'RFOLD OUTPUT ' .. os.date("%d-%b-%Y %H:%M:%S") )
-
+   if not noRemark then
+      s = s .. string.format('%-80s\n','REMARK   5')
+      s = s .. string.format('%-80s\n','REMARK   5 WARNING')
+      s = s .. string.format('%-80s\n','REMARK   5 ' .. self['id'] .. ':   ' .. 'RFOLD OUTPUT ' .. os.date("%d-%b-%Y %H:%M:%S") )
+   end
+   
    local ndx=0
    local ls
    for k,v in ipairs(self['chainOrder']) do
       local chain = self['chains'][v]
-      ls, ndx = chain:toPDB(ndx)
+      ls, ndx = chain:writePDB(ndx)
       s = s .. ls
    end
    s = s .. string.format('%-80s','END')
@@ -130,13 +161,13 @@ end
 
 --- generate text data specifying hedra with length, angle, length ; dihedra with angle ; relevant PDB records for annotation and start coordinates
 -- @return string containing structure specification in internal coordinates (complete)
-function Protein:toInternalCoords()
+function Protein:writeInternalCoords()
    local s = ''
    if self['header'] then s = s .. self['header'] ..'\n' end
    if self['title'] then s = s .. self['title'] ..'\n' end
    for k,v in ipairs(self['chainOrder']) do
       local chain = self['chains'][v]
-      s = s .. chain:toInternalCoords()
+      s = s .. chain:writeInternalCoords()
    end
    return s
 end
@@ -155,8 +186,22 @@ function Protein:renderDihedra()
    end
 end
 
+--- delete protein space atom coordinate data throughout protein object
+function Protein:clearAtomCoords()
+   for k,v in pairs(self['chains']) do
+      v:clearAtomCoords()
+   end
+end
+   
+--- delete internal coordinate data throughout protein object
+function Protein:clearInternalCoords()
+   for k,v in pairs(self['chains']) do
+      v:clearInternalCoords()
+   end
+end
+   
 --- inverse of linkResidues() and renderDihedra() : from input atom coordinates, build complete hedra and dihedra 
-function Protein:dihedraFromAtoms()
+function Protein:atomsToInternalCoords()
    for k,v in pairs(self['chains']) do
       v:dihedraFromAtoms()
    end
@@ -176,6 +221,17 @@ function Protein:setStartCoords()
    end
 end
 
+--- generate string indicating chain IDs and residues in each
+-- @return string
+function Protein:report()
+   local s=''
+   for k,v in ipairs(self['chainOrder']) do
+      local chain = self['chains'][v]
+      s = s .. 'chain ' .. v .. ' ' .. chain:countResidues() .. ' residues  '
+   end
+   return s
+end
+      
 
    
 return protein

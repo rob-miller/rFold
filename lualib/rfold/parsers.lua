@@ -5,16 +5,22 @@
 
 local parsers = {}
 
-local function usage(valid_flags, valid_params)
-   print(arg[0] .. ': command line error')
+local function usage(valid_flags, valid_params, info, usage)
+   local s = arg[0] .. (info and ': ' .. info or '') 
+   print(s)
+   if usage then
+      print(' usage: ' .. arg[0] .. usage)
+   else
+      print(' usage: ' .. arg[0] .. ' [options ...] arg ...' )
+   end
    if valid_flags then
-      io.write(' valid flags: ')
-      for f,v in pairs(valid_flags) do io.write( '-' .. f .. ' ') end
+      print(' valid flags: ')
+      for f,v in pairs(valid_flags) do io.write( '   -' .. f .. ' ' .. v ..'\n') end
       print()
    end
    if valid_params then
-      io.write(' valid parameters: ')
-      for p,v in pairs(valid_params) do io.write( '-' .. p .. '=  ') end
+      print(' valid parameters: ')
+      for p,v in pairs(valid_params) do io.write( '     -' .. p .. '=' .. v .. '\n') end
       print()
    end
 end
@@ -22,10 +28,10 @@ end
 --- parse specified flags and parameters from command line, pass remaining args through
 --
 -- ./parseCmdLine.lua -p1=hello -f1 -f1 fee fie fo fum
--- @param valid_flags { ['f1'] = true, ['f2'] = true }
--- @param valid_params { ['p1'] = true, ['p2'] = true }
+-- @param valid_flags { ['f1'] = "flag1 effect message", ['f2'] = "flag2 message" }
+-- @param valid_params { ['p1'] = "parameter1 info", ['p2'] = "parameter2 info" }
 -- @return table with 'param' values as specified, 'flag' values counting number of times flag seen, and remaining args in sequential numbered slots 
-function parsers.parseCmdLine (valid_flags, valid_params)
+function parsers.parseCmdLine (valid_flags, valid_params, info)
    local args = {}
 
    for i=1,#arg do
@@ -34,15 +40,17 @@ function parsers.parseCmdLine (valid_flags, valid_params)
             local key, val
             key, val = string.match(arg[i],'^-(%S+)=(%S+)$')
             if not (valid_params and valid_params[ key ]) then
-               usage(valid_flags, valid_params)
-               assert(nil, 'parameter -' .. key .. ' value ' .. val .. ' not recognised')
+               usage(valid_flags, valid_params, info)
+               print('parameter -' .. key .. ' value ' .. val .. ' not recognised')
+               os.exit()
             end
             args[ key ] = val
          else
             flag = string.match(arg[i],'^-(%S+)$')
             if not (valid_flags and valid_flags[ flag ]) then
-               usage(valid_flags, valid_params)
-               assert(nil, 'flag -' .. flag .. ' not recognised')
+               usage(valid_flags, valid_params, info)
+               print('flag -' .. flag .. ' not recognised')
+               os.exit()
             end
             args[flag] = (args[flag] or 0)+1
          end
@@ -55,11 +63,11 @@ function parsers.parseCmdLine (valid_flags, valid_params)
 end
 
 
---- parse rfold modified DSSP output file
+--- parse PDB file, internal coordinates (.pic) file, or rfold modified DSSP output file
 -- @param infile rfold modified DSSP output or PDB file or lines with hedron or dihedron specifications
--- @param callback (optional) call with table containing parsed fields for DSSP data lines, hedron length-angle-length lines, or dihedron angle lines
+-- @param callback (optional) call with table containing parsed fields for DSSP data lines, PDB ATOM etc. lines, hedron length-angle-length lines, or dihedron angle lines
 -- @return pdbid if callback specified, else sequential list of tables as for 'callback' above in order read
-function parsers.prd (infile, callback)
+function parsers.parseProteinData (infile, callback)
    local rdt = {}
    rdt['triples']={}
    rdt['quads']={}
@@ -87,7 +95,7 @@ function parsers.prd (infile, callback)
             rdt['title'] = title
          end
          --print(pdbid)
-      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec
+      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec
          local trip = {}
          trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
          if callback then
@@ -96,7 +104,7 @@ function parsers.prd (infile, callback)
             rdt['triples'][#rdt['triples']+1] = trip
          end
          --print(pdbid,chn,a1,a2,a3,v1,v2,v3)
-      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(%w+):(%w+):(%w+):(%w+)%s+(%S+)%s*$')  then   -- dihedron spec
+      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s*$')  then   -- dihedron spec
          local quad={}
          quad['pdbid'],quad['chn'],quad[1],quad[2],quad[3],quad[4],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
          if callback then
@@ -134,11 +142,33 @@ function parsers.prd (infile, callback)
             rdt['dssp'][#rdt['dssp']+1] = dsp
          end
          --print(ndx, resn, chn, res, '.'..ss..'.','>'..ss2..'<',phi,psi,omg,zn,zc,bca)
-      elseif line:ematch('^ATOM%s+(%d+)%s*(%w+)%s*(%a%a%a)%s(.)%s*(%d+)%s*(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%a)%s*$') then
+--[[
+         1         2         3         4         5         6         7         8
+12345678901234567890123456789012345678901234567890123456789012345678901234567890
+ATOM    145  N   VAL A  25      32.433  16.336  57.540  1.00 11.92      A1   N
+ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
+--]]
+         --                ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
+      elseif line:ematch('^ATOM%s+(%d+)%s*%w+') then
          local pdb = {}
-         pdb['ndx'], pdb['atom'],pdb['res3'],pdb['chn'],pdb['resn'],pdb['x'],pdb['y'],pdb['z'],pdb['occ'],pdb['tempfact'],pdb['elem']
-            = tonumber(_1), _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7), tonumber(_8), tonumber(_9), tonumber(_10), _11
+         pdb['ndx'] = tonumber(_1)
+         pdb['atom'] = line:sub(13,16):gsub('%s','')
+         pdb['altloc'] = line:sub(17,17);
+         if ' '==pdb['altloc'] then pdb['altloc']=nil end
+         
+         pdb['res3'] = line:sub(18,20)
+         pdb['chn'] = line:sub(22,22)
+         pdb['resn'] = tonumber(line:sub(23,26))
+         pdb['icode'] = line:sub(27,27)
+         if ' '==pdb['icode'] then pdb['icode']=nil end
+         
+         pdb['x'],pdb['y'],pdb['z'] = tonumber(line:sub(31,38)),tonumber(line:sub(39,46)),tonumber(line:sub(47,54))
+         pdb['occ'],pdb['tempfact'] = tonumber(line:sub(55,60)),tonumber(line:sub(61,66))
+         pdb['elem'] = line:sub(77,78):gsub('%s','')
+         
          --for k,v in pairs(pdb) do print(k,v) end
+         --print()
+         
          pdb['pdbid'] = pdbid
          if callback then
             callback(pdb)
@@ -159,6 +189,8 @@ function parsers.prd (infile, callback)
       elseif line:match(' HISTOGRAMS ') then
       elseif line:match(' PER ') then
       elseif line:match('^%s+#') then
+         -- dssp
+      elseif line:match('^%s*%d+%s+!*%s+') then
          -- pdb
       elseif line:match('^SEQADV') then
       elseif line:match('^LINK') then
@@ -184,12 +216,13 @@ function parsers.prd (infile, callback)
       elseif line:match('^ANISOU') then
       elseif line:match('^TER') then
       elseif line:match('^HETATM') then    -- todo: add support
+      elseif line:match('^MODRES') then
       elseif line:match('^CONECT') then
       elseif line:match('^MASTER') then
       elseif line:match('^END') then
          
       else
-         print('failed to parse: ' .. line)
+         io.stderr:write('failed to parse: ' .. line .. '\n')
       end
       
    end
