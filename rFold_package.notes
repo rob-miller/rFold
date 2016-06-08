@@ -1,0 +1,35 @@
+
+21 mar 2016
+
+rebuilt all so have on xub vm.
+
+---
+
+install netatalk so can mount on mac
+
+apt-get install libavahi-client-dev  libacl1-dev  libldap2-dev  libcrack2-dev  systemtap-sdt-dev  libdbus-1-dev  libdbus-glib-1-dev libglib2.0-dev  tracker  libtracker-sparql-1.0-dev  libtracker-miner-1.0-dev
+
+then as per http://netatalk.sourceforge.net/wiki/index.php/Install_Netatalk_3.1.8_on_Ubuntu_15.10_Wily
+
+---
+
+install postgresql 9.5 -- need special /etc/apt/sources.list.d/pgdg.list see https://wiki.postgresql.org/wiki/Apt
+
+sudo apt-get install libboost-all-dev  -- boost needed for dssp
+---
+
+torch - failed on copied dir, had to rm and clone from git again  (comment out torch lines in .profile)
+
+
+luarocks install luasql-postgres PGSQL_INCDIR=/usr/include/postgresql/
+
+numlua a pain again ...
+
+#sudo apt-get install totem   -- but doesn't see it anyway
+#git clone https://github.com/soumith/torch-hdf5
+
+really though with hdf5 already installed think main problem was vm is i386 so different dir :
+
+luarocks make numlua-0.3-1.rockspec HDF5_INCDIR="/usr/include/hdf5/serial/" HDF5_LIBDIR="/usr/lib/i386-linux-gnu/hdf5/serial"
+
+
