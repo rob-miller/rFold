@@ -70,7 +70,10 @@ function Chain:load(t)
       --print('dssp: ' .. t['res'] .. t['resn'])
       if t['res3'] then t['res'] = utils.res1[t['res3']] end
       --print(t['chn'],t['res'],t['resn'])
-      res = self:getResidue(t['res'], tonumber(t['resn']))
+      if (t['res'] and not t['icode']) and ((not t['altloc']) or ('A' == t['altloc'])) then     -- standard residue, no insdertion codes, only first altloc if present
+         --print(t['res'],t['resn'],t['atom'],t['altloc'])
+         res = self:getResidue(t['res'], tonumber(t['resn']))
+      end
    else  -- hedron or dihedron record
       --print(t[1])
       local akl = utils.splitAtomKey(t[1])
@@ -88,7 +91,7 @@ end
 --- custom iterator for residue array to skip missing residues and start at sequence positions other than 1
 -- @param a array of residues to iterate in numeric order
 -- @param i initial value
-local function resIter(a,i)
+local function ordResIter(a,i)
    local r={}
    while true do
       i = i+1
@@ -98,10 +101,29 @@ local function resIter(a,i)
    end
 end
 
---- initialiser for Chain:resIter()
+--- initialiser for Chain:oResIter()
 -- @param a array of residues to iterate in numeric order
-function Chain:resPairs(a)
-   return resIter, a, self['firstPos']-1
+function Chain:orderedResidues()
+   return ordResIter, self['residues'], self['firstPos']-1
+end
+   
+--- custom iterator for residue array to process all residue positions (including disordered) and start at sequence positions other than 1
+-- @param a array of residues to iterate in numeric order
+-- @param i initial value
+local function allResIter(a,i)
+   local r={}
+   while true do
+      i = i+1
+      local r = a[i]
+      if r then return i,r 
+      elseif not r then return nil end
+   end
+end
+
+--- initialiser for Chain:aResIter()
+-- @param a array of residues to iterate in numeric order
+function Chain:allResidues()
+   return allResIter, self['residues'], self['firstPos']-1
 end
    
 
@@ -113,7 +135,7 @@ end
 
 --- assign 'prev' and 'next' for Residues in self['residues']; trigger Residue to link its dihedra (create map of keys to dihedra, link dihedron atoms into backbone and sidechain tables)
 function Chain:linkResidues()
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       self:setPrevNext(i,r)
       r:linkDihedra()
    end
@@ -123,7 +145,7 @@ end
 -- @return sum of hedra for Residues in chain
 function Chain:countHedra()
    local c=0
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       --print(i,v['res'], v['resn'])
       c = c + r:countHedra()
    end
@@ -134,7 +156,7 @@ end
 -- @return sum of dihedra for Residues in chain
 function Chain:countDihedra()
    local c=0
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       --print(r['res'] .. r['resn'] .. ' ' .. r:countDihedra())
       c = c + r:countDihedra()
    end
@@ -145,7 +167,7 @@ end
 -- @return sum of Residues in chain with DSSP records
 function Chain:countDSSPs()
    local c=0
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       if r['dssp'] then c = c + 1 end
    end
    return c
@@ -153,14 +175,14 @@ end
 
 --- delete protein space atom coordinate data from this chain
 function Chain:clearAtomCoords()
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       r:clearAtomCoords()
    end
 end
    
 --- delete internal coordinate data from this chain
 function Chain:clearInternalCoords()
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       r:clearInternalCoords()
    end
 end
@@ -169,7 +191,7 @@ end
 -- @return chain amino acid sequence as string
 function Chain:seqStr()
    local s=''
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       s = s .. r['res']
    end
    return s
@@ -179,13 +201,13 @@ end
 -- <br>
 -- Dihedra depend on hedra in adjacent Residues, so must complete hedra first
 function Chain:renderDihedra()
-   for i,r in self:resPairs(self['residues']) do r:renderHedra() end
-   for i,r in self:resPairs(self['residues']) do r:renderDihedra() end
+   for i,r in self:orderedResidues() do r:renderHedra() end
+   for i,r in self:orderedResidues() do r:renderDihedra() end
 end   
 
 --- foreach chain, complete residue, dihedra, hedra data structures from protein space atom coordinates
 function Chain:dihedraFromAtoms()
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       self:setPrevNext(i,r)
       r:dihedraFromAtoms()
    end
@@ -199,7 +221,7 @@ end
 function Chain:assembleResidues()
    local c=1
    local ndx=0
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       local startPos
       if r['prev'] and r['prev']['ordered'] then  -- if sequential, i.e. no chain breaks
          startPos={}
@@ -229,11 +251,13 @@ function Chain:writePDB(ndx)
    --print('chain topdb '  .. ndx)
    local s = ''
    local ls
-   for i,r in self:resPairs(self['residues']) do
+   local lastRes
+   for i,r in self:orderedResidues() do
       ls,ndx = r:writePDB(self['id'],ndx)
       s = s .. ls
+      lastRes=i
    end
-   local res = self['residues'][#self['residues']]
+   local res = self['residues'][lastRes]
    ndx = ndx + 1
    s = s .. string.format('TER   %5d      %3s %1s%4d%54s\n',ndx, utils.res3[ res['res'] ], self['id'], res['resn'], '')
 
@@ -245,7 +269,7 @@ function Chain:writeInternalCoords()
 
    if {} ~= self['initNCaC'] then
       local n = 1
-      for i,r in self:resPairs(self['residues']) do
+      for i,r in self:orderedResidues() do
          if self['initNCaC'][i] then
             local initNCaC = self['initNCaC'][i]
             local akl =  r:NCaCKeySplit()
@@ -257,7 +281,7 @@ function Chain:writeInternalCoords()
          end
       end
    end
-   for i,r in self:resPairs(self['residues']) do
+   for i,r in self:orderedResidues() do
       s = s .. r:writeInternalCoords(self['pdbid'], self['id'])
    end
    return s
@@ -267,7 +291,7 @@ end
 -- @see assembleResidues
 function Chain:setStartCoords()
    local c=0
-   for i,r in self:resPairs(self['residues']) do  -- find any residues with no previous or previous is disordered
+   for i,r in self:orderedResidues() do  -- find any residues with no previous or previous is disordered
       if not (self['residues'][i-1] and self['residues'][i-1]['ordered']) then
          local akl =  r:NCaCKeySplit()
          local initCoords
@@ -288,17 +312,18 @@ function Chain:setStartCoords()
          if initCoords then c=c+1 end
       end
    end
-   io.stderr:write('set ' .. c .. ' start coords\n')
+   if utils.warn then io.stderr:write('set ' .. c .. ' start coords\n') end
 end
 
 --- report ordered (with coordinates) residues in this chain
 -- @return count of ordered residues
 function Chain:countResidues()
-   local c = 0
-   for i,r in self:resPairs(self['residues']) do
-      c=c+1
+   local o,a = 0,0
+   for i,r in self:allResidues() do
+      a=a+1
+      if r['ordered'] then o=o+1 end
    end
-   return c
+   return o,a
 end
 
 return chain

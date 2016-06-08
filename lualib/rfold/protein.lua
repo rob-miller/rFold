@@ -227,7 +227,8 @@ function Protein:report()
    local s=''
    for k,v in ipairs(self['chainOrder']) do
       local chain = self['chains'][v]
-      s = s .. 'chain ' .. v .. ' ' .. chain:countResidues() .. ' residues  '
+      local ordered,all = chain:countResidues()
+      s = s .. 'chain ' .. v .. ' ' .. ordered ..'/' .. all .. ' residues  '
    end
    return s
 end

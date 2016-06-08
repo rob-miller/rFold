@@ -44,7 +44,8 @@ function parsers.parseCmdLine (valid_flags, valid_params, info)
                print('parameter -' .. key .. ' value ' .. val .. ' not recognised')
                os.exit()
             end
-            args[ key ] = val
+            if not args[key] then args[key]={} end
+            args[ key ][#args[key]+1] = val
          else
             flag = string.match(arg[i],'^-(%S+)$')
             if not (valid_flags and valid_flags[ flag ]) then
@@ -66,15 +67,26 @@ end
 --- parse PDB file, internal coordinates (.pic) file, or rfold modified DSSP output file
 -- @param infile rfold modified DSSP output or PDB file or lines with hedron or dihedron specifications
 -- @param callback (optional) call with table containing parsed fields for DSSP data lines, PDB ATOM etc. lines, hedron length-angle-length lines, or dihedron angle lines
+-- @param chain only process line if specified chain matches input (where relevant)
 -- @return pdbid if callback specified, else sequential list of tables as for 'callback' above in order read
-function parsers.parseProteinData (infile, callback)
+function parsers.parseProteinData (infile, callback, chain)
    local rdt = {}
    rdt['triples']={}
    rdt['quads']={}
    rdt['dssp']={}
    local pdbid='xxxxx'
-   if infile then io.input(infile) end
-   for line in io.lines() do
+   local fh
+   assert(infile,'parseProteinData: no input file')
+
+   local err
+   if infile:match('%.gz$') then
+      fh,err = io.popen('zcat ' .. infile)
+   else
+      fh,err = io.open(infile)
+   end
+   if err then print(infile,err) return end
+
+   for line in fh:lines() do
       --print(line)
       if line:match('^HEADER ') then  -- dssp or pdb
          pdbid = line:match('(%S+)%s*%.?$')
@@ -98,19 +110,23 @@ function parsers.parseProteinData (infile, callback)
       elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec
          local trip = {}
          trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
-         if callback then
-            callback(trip)
-         else
-            rdt['triples'][#rdt['triples']+1] = trip
+         if not chain or chain == trip['chn'] then
+            if callback then
+               callback(trip)
+            else
+               rdt['triples'][#rdt['triples']+1] = trip
+            end
          end
          --print(pdbid,chn,a1,a2,a3,v1,v2,v3)
       elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s*$')  then   -- dihedron spec
          local quad={}
          quad['pdbid'],quad['chn'],quad[1],quad[2],quad[3],quad[4],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
-         if callback then
-            callback(quad)
-         else
-            rdt['quads'][#rdt['quads']+1] = quad
+         if not chain or chain == quad['chn'] then
+            if callback then
+               callback(quad)
+            else
+               rdt['quads'][#rdt['quads']+1] = quad
+            end
          end
          --print(pdbid,chn,a1,a2,a3,a4,v1)
       elseif line:ematch('^%s+(%d+)%s+(%d+)%s(%a?)%s(%a)%s') then    -- modified dssp output
@@ -136,10 +152,12 @@ function parsers.parseProteinData (infile, callback)
          dsp['ca']['x'], dsp['ca']['y'], dsp['ca']['z'], dsp['c']['x'], dsp['c']['y'], dsp['c']['z'] = tonumber(_7),tonumber(_8),tonumber(_9),tonumber(_10),tonumber(_11),tonumber(_12)
          dsp['cb']['x'], dsp['cb']['y'], dsp['cb']['z'],dsp['o']['x'], dsp['o']['y'], dsp['o']['z'] = tonumber(_13),tonumber(_14),tonumber(_15),tonumber(_16),tonumber(_17),tonumber(_18)
          dsp['bca'] = tonumber(_19)
-         if callback then
-            callback(dsp)
-         else
-            rdt['dssp'][#rdt['dssp']+1] = dsp
+         if not chain or chain == dspp['chn'] then
+            if callback then
+               callback(dsp)
+            else
+               rdt['dssp'][#rdt['dssp']+1] = dsp
+            end
          end
          --print(ndx, resn, chn, res, '.'..ss..'.','>'..ss2..'<',phi,psi,omg,zn,zc,bca)
 --[[
@@ -166,16 +184,18 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
          pdb['occ'],pdb['tempfact'] = tonumber(line:sub(55,60)),tonumber(line:sub(61,66))
          pdb['elem'] = line:sub(77,78):gsub('%s','')
          
+         pdb['pdbid'] = pdbid
+
          --for k,v in pairs(pdb) do print(k,v) end
          --print()
-         
-         pdb['pdbid'] = pdbid
-         if callback then
-            callback(pdb)
-         else
-            rdt['pdb'][#rdt['pdb']+1] = pdb
+
+         if (not chain) or (chain == pdb['chn']) then
+            if callback then
+               callback(pdb)
+            else
+               rdt['pdb'][#rdt['pdb']+1] = pdb
+            end
          end
-   
          -- lines to ignore:
          -- dssp / pdb
       elseif line:match('^--$') then
@@ -212,11 +232,16 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match('^SITE') then
       elseif line:match('^CRYST') then
       elseif line:match('^ORIGX') then
+      elseif line:match('^MTRIX') then
       elseif line:match('^SCALE') then
       elseif line:match('^ANISOU') then
       elseif line:match('^TER') then
       elseif line:match('^HETATM') then    -- todo: add support
       elseif line:match('^MODRES') then
+      elseif line:match('^MODEL') then
+      elseif line:match('^NUMMDL') then         
+      elseif line:match('^CAVEAT') then
+      elseif line:match('^SPRSDE') then
       elseif line:match('^CONECT') then
       elseif line:match('^MASTER') then
       elseif line:match('^END') then

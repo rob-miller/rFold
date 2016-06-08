@@ -5,6 +5,9 @@
 
 local utils = {}
 
+------- global flags
+utils.warn=nil
+
 --- extend string.match to test and capture patterns - goes into string: namespace
 --
 -- <br>`https://inspired-lua.org/index.php/2013/05/extend-string-match-to-test-and-capture-patterns/`
@@ -66,14 +69,18 @@ end
 -- @param num the initial value
 -- @return the value rounded to 5 decimal places
 function utils.setAccuracy95(num)
-   return tonumber( string.format("%9.5f",num) )
+   local r = tonumber( string.format("%9.5f",num) )
+   if -0.00000 == r then r=0.00000 end
+   return r
 end
 
 --- round number to value presented for %8.3lf in C
 -- @param num the initial value
 -- @return the value rounded to 3 decimal places
 function utils.setAccuracy83(num)
-   return tonumber( string.format("%8.3f",num) )
+   local r = tonumber( string.format("%8.3f",num) )
+   if -0.000 == r then r=0.000 end
+   return r 
 end
 
 --- sort table by keys, from pil 1st ed 19.3

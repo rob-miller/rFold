@@ -199,6 +199,11 @@ end
 
 -- based on code from DT Jones
 local function genGlyCB(n4,ca4,c4)
+   if not (n4 and ca4 and c4) then
+      if utils.warn then io.stderr:write('genGlyCB without complete NCaC\n') end
+      return
+   end
+         
    local n,ca,c = matrix.new(3),matrix.new(3),matrix.new(3)
    for i=1,3 do
       n[i] = n4[i][1]
@@ -283,7 +288,7 @@ function Residue:dihedraFromAtoms()
             self['dihedra'][utils.genKey(nt[1],nt[2],nt[3],nt[4])] = dihedron.new(nt)
          end
       end
-   elseif 'G' == self['res'] and not self['atomCoords'][sCB] then  -- only G,A do not have entries in utils.sidechains 
+   elseif 'G' == self['res'] and not self['atomCoords'][sCB] then  -- only G,A do not have entries in utils.sidechains
       self['atomCoords'][sCB] = genGlyCB(self['atomCoords'][sN],self['atomCoords'][sCA],self['atomCoords'][sC])
       --print(sCB .. self['atomCoords'][sCB]:transpose():pretty())
    end
@@ -325,9 +330,11 @@ function Residue:writePDB(chain,ndx)
          atomName = utils.splitAtomKey(dihedron[position])[3]   -- dihedron['atomNames'][position]  -- dihedron['atomCoords'][coordsInitial]['names'][position]
          local akl = { dihedron[1], dihedron[2], dihedron[3], dihedron[4] } -- utils.splitKey(dihedron['key'])
          atom = self['atomCoords'][akl[position]] --  dihedron['initialCoords'][position]
-         ls =  utils.atomString(ndx,atomName,self['res'], chain, self['resn'], atom[1][1], atom[2][1],atom[3][1], 1.0, 0.0)
-         --print(ls)
-         s = s .. ls
+         if atom then 
+            ls =  utils.atomString(ndx,atomName,self['res'], chain, self['resn'], atom[1][1], atom[2][1],atom[3][1], 1.0, 0.0)
+            --print(ls)
+            s = s .. ls
+         end
       end
    end
 
@@ -467,7 +474,7 @@ function Residue:assemble( atomCoordsIn )
       --print('start h1k ' .. h1k, dihedra)
       if dihedra then
          for di, d in ipairs(dihedra) do
-            if d['initialCoords'][4] then  -- (test for incomplete dihedron due to missing input data)
+            if d['initialCoords'][4] then  -- (skip incomplete dihedron if don't have 4th atom due to missing input data)
                --print('assemble: ' .. h1k .. ' -> ' .. d['key'])
                local dh2key = d['hedron2']['key']
                local akl = { d[1], d[2], d[3], d[4] }  -- utils.splitKey( d['key'] )
@@ -489,8 +496,11 @@ function Residue:assemble( atomCoordsIn )
                   --print('finished: ' .. d['key'] .. ' adding hedron ' .. dh2key .. ' a4: ' .. akl[4] .. ' -- ' .. atomCoords[akl[4]]:transpose():pretty())
                   q:push_left(dh2key)
                else
-                  io.stderr:write('no coords to start ' .. d['key'] .. '\n')
-                  q:push_left(h1k)
+                  if utils.warn then 
+                     io.stderr:write('no coords to start ' .. d['key'] .. '\n')
+                  end
+                  --assert(nil,'foo')
+                  --q:push_left(h1k)
                end
             end
          end

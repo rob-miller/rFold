@@ -57,11 +57,13 @@ end
 function Hedron:initPos()
 
    if not (self['len1'] and self['angle2'] and self['len3']) then
-      io.stderr:write('incomplete hedron missing ')
-      if not self['len1'] then io.stderr:write('len1 ') end
-      if not self['angle2'] then io.stderr:write('angle2 ') end
-      if not self['len3'] then io.stderr:write('len3 ') end
-      io.stderr:write(self:tostring() .. '\n')
+      if utils.warn then
+         io.stderr:write('incomplete hedron missing ')
+         if not self['len1'] then io.stderr:write('len1 ') end
+         if not self['angle2'] then io.stderr:write('angle2 ') end
+         if not self['len3'] then io.stderr:write('len3 ') end
+         io.stderr:write(self:tostring() .. '\n')
+      end
       self['updated'] = false
       return
    end
@@ -102,11 +104,13 @@ end
 function Hedron:hedronFromAtoms(atomCoords)
    local a1,a2,a3 = atomCoords[self[1]],atomCoords[self[2]],atomCoords[self[3]]
    if not (a1 and a2 and a3) then
-      io.stderr:write('hedron missing coordinates for ')
-      if not a1 then io.stderr:write('a1 ') end
-      if not a2 then io.stderr:write('a2 ') end
-      if not a3 then io.stderr:write('a3 ') end
-      io.stderr:write(self:tostring() .. '\n')
+      if utils.warn then
+         io.stderr:write('hedron missing coordinates for ')
+         if not a1 then io.stderr:write('a1 ') end
+         if not a2 then io.stderr:write('a2 ') end
+         if not a3 then io.stderr:write('a3 ') end
+         io.stderr:write(self:tostring() .. '\n')
+      end
       return
    end
    local len1,angle2,len3 = getDistAngleDist(a1,a2,a3)
