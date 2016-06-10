@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>rFold by rob-miller</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+    <meta name="viewport" content="width=device-width">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>rFold</h1>
+        <p>a set of Lua (LuaJIT) classes and submodules to build, manipulate and analyse three-dimensional protein structures.</p>
+
+        <p class="view"><a href="https://github.com/rob-miller/rFold">View the Project on GitHub <small>rob-miller/rFold</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/rob-miller/rFold/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/rob-miller/rFold/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/rob-miller/rFold">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a id="rfold" class="anchor" href="#rfold" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>rFold</h1>
+
+<p><a href="http://rob-miller.github.io/rFold/doc/index.html">rFold</a> is a set of Lua (LuaJIT) classes and submodules to build, manipulate and analyse three-dimensional protein structures.</p>
+
+<h2>
+<a id="overview" class="anchor" href="#overview" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Overview</h2>
+
+<p>rFold is intended to be a library of functions to assist in protein structure analysis and prediction.  The predictive methodology will be largely based on kinematic and artificial intelligence approaches, but hopefully interested users can pick and choose utilities from the project to meet their own needs.</p>
+
+<p>The intended development roadmap is to create functionality in roughly the following order: Build (generate 3D structure coordinates from internal phi, psi, omega and chi dihedral angles); Collect (catalogue internal coordinate and other data from known protein structures); Move (perturb structures to explore local regions of conformational space); and Evaluate (assess three dimensional residue environments based on data from known structures).</p>
+
+<p>Currently (June, 2016) only the Build module is working,  This software can accurately interconvert between PDB files and fully specified internal coordinates (<em>phi, psi, omega</em> and <em>chi</em> dihedral angles, plus all bond lengths and angles).  Planned functionality includes incorporating average bond lengths and angles and default dihedral angles if not specified.</p>
+
+<h2>
+<a id="external-dependencies" class="anchor" href="#external-dependencies" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>External Dependencies</h2>
+
+<p><a href="https://github.com/carvalho/numlua">numlua</a> -- Numeric Libraries for Lua for matrix support.  I needed to pull the lua_number2int fix for this repository; possibly this should be switched to use <a href="http://torch.ch/">Torch</a>.</p>
+
+<p><a href="https://github.com/catwell/cw-lua/tree/master/deque">deque</a> -- Queue implementation used to assemble residues for Build module.</p>
+
+<p><a href="https://github.com/stevedonovan/LDoc">ldoc</a> -- Lua documentation generator.</p>
+
+<h2>
+<a id="build" class="anchor" href="#build" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Build</h2>
+
+<p>Accurate creation of 3D coordinate data from protein structure internal coordinates (phi and psi dihedral angles) requires explicit specification of all structure details: bond lengths, angles and dihedral angles.  rFold defines a '.pic' datafile format in which each standalone line specifies 3 atoms and their length, angle, length relationship, or 4 atoms with their dihedral angle relationship.  For example:</p>
+
+<p>1MUD A 1MN:1MCA:1MC   1.45628 114.95350   1.53294</p>
+
+<p>1MUD A 1MN:1MCA:1MC:2QN 144.22629</p>
+
+<p>In addition the coordinates for the first three atoms (usually N, CA and C) of each chain are required from the original PDB file in order to place the chain in the correct coordinate space, if the coordinates are to be compared to the PDB data.</p>
+
+<p>While there is an inevitable buildup of error as residues are assembled along a protein chain, the current implementation with five decimal point precision for the internal coordinates is sufficient to exactly regenerate backbone and sidechain coordinates for PDB chains of over 1200 residues.</p>
+
+<p>Using a May, 2016 <code>cullpdb_pc20_res2.2_R1.0.curr</code> file from the <a href="http://dunbrack.fccc.edu/PISCES.php">Dunbrack Lab PISCES server</a>, 97.5% of 5,825 protein chains are regenerated exactly according to a line-by-line comparison test (see buildProtein.lua).  As of June, 2016, the 143 chains generating differences have not yet been investigated.</p>
+
+<h2>
+<a id="collect" class="anchor" href="#collect" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Collect</h2>
+
+<p>Not yet implemented.  Source tree contains modified DSSP program, changed to output internal coordinate records matching PIC data above and more atom coordinates.</p>
+
+<h2>
+<a id="move" class="anchor" href="#move" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Move</h2>
+
+<p>Not implented.</p>
+
+<h2>
+<a id="evaluate" class="anchor" href="#evaluate" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Evaluate</h2>
+
+<p>Not implemented.  See <a href="https://books.google.com/books?id=VmFSNNm7k6cC&amp;lpg=PA22&amp;ots=kq7am9BPse&amp;dq=miller%20douthart%20and%20dunker&amp;pg=PA9">Miller, Douthart and Dunker 1994</a> for early work.</p>
+
+<h2>
+<a id="why-lua--luajit" class="anchor" href="#why-lua--luajit" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Why Lua / LuaJIT?</h2>
+
+<p>In addition to speed and its connection with the <a href="http://torch.ch/">Torch7</a> Neural Nets / Scientific Computing Framework, I find Lua code remarkably easy to understand and modify long after initial development work.</p>
+
+<h2>
+<a id="license" class="anchor" href="#license" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>License</h2>
+
+<p>Copyright 2016 Robert T. Miller</p>
+
+<p>Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use these files except in compliance with the License.
+   You may obtain a copy of the License at</p>
+
+<pre><code>   http://www.apache.org/licenses/LICENSE-2.0
+</code></pre>
+
+<p>Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/rob-miller">rob-miller</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
