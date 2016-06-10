@@ -169,3 +169,9 @@
    - works for 3egw 3 chains 1244 / 509 / 224 residues
    - works for 4lgy 1 chain, 1287 residues, starts at -9, missing sidechains, missing residues, 1 non-standard residue treated as chain break
    
+01 june 2016
+   - -f working for PISCES input list, various tweaks to get all the way through
+
+08 june 2016
+   - documentation, license, get ready for github release
+

@@ -1,7 +1,26 @@
+--[[
+   parsers.lua
+   
+Copyright 2016 Robert T. Miller
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use these files except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+]]
 
 --- file parsers:
--- modified DSSP output parser, command line parser, PDB file parser
--- @module parsers
+-- command line parser, PDB file / (modified) DSSP output parser
+--
+-- not a class but works better with ldoc if we say it is
+-- @classmod parsers
 
 local parsers = {}
 
@@ -29,7 +48,8 @@ end
 --
 -- ./parseCmdLine.lua -p1=hello -f1 -f1 fee fie fo fum
 -- @param valid_flags { ['f1'] = "flag1 effect message", ['f2'] = "flag2 message" }
--- @param valid_params { ['p1'] = "parameter1 info", ['p2'] = "parameter2 info" }
+-- @param valid_params { ['p1'] = "parameter1 explanation ...", ['p2'] = "parameter2 explanation ..." }
+-- @param info descriptive text for what the program does
 -- @return table with 'param' values as specified, 'flag' values counting number of times flag seen, and remaining args in sequential numbered slots 
 function parsers.parseCmdLine (valid_flags, valid_params, info)
    local args = {}
