@@ -1,5 +1,5 @@
 #rFold
-[rFold](http://rob-miller.github.io/rFold/doc/index.html) is a set of Lua (LuaJIT) classes and submodules to build, manipulate and analyse three-dimensional protein structures.
+[rFold](http://rob-miller.github.io/rFold/doc/topics/README.md.html) is a set of Lua (LuaJIT) classes and submodules to build, manipulate and analyse three-dimensional protein structures.
 
 ## Overview
 
