@@ -1,0 +1,452 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>rFold reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>rFold</h1>
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Methods">Methods</a></li>
+</ul>
+
+
+<h2>Classes</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../classes/Protein.html">Protein</a></li>
+  <li><a href="../classes/Chain.html">Chain</a></li>
+  <li><strong>Residue</strong></li>
+  <li><a href="../classes/Dihedron.html">Dihedron</a></li>
+  <li><a href="../classes/Hedron.html">Hedron</a></li>
+  <li><a href="../classes/geom3d.html">geom3d</a></li>
+  <li><a href="../classes/parsers.html">parsers</a></li>
+  <li><a href="../classes/utils.html">utils</a></li>
+</ul>
+<h2>Topics</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../topics/README.md.html">README</a></li>
+</ul>
+<h2>Examples</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../examples/buildProtein.lua.html">buildProtein.lua</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Class <code>Residue</code></h1>
+<p>residue structure classes for rFold</p>
+<p> <strong>external dependencies</strong> : deque (https://github.com/catwell/cw-lua/tree/master/deque)</p>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#residue.new">residue.new (o)</a></td>
+	<td class="summary">Residue class object initialiser (not a class method)</td>
+	</tr>
+</table>
+<h2><a href="#Methods">Methods</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Residue:load">Residue:load (t)</a></td>
+	<td class="summary">callback from file parser, import table data for this Residue according to contents</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:tostring">Residue:tostring ()</a></td>
+	<td class="summary">generate descriptive string for Residue: 1-letter amino acid code, sequence position</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:countHedra">Residue:countHedra ()</a></td>
+	<td class="summary">count entries in self['hedra'] table</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:countDihedra">Residue:countDihedra ()</a></td>
+	<td class="summary">count entries in self['dihedra'] table</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:clearAtomCoords">Residue:clearAtomCoords ()</a></td>
+	<td class="summary">delete protein space atom coordinate data from this residue</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:clearInternalCoords">Residue:clearInternalCoords ()</a></td>
+	<td class="summary">delete internal coordinate data from this chain</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:renderHedra">Residue:renderHedra ()</a></td>
+	<td class="summary">set hedron space coordinates for each point from supplied length, angle, length</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:renderDihedra">Residue:renderDihedra ()</a></td>
+	<td class="summary">set dihedron space coordinates for each point from hedra and supplied dihedral angle</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:linkDihedra">Residue:linkDihedra ()</a></td>
+	<td class="summary">create map of key(first 3 atom ids) to dihedron for all dihedra in Residue; create backbone and sidechain tables of (dihedron, position) for atoms in PDB order</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:dihedraFromAtoms">Residue:dihedraFromAtoms ()</a></td>
+	<td class="summary">complete residue, dihedra, hedra data structures from protein space atom coordinates</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:writePDB">Residue:writePDB (chain, ndx)</a></td>
+	<td class="summary">generate ATOM records for this Residue
+<br>
+ Note: OXT defined in Dihedra like other atoms, if present</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:dsspAtom">Residue:dsspAtom (atomKey)</a></td>
+	<td class="summary">create a 4x1 matrix with coordinates for specified atom token as read from DSSP</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:NCaCKeySplit">Residue:NCaCKeySplit ()</a></td>
+	<td class="summary">generate a table of atom tokens for this Residue's N, CA, C backbone atoms</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:assemble">Residue:assemble (atomCoordsIn)</a></td>
+	<td class="summary">join dihedrons from N-CA-C and N-CA-CB hedrons, computing protein space coordinates for backbone and sidechain atoms</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+    Methods
+    <dl class="function">
+    <dt>
+    <a name = "residue.new"></a>
+    <strong>residue.new (o)</strong>
+    </dt>
+    <dd>
+    Residue class object initialiser (not a class method)
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">o</span>
+         table with fields 'res' = 1-letter amino acid code, 'resn' = sequence position of Residue in Chain
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        minimally initialised Residue object
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Methods"></a>Methods</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Residue:load"></a>
+    <strong>Residue:load (t)</strong>
+    </dt>
+    <dd>
+    callback from file parser, import table data for this Residue according to contents
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">t</span>
+         parsed file record data: DSSP record, or hedron / dihedron specification
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:tostring"></a>
+    <strong>Residue:tostring ()</strong>
+    </dt>
+    <dd>
+    generate descriptive string for Residue: 1-letter amino acid code, sequence position
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        descriptive string
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:countHedra"></a>
+    <strong>Residue:countHedra ()</strong>
+    </dt>
+    <dd>
+    count entries in self['hedra'] table
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        number of hedra in Residue
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:countDihedra"></a>
+    <strong>Residue:countDihedra ()</strong>
+    </dt>
+    <dd>
+    count entries in self['dihedra'] table
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        number of dihedra in Residue
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:clearAtomCoords"></a>
+    <strong>Residue:clearAtomCoords ()</strong>
+    </dt>
+    <dd>
+    delete protein space atom coordinate data from this residue
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:clearInternalCoords"></a>
+    <strong>Residue:clearInternalCoords ()</strong>
+    </dt>
+    <dd>
+    delete internal coordinate data from this chain
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:renderHedra"></a>
+    <strong>Residue:renderHedra ()</strong>
+    </dt>
+    <dd>
+    set hedron space coordinates for each point from supplied length, angle, length
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:renderDihedra"></a>
+    <strong>Residue:renderDihedra ()</strong>
+    </dt>
+    <dd>
+    set dihedron space coordinates for each point from hedra and supplied dihedral angle
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:linkDihedra"></a>
+    <strong>Residue:linkDihedra ()</strong>
+    </dt>
+    <dd>
+    create map of key(first 3 atom ids) to dihedron for all dihedra in Residue; create backbone and sidechain tables of (dihedron, position) for atoms in PDB order
+
+
+
+
+
+    <h3>See also:</h3>
+    <ul>
+         <a href="../classes/Residue.html#Residue:writePDB">writePDB</a>
+    </ul>
+
+
+</dd>
+    <dt>
+    <a name = "Residue:dihedraFromAtoms"></a>
+    <strong>Residue:dihedraFromAtoms ()</strong>
+    </dt>
+    <dd>
+    complete residue, dihedra, hedra data structures from protein space atom coordinates
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:writePDB"></a>
+    <strong>Residue:writePDB (chain, ndx)</strong>
+    </dt>
+    <dd>
+    generate ATOM records for this Residue
+<br>
+ Note: OXT defined in Dihedra like other atoms, if present
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">chain</span>
+         chain ID
+        </li>
+        <li><span class="parameter">ndx</span>
+         ATOM record sequence counter
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        string containing sequential ATOM records, ndx
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:dsspAtom"></a>
+    <strong>Residue:dsspAtom (atomKey)</strong>
+    </dt>
+    <dd>
+    create a 4x1 matrix with coordinates for specified atom token as read from DSSP
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">atomKey</span>
+         atom token of form (sequence postion)(residue)(atom string)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        4x1 matrix with protein space coordinates for atom
+    </ol>
+
+
+    <h3>See also:</h3>
+    <ul>
+         <a href="../classes/Chain.html#Chain:setStartCoords">Chain:setStartCoords</a>
+    </ul>
+
+
+</dd>
+    <dt>
+    <a name = "Residue:NCaCKeySplit"></a>
+    <strong>Residue:NCaCKeySplit ()</strong>
+    </dt>
+    <dd>
+    generate a table of atom tokens for this Residue's N, CA, C backbone atoms
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        table of atom tokens { (sequence postion)(residue)(atom string) } for N, CA, C backbone atoms
+    </ol>
+
+
+    <h3>See also:</h3>
+    <ul>
+         <a href="../classes/Chain.html#Chain:setStartCoords">Chain:setStartCoords</a>
+    </ul>
+
+
+</dd>
+    <dt>
+    <a name = "Residue:assemble"></a>
+    <strong>Residue:assemble (atomCoordsIn)</strong>
+    </dt>
+    <dd>
+    join dihedrons from N-CA-C and N-CA-CB hedrons, computing protein space coordinates for backbone and sidechain atoms
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">atomCoordsIn</span>
+         table of atom_token : 4x1 matrix of protein space coordinates
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
+<i style="float:right;">Last updated 2016-06-10 13:13:37 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
