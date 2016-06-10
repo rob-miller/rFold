@@ -16,7 +16,7 @@ Copyright 2016 Robert T. Miller
    limitations under the License.
 ]]
 
---- Residue structure classes for rFold 
+--- residue structure classes for rFold 
 --
 -- **external dependencies** : deque (https://github.com/catwell/cw-lua/tree/master/deque)
 --

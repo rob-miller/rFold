@@ -6,4 +6,5 @@ full_description = ""
 format = 'markdown'
 readme = "README.md"
 examples = {'build/buildProtein.lua'}
+boilerplate = true
 

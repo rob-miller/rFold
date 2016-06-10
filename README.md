@@ -7,7 +7,7 @@ rFold is intended to be a library of functions to assist in protein structure an
 
 The intended development roadmap is to create functionality in roughly the following order: Build (generate 3D structure coordinates from internal phi, psi, omega and chi dihedral angles); Collect (catalogue internal coordinate and other data from known protein structures); Move (perturb structures to explore local regions of conformational space); and Evaluate (assess three dimensional residue environments based on data from known structures).
 
-Currently (June, 2016) only the Build module is working,  This software can accurately interconvert between PDB files and fully specified internal coordinates (_phi, psi, omega_ and _chi_ dihedral angles, plus all bond lengths and angles).  Planned functionality will include incorporating average bond lengths and angles and default dihedral angles if not specified.
+Currently (June, 2016) only the Build module is working,  This software can accurately interconvert between PDB files and fully specified internal coordinates (_phi, psi, omega_ and _chi_ dihedral angles, plus all bond lengths and angles).  Planned functionality includes incorporating average bond lengths and angles and default dihedral angles if not specified.
 
 ## External Dependencies
 
