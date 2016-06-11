@@ -51,6 +51,31 @@ local utils = require 'rfold.utils'
 
 local PDB_repository_base = '/media/data/pdb/'
 
+local function lineByLine(s1,s2)
+   local s1t, s2t = {}, {}
+   for line in s1:gmatch("[^\r\n]+") do s1t[#s1t+1] = line end
+   for line in s2:gmatch("[^\r\n]+") do s2t[#s2t+1] = line end
+
+   local ecnt = 2
+   for i,lin in ipairs(s1t) do
+      if lin ~= s2t[i] then
+         print()
+         print(lin)
+         print(s2t[i])
+         ecnt = ecnt-1
+         if 0>ecnt then return false end
+      end
+   end
+   if #s1t ~= #s2t then
+      print(' different linecounts.')
+      return false
+   end
+   --return true
+   return #s1t
+end
+
+
+
 local args = parsers.parseCmdLine(
    {
 --      ['a'] = 'average: generate hedron_default.lua and dihedron_default.lua files of average values from input files',
@@ -136,7 +161,7 @@ for i,arg in ipairs(toProcess) do
             --hedron_default = prot:addHedronData(hedron_default)
             --dihedron_default = prot:addDihedronData(dihedron_default)
          elseif args['t'] then
-            io.write('testing ' .. a .. ' ... ')
+            io.write('testing ' .. arg .. ' ... ')
             io.flush()
             local s0 = prot:writePDB(true)     -- PDB format text without REMARK RFOLD record (timestamp may not match)
             prot:clearAtomCoords()
@@ -161,25 +186,3 @@ for i,arg in ipairs(toProcess) do
    end
 end
 
-local function lineByLine(s1,s2)
-   local s1t, s2t = {}, {}
-   for line in s1:gmatch("[^\r\n]+") do s1t[#s1t+1] = line end
-   for line in s2:gmatch("[^\r\n]+") do s2t[#s2t+1] = line end
-
-   local ecnt = 2
-   for i,lin in ipairs(s1t) do
-      if lin ~= s2t[i] then
-         print()
-         print(lin)
-         print(s2t[i])
-         ecnt = ecnt-1
-         if 0>ecnt then return false end
-      end
-   end
-   if #s1t ~= #s2t then
-      print(' different linecounts.')
-      return false
-   end
-   --return true
-   return #s1t
-end
