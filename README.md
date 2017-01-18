@@ -19,7 +19,7 @@ Currently (June, 2016) only the Build module is working,  This software can accu
 
 ## Build
 
-Accurate creation of 3D coordinate data from protein structure internal coordinates (phi and psi dihedral angles) requires explicit specification of all structure details: bond lengths, angles and dihedral angles.  rFold defines a '.pic' datafile format in which each standalone line specifies 3 atoms and their length, angle, length relationship, or 4 atoms with their dihedral angle relationship.  For example:
+Accurate creation of 3D coordinate data from protein structure internal coordinates (phi and psi dihedral angles) requires explicit specification of all structure details: bond lengths, angles and dihedral angles.  rFold defines a '.pic' ('protein internal coordinates') datafile format in which each standalone line specifies 3 atoms and their length, angle, length relationship, or 4 atoms with their dihedral angle relationship.  For example:
 
 1MUD A 1MN:1MCA:1MC   1.45628 114.95350   1.53294
 
