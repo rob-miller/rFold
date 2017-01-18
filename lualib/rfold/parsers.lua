@@ -90,8 +90,9 @@ end
 -- @param infile (file or string) rfold modified DSSP output or PDB file or lines with hedron or dihedron specifications
 -- @param callback (optional) call with table containing parsed fields for DSSP data lines, PDB ATOM etc. lines, hedron length-angle-length lines, or dihedron angle lines
 -- @param chain only process line if specified chain matches input (where relevant)
+-- @param infname (optional) specify source for infile=string data
 -- @return pdbid if callback specified, else sequential list of tables as for 'callback' above in order read
-function parsers.parseProteinData (infile, callback, chain)
+function parsers.parseProteinData (infile, callback, chain, infname)
    local rdt = {}
    rdt['triples']={}
    rdt['quads']={}
@@ -109,6 +110,7 @@ function parsers.parseProteinData (infile, callback, chain)
    elseif infile:match('.[\r\n].') then
       stringArray = utils.split_newlines(infile)
       --print('stringArray count',#stringArray)
+      fname = infname or 'text_string'
    else
       fh,err = io.open(infile)
       fname = infile
@@ -257,6 +259,7 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match('^SEQRES') then
          local sr = {}
          sr['chn'] = line:sub(12,12)
+         sr['pdbid'] = pdbid
          local s = ''
          local psr = line:sub(20)
          for res3 in psr:gmatch("%a+") do
@@ -268,7 +271,7 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
             end
             s = s .. r1
          end
-         sr['seqres'] = sr
+         sr['seqres'] = s
          if callback then
             callback(sr)
          else
