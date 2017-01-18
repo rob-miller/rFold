@@ -91,6 +91,12 @@ function Chain:load(t)
          --print(t['res'],t['resn'],t['atom'],t['altloc'])
          res = self:getResidue(t['res'], tonumber(t['resn']))
       end
+   elseif t['seqres'] then -- pdb seqres record
+      if self['seqres'] then
+         self['seqres'] = self['seqres'] .. t['seqres']
+      else
+         self['seqres'] = t['seqres']
+      end
    else  -- hedron or dihedron record
       --print(t[1])
       local akl = utils.splitAtomKey(t[1])
@@ -303,6 +309,29 @@ function Chain:writeInternalCoords()
    end
    return s
 end
+
+function Chain:writeDb(rfpg, pdb_no)
+   xxx
+   if {} ~= self['initNCaC'] then
+      local n = 1
+      for i,r in self:orderedResidues() do
+         if self['initNCaC'][i] then
+            local initNCaC = self['initNCaC'][i]
+            local akl =  r:NCaCKeySplit()
+            for ai,ak in ipairs(akl) do
+               local aks = utils.splitAtomKey(ak)
+               s = s .. utils.atomString(n,aks[3],r['res'],self['id'],r['resn'],initNCaC[ak][1][1],initNCaC[ak][2][1],initNCaC[ak][3][1],1.0,0.0)
+               n = n+1
+            end
+         end
+      end
+   end
+   for i,r in self:orderedResidues() do
+      s = s .. r:writeInternalCoords(self['pdbid'], self['id'])
+   end
+   return s
+end
+
 
 --- if first Residue in Chain has 'dssp' field, set self['initNCaC'] to hold those protein space coordinates to build the rest of the Chain from
 -- @see assembleResidues
