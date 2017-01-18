@@ -136,7 +136,7 @@ for i,arg in ipairs(toProcess) do
             --hedron_default = prot:addHedronData(hedron_default)
             --dihedron_default = prot:addDihedronData(dihedron_default)
          elseif args['t'] then
-            io.write('testing ' .. a .. ' ... ')
+            io.write('testing ' .. arg .. ' ... ')
             io.flush()
             local s0 = prot:writePDB(true)     -- PDB format text without REMARK RFOLD record (timestamp may not match)
             prot:clearAtomCoords()
