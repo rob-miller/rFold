@@ -3,7 +3,7 @@
 --[[
    rFoldLoadDB.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 2016, 2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -45,14 +45,15 @@ local mkdssp = 'dssp/rtm-dssp-2.2.1/mkdssp'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
 
+
 local args = parsers.parseCmdLine(
    {
-      ['nd'] = 'do not run dssp on PDB input file'
+      ['nd'] = 'do not run dssp on PDB input file',
       ['u'] = 'update database (default is skip if entry already exists)'
    },{
       ['f'] = '<input file> : process files listed in <input file> (1 per line) followed by any on command line'
      },
-   'convert PDB files to internal coordinates and vice-versa'
+   'convert PDB file to internal coordinates and load into database.  repository base: ' .. PDB_repository_base .. ' db: ' .. rfpg.db .. ' on ' .. rfpg.host .. ' ('  ..utils.getHostname() .. ')' 
 )
 
 local toProcess={}
@@ -145,7 +146,7 @@ for i,arg in ipairs(toProcess) do
       if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, check dssp
          -- see if rtm mkdssp gets same internal coordinates
          local dsspstatus,dsspresult,dssperr = ps.pipe_simple(coords3D,mkdssp,unpack({'-i','-'}))
-         local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain)
+         local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')
          s1 = prot:writeInternalCoords()  -- get output for internal coordinate data as read from dssp
          local c = utils.lineByLineCompare(coordsInternal,s1) 
          if not c then
@@ -160,7 +161,7 @@ for i,arg in ipairs(toProcess) do
       print('we have happy data for ' .. arg)
       print(prot:tostring())
 
-      prot:writeDB(rfpg,args['u'])
+     -- prot:writeDB(rfpg,args['u'])
       
    end
 

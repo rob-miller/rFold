@@ -80,7 +80,7 @@ end
 function Chain:load(t)
    local res
 
-   --for k,v in pairs(t) do print(k,v) end
+   --for k,v in pairs(t) do print('c: ' .. k,v) end
    --print()
    
    if t['resn'] then -- dssp record or pdb atom record
@@ -311,7 +311,8 @@ function Chain:writeInternalCoords()
 end
 
 function Chain:writeDb(rfpg, pdb_no)
-   xxx
+   --   xxx
+   
    if {} ~= self['initNCaC'] then
       local n = 1
       for i,r in self:orderedResidues() do

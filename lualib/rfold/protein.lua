@@ -94,6 +94,8 @@ function protein.load(t)
 
    local thisProtein = protein.get(t['pdbid'])
 
+   --for k,v in pairs(t) do print('p: ' .. k,v) end
+
    if t['header'] then
       thisProtein['header'] = t['header'] --  .. t['pdbid']
    elseif t['title'] then
