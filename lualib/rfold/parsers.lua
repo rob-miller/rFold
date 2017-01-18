@@ -22,6 +22,8 @@ Copyright 2016 Robert T. Miller
 -- not a class but works better with ldoc if we say it is
 -- @classmod parsers
 
+local utils = require 'rfold.utils'
+
 local parsers = {}
 
 local function usage(valid_flags, valid_params, info, usage)
@@ -85,7 +87,7 @@ end
 
 
 --- parse PDB file, internal coordinates (.pic) file, or rfold modified DSSP output file
--- @param infile rfold modified DSSP output or PDB file or lines with hedron or dihedron specifications
+-- @param infile (file or string) rfold modified DSSP output or PDB file or lines with hedron or dihedron specifications
 -- @param callback (optional) call with table containing parsed fields for DSSP data lines, PDB ATOM etc. lines, hedron length-angle-length lines, or dihedron angle lines
 -- @param chain only process line if specified chain matches input (where relevant)
 -- @return pdbid if callback specified, else sequential list of tables as for 'callback' above in order read
@@ -99,14 +101,26 @@ function parsers.parseProteinData (infile, callback, chain)
    assert(infile,'parseProteinData: no input file')
 
    local err
+   local stringArray
+   local fname=nil
    if infile:match('%.gz$') then
       fh,err = io.popen('zcat ' .. infile)
+      fname = infile:match('%.gz$')
+   elseif infile:match('.[\r\n].') then
+      stringArray = utils.split_newlines(infile)
+      --print('stringArray count',#stringArray)
    else
       fh,err = io.open(infile)
+      fname = infile
    end
    if err then print(infile,err) return end
-
-   for line in fh:lines() do
+   if fh then
+      stringArray = {}
+      for line in fh:lines() do
+         stringArray[#stringArray+1] = line  -- hard on memory usage but need flexibility to call with string
+      end
+   end
+   for key,line in ipairs(stringArray) do
       --print(line)
       if line:match('^HEADER ') then  -- dssp or pdb
          pdbid = line:match('(%S+)%s*%.?$')
@@ -241,6 +255,31 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match('^REMARK') then
       elseif line:match('^DBREF') then
       elseif line:match('^SEQRES') then
+         local sr = {}
+         sr['chn'] = line:sub(12,12)
+         local s = ''
+         local psr = line:sub(20)
+         for res3 in psr:gmatch("%a+") do
+            local r1 = utils.res1[res3]
+            if not r1 then
+               io.stderr:write("SEQRES code '" .. res3 .."' not recognised, file: " .. infile .. "\n")
+               r1 = 'x'
+               -- os.exit()
+            end
+            s = s .. r1
+         end
+         sr['seqres'] = sr
+         if callback then
+            callback(sr)
+         else
+            if not rdt['seqres'] then
+               rdt['seqres'] = { sr['chn'] }
+            elseif not rdt['seqres'][ sr['chn'] ] then
+               rdt['seqres'][ sr['chn'] ] = s
+            else
+               rdt['seqres'][ sr['chn'] ] = rdt['seqres'][ sr['chn'] ] .. s
+            end
+         end
       elseif line:match('^HET ') then
       elseif line:match('^HETNAM') then
       elseif line:match('^HETSYN') then
@@ -267,15 +306,17 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match('^END') then
          
       else
-         io.stderr:write('failed to parse: ' .. line .. '\n')
+         io.stderr:write('failed to parse: >' .. line .. '<\n')
       end
       
    end
    io.close()
 
    if callback then
+      callback({['pdbid'] = pdbid, ['filename'] = fname})
       return pdbid
    end
+   rdt['filename'] = fname
    return rdt
 end
 
