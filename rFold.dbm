@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.8.2-beta" last-position="87,148" last-zoom="1.3"
+<dbmodel pgmodeler-ver="0.8.2" last-position="286,119" last-zoom="1.3"
 	 default-schema="public" default-owner="postgres">
 <database name="rFold">
 </database>
@@ -14,7 +14,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="pdb_chain">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="78.6667" y="273.667"/>
+	<position x="280" y="160"/>
 	<column name="pdb_no" not-null="true">
 		<type name="serial"/>
 	</column>
@@ -25,6 +25,23 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		<type name="varchar"/>
 	</column>
 	<column name="filename">
+		<type name="varchar"/>
+	</column>
+	<column name="sequence">
+		<type name="varchar"/>
+		<comment><![CDATA[as read from atom records, '-' gapped, indexed by res_pos]]></comment>
+	</column>
+	<column name="seqres">
+		<type name="varchar"/>
+		<comment><![CDATA[PDB file chain SEQRES data]]></comment>
+	</column>
+	<column name="chain_order" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="header">
+		<type name="varchar"/>
+	</column>
+	<column name="title">
 		<type name="varchar"/>
 	</column>
 	<constraint name="pdb_chain_pk" type="pk-constr" table="public.pdb_chain">
@@ -46,7 +63,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="residue">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="302.5" y="209.167"/>
+	<position x="280" y="320"/>
 	<column name="res_id" not-null="true">
 		<type name="serial"/>
 	</column>
@@ -95,7 +112,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dihedral_code">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="742.179" y="138.59"/>
+	<position x="740" y="140"/>
 	<column name="code" not-null="true">
 		<type name="smallserial"/>
 	</column>
@@ -119,7 +136,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="angle_code">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="744.487" y="296.987"/>
+	<position x="740" y="300"/>
 	<column name="code" not-null="true">
 		<type name="smallserial"/>
 	</column>
@@ -137,7 +154,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="bond_code">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="744.359" y="409.551"/>
+	<position x="740" y="400"/>
 	<column name="code" not-null="true">
 		<type name="smallserial"/>
 	</column>
@@ -158,7 +175,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dihedral">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="491.667" y="124.167"/>
+	<position x="500" y="120"/>
 	<column name="res_id" not-null="true">
 		<type name="bigint"/>
 	</column>
@@ -193,7 +210,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="angle">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="493.333" y="238.333"/>
+	<position x="500" y="240"/>
 	<column name="angle_id" not-null="true">
 		<type name="serial"/>
 	</column>
@@ -231,7 +248,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="bond">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="492.564" y="370.256"/>
+	<position x="500" y="380"/>
 	<column name="bond_id" not-null="true">
 		<type name="serial"/>
 	</column>
@@ -263,7 +280,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="atoms">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="940.769" y="398.462"/>
+	<position x="760" y="500"/>
 	<column name="name" not-null="true">
 		<type name="varchar"/>
 	</column>
@@ -281,7 +298,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="atom_class">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="1107.69" y="343.077"/>
+	<position x="940" y="500"/>
 	<column name="class" not-null="true">
 		<type name="varchar"/>
 	</column>
@@ -296,7 +313,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="periodic_table">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="1109.23" y="462.308"/>
+	<position x="960" y="580"/>
 	<column name="atom" not-null="true">
 		<type name="varchar"/>
 	</column>
@@ -309,14 +326,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 </table>
 
 <textbox name="res_x_codes" font-size="9">
-	<position x="495.385" y="473.077"/>
+	<position x="500" y="480"/>
 	<comment><![CDATA[res_*_codes null for side chain entries]]></comment>
 </textbox>
 
 <table name="dssp">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="302.308" y="533.846"/>
+	<position x="280" y="620"/>
 	<column name="res_id" not-null="true">
 		<type name="bigint"/>
 	</column>
@@ -343,7 +360,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dssp_coordinates">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="301.538" y="630.769"/>
+	<position x="280" y="520"/>
 	<column name="res_id" not-null="true">
 		<type name="bigint"/>
 	</column>

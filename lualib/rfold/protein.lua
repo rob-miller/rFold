@@ -98,6 +98,8 @@ function protein.load(t)
       thisProtein['header'] = t['header'] --  .. t['pdbid']
    elseif t['title'] then
       thisProtein['title'] = t['title']
+   elseif t['filename'] then
+      thisProtein['filename'] = t['filename']
    else
       local chn = t['chn'] or ''
       if not thisProtein['chains'][chn] then
@@ -141,18 +143,29 @@ function Protein:countDihedra()
    return dc
 end
 
+--- sum dssp counts for chains
+-- @return total number of dssp entries loaded for protein
+function Protein:countDSSPs()
+   local dc = 0
+   for k,v in pairs(self['chains']) do
+      dc = dc + v:countDSSPs()
+   end
+   return dc
+end
+
 --- generate descriptive string for Protein : id, sequence, counts of residues, DSSP entries, hedra and dihedra
 -- @return descriptive string
 function Protein:tostring()
    local s = ''
    for k,v in pairs(self['chains']) do
       s = self.id .. ' ' .. k .. ' ' .. v:seqStr() .. '\n'
-      s = s .. '  ' .. #v['residues'] .. ' residues '  .. v:countDSSPs() .. ' dssps ' .. v:countDihedra() .. ' dihedra' .. v:countHedra() ..  ' hedra '
+      s = s .. '  ' .. #v['residues'] .. ' residues '  .. v:countDSSPs() .. ' dssps ' .. v:countDihedra() .. ' dihedra ' .. v:countHedra() ..  ' hedra '
    end
    return s
 end
 
 --- generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:writePDB() result
+--  note Residue structures need dihedron data structures to write complete chain
 -- @return string containing PDB format text (complete)
 function Protein:writePDB(noRemark)
    --print('protein topdb ')   
@@ -188,6 +201,43 @@ function Protein:writeInternalCoords()
    end
    return s
 end
+
+--- write protein data to rfold database
+-- @param rfpg open database handle
+-- @param update optional flag, if false (default at protein level only) silently skip if [pdbid,chain,filename] entry exists already in pdb_chain 
+function Protein:writeDb(rfpg,update)
+   update = update or false
+   local first=true
+   local tct = "','"
+   for k,v in ipairs(self['chainOrder']) do
+      local pdb_no = rfpg:Q("select pdb_no from pdb_chain where pdbid='" .. self['id'] .. "' and chain = '" .. v .. "' and filename = '" .. self['filename'] .. "'")
+      if not pdb_no then 
+         pdb_no  = rfpg:Q("insert into pdb_chain (pdbid, chain, filename) values ('".. self['id'] .. tct .. v .. tct .. self['filename'] .."') returning pdb_no")
+      elseif not update then
+         goto skipChain
+      end
+
+      local colStr
+      if first then
+         colStr = "(header,title) = ('" .. self['header'] .. tct .. self['title'] .. "')"
+         rfpg:Q("insert into pdb_chain " .. colStr .. " where pdb_no = " .. pdb_no .. " on conflict do update set " .. colStr)
+         first = false
+      end
+
+      local chain = self['chains'][v]
+      
+      local seqStr = chain:seqStr()
+      local seqRes = chain['seqres'] or ''
+      colStr = "(sequence, seqres, chain_order) = ('" .. seqStr .. tct .. seqRes.. "', .. k)"
+      rfpg:Q("insert into pdb_chain " .. colStr .. " where pdb_no = " .. pdb_no .. " on conflict do update set " .. colStr)
+
+      self['chains'][v]:writeDb(rfpg, pdb_no)
+
+      ::skipChain::
+   end
+   
+end
+
 
 --- trigger linking of residues, dihedrons and hedrons within chains
 function Protein:linkResidues()
