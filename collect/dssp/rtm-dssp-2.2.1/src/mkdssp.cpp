@@ -34,6 +34,11 @@ namespace ba = boost::algorithm;
 
 int VERBOSE = 0;
 
+// noop to support read PDB from stdin below
+struct noop {
+    void operator()(...) const {}
+};
+
 int main(int argc, char* argv[])
 {
 	try
@@ -41,7 +46,7 @@ int main(int argc, char* argv[])
 		po::options_description desc("mkdssp " VERSION " options");
 		desc.add_options()
 			("help,h",							 "Display help message")
-			("input,i",		po::value<string>(), "Input file")
+			("input,i",		po::value<string>(), "Input file, use '-' or 'stdin' to read uncompressed PDB from pipe")
 			("output,o",	po::value<string>(), "Output file, use 'stdout' to output to screen")
 			("verbose,v",						 "Verbose output")
 			("version",							 "Print version")
@@ -92,28 +97,41 @@ int main(int argc, char* argv[])
 			VERBOSE = vm["debug"].as<int>();
 		
 		string input = vm["input"].as<string>();
+                ifstream infile(input.c_str(), ios_base::in | ios_base::binary);
 
-		ifstream infile(input.c_str(), ios_base::in | ios_base::binary);
-		if (not infile.is_open())
-			throw runtime_error("No such file");
+                if ("-" == input || "stdin" == input) {
+                  if (infile.is_open())
+                    infile.close();     // local file named 'stdin' or '-'
+                } else {
+                  if (not infile.is_open())
+                    throw runtime_error("No such file");
+                }
+                
+                io::filtering_stream<io::input> in;
 		
-		io::filtering_stream<io::input> in;
-		
+                if ("-" == input || "stdin" == input) {
+                  //cerr << "read from stdin" << endl;
+                  in.push(cin);
+                } else {
+                
+                  //cerr << "read from file" << endl;
+
 #if defined USE_COMPRESSION
-		if (ba::ends_with(input, ".bz2"))
-		{
-			in.push(io::bzip2_decompressor());
-			input.erase(input.length() - 4);
-		}
-		else if (ba::ends_with(input, ".gz"))
-		{
-			in.push(io::gzip_decompressor());
-			input.erase(input.length() - 3);
-		}
+                  if (ba::ends_with(input, ".bz2"))
+                    {
+                      in.push(io::bzip2_decompressor());
+                      input.erase(input.length() - 4);
+                    }
+                  else if (ba::ends_with(input, ".gz"))
+                    {
+                      in.push(io::gzip_decompressor());
+                      input.erase(input.length() - 3);
+                    }
 #endif
 		
-		in.push(infile);
-	
+                  in.push(infile);
+                }
+                
 		// OK, we've got the file, now create a protein
 		MProtein a;
 

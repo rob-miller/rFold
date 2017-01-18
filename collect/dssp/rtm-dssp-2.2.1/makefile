@@ -13,7 +13,7 @@ all: mkdssp
 
 include make.config
 
-VERSION				= 2.2.1
+VERSION				= 2.2.1-rtm-1
 
 DEST_DIR			?= /usr/local
 LIB_DIR				= $(BOOST_LIB_DIR)
@@ -27,7 +27,7 @@ LIBS				= $(BOOST_LIBS:%=boost_%$(BOOST_LIB_SUFFIX)) z bz2
 DEFINES				= USE_COMPRESSION LINUX VERSION='"$(VERSION)"'
 CXX				= g++
 
-CFLAGS				+= $(INC_DIR:%=-I%) -iquote src -g -Wall -Wno-multichar -pthread
+CFLAGS				+= $(INC_DIR:%=-I%) -iquote src -g -Wall -Wno-multichar -pthread 
 LDOPTS				+= $(LIB_DIR:%=-L%) $(LIBS:%=-l%) -g -pthread
 
 OBJ_DIR				= obj
