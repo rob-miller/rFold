@@ -206,6 +206,13 @@ function utils.writeFile(fname,s)
    file:close()
 end
 
+function utils.getHostname()
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname =string.gsub(hostname, "\n$", "")
+    return hostname
+end
 
 
 ---------------------------------------------- tables -------------------------------------------------------------------------------------------------------------
