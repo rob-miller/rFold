@@ -39,6 +39,65 @@ function string:ematch(pat)
    return unpack(matches)                 -- return original results
 end
 
+--- split_newlines
+-- http://lua-users.org/wiki/EnhancedFileLines
+--
+-- Splits string s into array of lines, returning the result.
+-- New-line character sequences ("\n", "\r\n", "\r"),
+-- if any, are NOT included at the ends of the lines.
+-- @param s string containing newline characters
+-- @return array of lines 
+function utils.split_newlines(s)
+  local ts = {}
+  local posa = 1
+  while 1 do
+    local pos, chars = s:match('()([\r\n].?)', posa)
+    if pos then
+       if 1 < pos then           -- only if not newline only
+          local npos = pos -1    -- drop newline
+          local line = s:sub(posa, npos)
+          ts[#ts+1] = line
+       end
+       if chars == '\r\n' then pos = pos + 1 end  -- skip past cmplete newline cahr
+       posa = pos + 1
+    else
+      local line = s:sub(posa)
+      if line ~= '' then ts[#ts+1] = line end
+      break      
+    end
+  end
+  return ts
+end
+
+--- execute line-by-line compare of 2 passed strings
+-- @param s1t string containing newline characters
+-- @param s2t string containing newline characters
+-- @return false if not perfect match, else number of lines compared
+function utils.lineByLineCompare(s1,s2)
+   local s1t, s2t = {}, {}
+   for line in s1:gmatch("[^\r\n]+") do s1t[#s1t+1] = line end
+   for line in s2:gmatch("[^\r\n]+") do s2t[#s2t+1] = line end
+
+   local ecnt = 2
+   for i,lin in ipairs(s1t) do
+      if lin ~= s2t[i] then
+         print()
+         print(lin)
+         print(s2t[i])
+         ecnt = ecnt-1
+         if 0>ecnt then return false end
+      --else
+         --print(lin,s2t[i])         
+      end
+   end
+   if #s1t ~= #s2t then
+      print(' different linecounts.')
+      return false
+   end
+   --return true
+   return #s1t
+end
+
 
 --- generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s
 --
@@ -155,12 +214,14 @@ end
 --- residue single letter to 3-letter name conversion
 -- @table res3
 utils.res3 = { G = 'GLY', A = 'ALA', V = 'VAL', L = 'LEU', I = 'ILE', M = 'MET', F = 'PHE', P = 'PRO', S = 'SER', T = 'THR',
-               C = 'CYS', N = 'ASN', Q = 'GLN', Y = 'TYR', W = 'TRP', D = 'ASP', E = 'GLU', H = 'HIS', K = 'LYS', R = 'ARG' }
+               C = 'CYS', N = 'ASN', Q = 'GLN', Y = 'TYR', W = 'TRP', D = 'ASP', E = 'GLU', H = 'HIS', K = 'LYS', R = 'ARG',
+               X = 'UNK' }
 
 --- residue 3-letter name to single letter conversion
 -- @table res1
 utils.res1 = { ['GLY'] = 'G', ['ALA'] = 'A', ['VAL'] = 'V', ['LEU'] = 'L', ['ILE'] = 'I', ['MET'] = 'M', ['PHE'] = 'F', ['PRO'] = 'P', ['SER'] = 'S', ['THR'] = 'T',
-               ['CYS'] = 'C', ['ASN'] = 'N', ['GLN'] = 'Q', ['TYR'] = 'Y', ['TRP'] = 'W', ['ASP'] = 'D', ['GLU'] = 'E', ['HIS'] = 'H', ['LYS'] = 'K', ['ARG'] = 'R' }
+               ['CYS'] = 'C', ['ASN'] = 'N', ['GLN'] = 'Q', ['TYR'] = 'Y', ['TRP'] = 'W', ['ASP'] = 'D', ['GLU'] = 'E', ['HIS'] = 'H', ['LYS'] = 'K', ['ARG'] = 'R',
+               ['UNK'] = 'X' }
 
 
 --- per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file
