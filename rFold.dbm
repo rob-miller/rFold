@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.8.2" last-position="286,119" last-zoom="1.3"
+<dbmodel pgmodeler-ver="0.8.2" last-position="105,187" last-zoom="1.45"
 	 default-schema="public" default-owner="postgres">
 <database name="rFold">
 </database>
@@ -298,11 +298,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="atom_class">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="940" y="500"/>
+	<position x="940" y="520"/>
 	<column name="class" not-null="true">
 		<type name="varchar"/>
 	</column>
 	<column name="r_covalent">
+		<type name="double precision"/>
+	</column>
+	<column name="v_covalent">
 		<type name="double precision"/>
 	</column>
 	<constraint name="atom_class_pk_name" type="pk-constr" table="public.atom_class">
@@ -313,22 +316,20 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="periodic_table">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="960" y="580"/>
+	<position x="940" y="580"/>
 	<column name="atom" not-null="true">
 		<type name="varchar"/>
 	</column>
 	<column name="weight">
 		<type name="double precision"/>
 	</column>
+	<column name="electronegativity">
+		<type name="double precision"/>
+	</column>
 	<constraint name="periodic_table_pk_atom" type="pk-constr" table="public.periodic_table">
 		<columns names="atom" ref-type="src-columns"/>
 	</constraint>
 </table>
-
-<textbox name="res_x_codes" font-size="9">
-	<position x="500" y="480"/>
-	<comment><![CDATA[res_*_codes null for side chain entries]]></comment>
-</textbox>
 
 <table name="dssp">
 	<schema name="public"/>
