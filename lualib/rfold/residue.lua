@@ -23,6 +23,7 @@ Copyright 2016 Robert T. Miller
 -- @classmod Residue
 
 local utils = require 'rfold.utils'
+local chemdata = require 'rfold.chemdata'
 local geom3d = require 'rfold.geom3d'
 local hedron = require 'rfold.hedron'
 local dihedron = require 'rfold.dihedron'
@@ -295,7 +296,7 @@ function Residue:dihedraFromAtoms()
    end
    
    -- sidechain hedra and dihedra
-   local sct = utils.sidechains[self['res']]
+   local sct = chemdata.sidechains[self['res']]
    if sct then 
       for i,t in ipairs(sct) do
          local nt = utils.addBase(skbase,t)
@@ -305,7 +306,7 @@ function Residue:dihedraFromAtoms()
             self['dihedra'][utils.genKey(nt[1],nt[2],nt[3],nt[4])] = dihedron.new(nt)
          end
       end
-   elseif 'G' == self['res'] and not self['atomCoords'][sCB] then  -- only G,A do not have entries in utils.sidechains
+   elseif 'G' == self['res'] and not self['atomCoords'][sCB] then  -- only G,A do not have entries in chemdata.sidechains
       self['atomCoords'][sCB] = genGlyCB(self['atomCoords'][sN],self['atomCoords'][sCA],self['atomCoords'][sC])
       --print(sCB .. self['atomCoords'][sCB]:transpose():pretty())
    end

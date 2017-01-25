@@ -21,6 +21,7 @@ Copyright 2016 Robert T. Miller
 -- @classmod Chain
 
 local utils = require 'rfold.utils'
+local chemdata = require 'rfold.chemdata'
 local residue = require 'rfold.residue'
 
 local chain = {}  -- module
@@ -85,7 +86,7 @@ function Chain:load(t)
    
    if t['resn'] then -- dssp record or pdb atom record
       --print('dssp: ' .. t['res'] .. t['resn'])
-      if t['res3'] then t['res'] = utils.res1[t['res3']] end
+      if t['res3'] then t['res'] = chemdata.res1[t['res3']] end
       --print(t['chn'],t['res'],t['resn'])
       if (t['res'] and not t['icode']) and ((not t['altloc']) or ('A' == t['altloc'])) then     -- standard residue, no insdertion codes, only first altloc if present
          --print(t['res'],t['resn'],t['atom'],t['altloc'])
@@ -282,7 +283,7 @@ function Chain:writePDB(ndx)
    end
    local res = self['residues'][lastRes]
    ndx = ndx + 1
-   s = s .. string.format('TER   %5d      %3s %1s%4d%54s\n',ndx, utils.res3[ res['res'] ], self['id'], res['resn'], '')
+   s = s .. string.format('TER   %5d      %3s %1s%4d%54s\n',ndx, chemdata.res3[ res['res'] ], self['id'], res['resn'], '')
 
    return s,ndx
 end

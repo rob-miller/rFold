@@ -23,6 +23,7 @@ Copyright 2016 Robert T. Miller
 -- @classmod parsers
 
 local utils = require 'rfold.utils'
+local chemdata = require 'rfold.chemdata'
 
 local parsers = {}
 
@@ -263,7 +264,7 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
          local s = ''
          local psr = line:sub(20)
          for res3 in psr:gmatch("%a+") do
-            local r1 = utils.res1[res3]
+            local r1 = chemdata.res1[res3]
             if not r1 then
                io.stderr:write("SEQRES code '" .. res3 .."' not recognised, file: " .. infile .. "\n")
                r1 = 'x'
