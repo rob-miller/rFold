@@ -37,6 +37,7 @@ Copyright 2016, 2017 Robert T. Miller
 local parsers = require 'rfold.parsers'
 local protein = require "rfold.protein"
 local utils = require 'rfold.utils'
+local chemdata = require 'rfold.chemdata'
 
 local ps = require 'pipe_simple'
 
@@ -44,6 +45,53 @@ local PDB_repository_base = '/media/data/pdb/'
 local mkdssp = 'dssp/rtm-dssp-2.2.1/mkdssp'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
+
+
+
+function verifyDb()
+   local c=0
+   for _ in pairs(chemdata.atomic_weight) do c = c + 1 end
+
+   local rows = tonumber(rfpg.Q('select count(*) from periodic_table;')[1]);
+   --print('periodic_table:', rows)
+
+   if (rows < c) then 
+         for k,v in pairs(chemdata.atomic_weight) do
+            rfpg.Qcur("insert into periodic_table (atom, weight, electronegativity) values ('" .. k .. "'," .. v .. "," .. chemdata.electronegativity[k] .. ") on conflict (atom) do update set weight=" .. v .. ", electronegativity = " .. chemdata.electronegativity[k] .. ";")
+         end
+   end
+
+   c=0
+   for _ in pairs(chemdata.covalent_radii) do c = c + 1 end
+   rows = tonumber(rfpg.Q('select count(*) from atom_class;')[1]);
+   if (rows < c) then
+         for k,v in pairs(chemdata.covalent_radii) do
+            rfpg.Qcur("insert into atom_class (class, r_covalent, v_covalent) values ('" .. k .. "'," .. v .. "," .. chemdata.covalent_volume(k) .. ") on conflict (class) do update set r_covalent=" .. v .. ", v_covalent = " .. chemdata.covalent_volume(k) .. ";")
+         end
+   end
+
+   for r1,r3 in pairs(chemdata.res3) do
+      local pdb_atoms = { 'N', 'CA', 'C', 'O', 'CB', 'OXT' }
+      local backbone = chemdata.residue_atom_class['X']
+      for i,pa in ipairs(pdb_atoms) do
+         if (not (r1 == 'G' and pa == 'CB')) then
+            --print('r1',r1)
+            --print('pa',pa)
+            --print('b[pa]', backbone[pa])
+            --print('pa[1]', string.sub(pa,1,1))
+            rfpg.Qcur("insert into atoms (name, class, atom) values ('" .. r1 .. pa .. "','" .. backbone[pa] .. "','" .. string.sub(pa,1,1) .. "') on conflict (name) do nothing;")
+         end
+      end
+      local sidechain = (r1 == 'G' or r1 == 'A' or r1 == 'X') and {} or chemdata.residue_atom_class[r1]
+      for an,ac in pairs(sidechain) do
+         --print('an[1]', string.sub(an,1,1))
+         rfpg.Qcur("insert into atoms (name, class, atom) values ('" .. r1 .. an .. "','" .. ac .. "','" .. string.sub(an,1,1) .. "') on conflict (name) do nothing;")
+      end
+      --print()
+   end
+   rfpg.Qcur('commit')
+end
+
 
 
 local args = parsers.parseCmdLine(
@@ -66,7 +114,9 @@ if args['f'] then
    end
 end
 
-for i,a in ipairs(args) do table.insert(toProcess, a) end 
+for i,a in ipairs(args) do table.insert(toProcess, a) end
+
+
 
 for i,a in ipairs(toProcess) do
    if a:match('^IDs%s') then toProcess[i]='' end     -- header line for Dunbrack list : 'IDs         length Exptl.  resolution  R-factor FreeRvalue'
@@ -80,6 +130,8 @@ for i,a in ipairs(toProcess) do
       end
    end
 end
+
+verifyDb()
 
 for i,arg in ipairs(toProcess) do
    if '' ~= arg then
