@@ -27,14 +27,26 @@ local chemdata = require 'rfold.chemdata'
 
 local parsers = {}
 
-local function usage(valid_flags, valid_params, info, usage)
-   local s = arg[0] .. (info and ': ' .. info or '') 
-   print(s)
-   if usage then
-      print(' usage: ' .. arg[0] .. usage)
+local function usage(argFormat, info, valid_flags, valid_params)
+   print( arg[0] .. ':\n')
+   if argFormat then
+      if (valid_flags or valid_params) then
+         print(' usage: ' .. arg[0] .. '  [options ... ] ' .. argFormat )
+      else
+         print(' usage: ' .. arg[0] .. argFormat )
+      end
    else
-      print(' usage: ' .. arg[0] .. ' [options ...] arg ...' )
+      if (valid_flags or valid_params) then
+         print(' usage: ' .. arg[0] .. ' [ options ... ] ' )
+      else
+         print(' usage: ' .. arg[0] )
+      end      
    end
+   
+   if (info) then 
+      print(info)
+   end
+   
    if valid_flags then
       print(' valid flags: ')
       for f,v in pairs(valid_flags) do io.write( '   -' .. f .. ' ' .. v ..'\n') end
@@ -54,16 +66,20 @@ end
 -- @param valid_params { ['p1'] = "parameter1 explanation ...", ['p2'] = "parameter2 explanation ..." }
 -- @param info descriptive text for what the program does
 -- @return table with 'param' values as specified, 'flag' values counting number of times flag seen, and remaining args in sequential numbered slots 
-function parsers.parseCmdLine (valid_flags, valid_params, info)
+function parsers.parseCmdLine (argFormat, info, valid_flags, valid_params)
    local args = {}
 
+   if (argFormat and (0 == #arg)) then
+      usage(argFormat, info, valid_flags, valid_params)
+      os.exit()
+   end
    for i=1,#arg do
       if string.match(arg[i],'^-') then
          if string.match(arg[i],'=') then
             local key, val
             key, val = string.match(arg[i],'^-(%S+)=(%S+)$')
             if not (valid_params and valid_params[ key ]) then
-               usage(valid_flags, valid_params, info)
+               usage(argFormat, info, valid_flags, valid_params)
                print('parameter -' .. key .. ' value ' .. val .. ' not recognised')
                os.exit()
             end
@@ -72,7 +88,7 @@ function parsers.parseCmdLine (valid_flags, valid_params, info)
          else
             flag = string.match(arg[i],'^-(%S+)$')
             if not (valid_flags and valid_flags[ flag ]) then
-               usage(valid_flags, valid_params, info)
+               usage(argFormat, info, valid_flags, valid_params)
                print('flag -' .. flag .. ' not recognised')
                os.exit()
             end
