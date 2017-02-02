@@ -99,9 +99,11 @@ for i,arg in ipairs(toProcess) do
       local pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)   -- read protein data file either PDB or pic format into object in in-memory table 'proteins' (purged at end of loop)
       local prot = protein.get(pdbid)  -- select protein object from proteins table
 
+      prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
+
       if prot:countDihedra() > 0 then  -- did read internal coordinates (pic format data), so generate PDB
 
-         prot:setStartCoords()               -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list
+         --prot:setStartCoords()               -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list
          if args['a'] then
             -- not yet implemented
             --hedron_default = prot:addHedronData(hedron_default)
@@ -131,7 +133,7 @@ for i,arg in ipairs(toProcess) do
          end
          
       else                             -- did read PDB format data, generate internal coordinates
-         prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
+         --prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
          
          prot:atomsToInternalCoords()          -- calculate bond lengths, bond angles and dihedral angles from input coordinates
          if args['a'] then
