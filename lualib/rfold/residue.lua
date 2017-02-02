@@ -268,7 +268,7 @@ function Residue:dihedraFromAtoms()
       self['atomCoords'][nC] = rn['atomCoords'][nC]
 
       self['dihedra'][utils.genKey(sN,sCA,sC,nN)] = dihedron.new({ sN,sCA,sC,nN })    -- psi 
-      self['dihedra'][utils.genKey(sCA,sC,nN,nCA)] = dihedron.new({ sCA,sC,nN,nCA })  -- omega
+      self['dihedra'][utils.genKey(sCA,sC,nN,nCA)] = dihedron.new({ sCA,sC,nN,nCA })  -- omega i+1
       self['dihedra'][utils.genKey(sC,nN,nCA,nC)] = dihedron.new({ sC,nN,nCA,nC })    -- phi i+1
 
       self['hedra'][utils.genKey(sCA,sC,nN)] = hedron.new({ sCA,sC,nN })

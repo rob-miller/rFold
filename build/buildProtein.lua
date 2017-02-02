@@ -96,10 +96,10 @@ for i,arg in ipairs(toProcess) do
       local file,chain = arg:match('^(%S+)%s?(%w?)%s*$')
       if chain == '' then chain = nil end
       --print(file,chain,arg)
-      local pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
-      local prot = protein.get(pdbid)
+      local pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)   -- read protein data file either PDB or pic format into object in in-memory table 'proteins' (purged at end of loop)
+      local prot = protein.get(pdbid)  -- select protein object from proteins table
 
-      if prot:countDihedra() > 0 then  -- did read internal coordinates, so generate PDB
+      if prot:countDihedra() > 0 then  -- did read internal coordinates (pic format data), so generate PDB
 
          prot:setStartCoords()               -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list
          if args['a'] then
@@ -130,7 +130,7 @@ for i,arg in ipairs(toProcess) do
             end
          end
          
-      else                             -- did read PDB, generate internal coordinates
+      else                             -- did read PDB format data, generate internal coordinates
          prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
          
          prot:atomsToInternalCoords()          -- calculate bond lengths, bond angles and dihedral angles from input coordinates

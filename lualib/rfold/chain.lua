@@ -232,8 +232,8 @@ end
 --- foreach chain, complete residue, dihedra, hedra data structures from protein space atom coordinates
 function Chain:dihedraFromAtoms()
    for i,r in self:orderedResidues() do
-      self:setPrevNext(i,r)
-      r:dihedraFromAtoms()
+      self:setPrevNext(i,r)  -- set 'prev' and 'next' for this residue
+      r:dihedraFromAtoms()   
    end
 end
 
