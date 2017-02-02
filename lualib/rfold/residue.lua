@@ -205,7 +205,7 @@ function Residue:linkDihedra()
             elseif s and not self['sidechain'][s] then
                self['sidechain'][s] = { dihedron, i }
             elseif not (b or s) then
-               assert(nil, 'cannot identify atom ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
+               assert(nil, 'cannot identify atom ' ..r .. n .. ' ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
             end
          end
       end
