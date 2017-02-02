@@ -313,6 +313,11 @@ end
 
 function Chain:writeDb(rfpg, pdb_no)
    --   xxx
+
+   working here -- below is all to just list available data at this point
+   need to add 3x3 chain inital coords to db tables
+   
+   local s=''
    
    if {} ~= self['initNCaC'] then
       local n = 1
@@ -328,9 +333,13 @@ function Chain:writeDb(rfpg, pdb_no)
          end
       end
    end
+
    for i,r in self:orderedResidues() do
       s = s .. r:writeInternalCoords(self['pdbid'], self['id'])
    end
+   print(s)
+   print('----------------------------------------------------')
+
    return s
 end
 

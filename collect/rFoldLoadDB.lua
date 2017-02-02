@@ -64,35 +64,79 @@ function bondPairValueString(a1,a3,b1,b2)
    return vals
 end
 
+--- ensure there is an angle_class entry and subsidiary bond_class entries in database for passed angle stringspecification
+-- @param(a) table 3 strings specifying order of residue-atoms comprising angle
+-- @return database ID for angle_class
 function getOrCreateAngleId(a)
    local angleAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3])
    local qry = rfpg.Q("select id from angle_string where atom_string = '" .. angleAtomStr .. "'")
    local rid
    
-   if (not qry) then
+   if (not qry) then  -- angle not already configured
       local b = {}
       for k=1,2 do
          local bondAtomStr = rfpg.pgArrayOfStrings(a[k],a[k+1])
          qry = rfpg.Q("select id from bond_string where atom_string = '" .. bondAtomStr .. "'")
-         if (qry) then 
+         if (qry) then     -- bond already configured for this string
             b[k] = qry[1]
-         else
+         else              -- need to possibly create bond, or just attach ID to different order for string
             local vals = atomPairValueString(a[k],a[k+1])
             b[k] = rfpg.Q("insert into bond_class (res_atoms) values (" .. vals .. ") on conflict(res_atoms) do update set res_atoms = " .. vals .. " returning id;")[1]  -- id may exist already for different order, update will not change
             rfpg.Qcur("insert into bond_string (atom_string, id) values ('" .. bondAtomStr .. "'," .. b[k] ..')')
          end
       end
-      
+
+      -- now create the angle and set string for ID, as we know it is not already configured if here
       local bpvstr = bondPairValueString(a[1],a[3],b[1],b[2])
       rid = rfpg.Q('insert into angle_class (res_bonds) values (' .. bpvstr .. ') on conflict(res_bonds) do update set res_bonds = ' .. bpvstr .. ' returning id' )[1]
       rfpg.Qcur("insert into angle_string (atom_string,id) values ('" .. angleAtomStr .. "'," .. rid .. ')')
    else
+      -- get existing ID for angle string from successful database query
       rid = qry[1]
    end
    return rid
 end
 
---- deterministically populate database tables with serial IDs so IDs do not change with change in protein sets
+--- ensure there is a dihedral_class entry and subsidiary angle_class and bond_class entries in database for passed dihedral angle string specification
+-- @param(a) table 4 strings specifying order of residue-atoms comprising dihedral angle
+-- @param(res) string indicating residue and adjacent neighbour if involved in bond
+-- @param(nameId) int optional database id referencing name of dihedral angle (e.g. psi or chi1)
+function getOrCreateDihedralId(a,res,nameId)
+   local dihedralAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3],a[4])
+   local qry = rfpg.Q("select id from dihedral_string where atom_string = '" .. dihedralAtomStr .. "'")
+   if (not qry) then
+      local angIDs={}
+      for j=1,2 do
+         angIDs[j] = getOrCreateAngleId({a[j],a[j+1],a[j+2]})
+         --rfpg.Q("select id from angle_string where atom_string='" .. rfpg.pgArrayOfStrings(a[j],a[j+1],a[j+2]) .."'")[1]
+      end
+
+      -- figure out how bonds and angles got ordered
+      local bndNdx={}
+      for i=1,3 do
+         bndNdx[i] = (a[i] == utils.orderPair(a[i],a[i+1])[1] and '{1,2}' or '{2,1}')
+      end
+      local angNdx={}
+      angNdx[1] = (a[1] == utils.orderPair(a[1],a[3]) and "{" .. bndNdx[1] .. ',' .. bndNdx[2] .. "}" or "{" .. bndNdx[2] .. ',' .. bndNdx[1] .. "}")
+      angNdx[2] = (a[2] == utils.orderPair(a[2],a[4]) and "{" .. bndNdx[2] .. ',' .. bndNdx[3] .. "}" or "{" .. bndNdx[3] .. ',' .. bndNdx[2] .. "}")
+
+      -- order angles within dihedral and log
+      local dihedNdx
+      local dihedIDs
+      if (a[1] == utils.orderPair(a[1],a[4])) then
+         dihedNdx = '{' .. angNdx[1] .. ',' .. angNdx[2] .. '}'
+         dihedIDs = '{' .. angIDs[1] .. ',' .. angIDs[2] .. '}'
+      else
+         dihedNdx = '{' .. angNdx[2] .. ',' .. angNdx[1] .. '}'
+         dihedIDs = '{' .. angIDs[2] .. ',' .. angIDs[1] .. '}'
+      end
+
+      local dihedId = rfpg.Q('insert into dihedral_class(res_angles, angle_atom_order, res3' .. (nameId and ',name' or '') .. ") values ('" .. dihedIDs .. "','" .. dihedNdx .. "','" .. res .. (nameId and "'," .. nameId or "'" ) .. ") on conflict(res_angles) do update set res3='" .. res .. "' returning id")[1]
+      rfpg.Qcur("insert into dihedral_string (atom_string, id) values ('" .. dihedralAtomStr .. "'," .. dihedId .. ')')
+   end
+end
+
+--- deterministically populate database tables for bond, angle and dihedral angle classes with serial IDs so IDs do not change with change in protein sets
 function verifyDb()
    -- load dihedral_names
    rfpg.Qcur("insert into dihedral_name (name) values ('psi') on conflict (name) do nothing")
@@ -142,7 +186,7 @@ function verifyDb()
       end
    end
    
-   for r1,r3 in pairs(chemdata.res3) do  -- second round through all residues: populate res_bond_class
+   for r1,r3 in pairs(chemdata.res3) do  -- second round through all residues: populate bond_class
       -- load res_bond_class, res_angle_class for backbone and c-beta (ala atoms)
       -- if _ in any atom position in triple, then need to cycle that position for all 20 neighbouring residues
       for r12,r32 in pairs(chemdata.res3) do
@@ -174,48 +218,35 @@ function verifyDb()
                end
             end
 
-            local dihedralAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3],a[4])
-            local qry = rfpg.Q("select id from dihedral_string where atom_string = '" .. dihedralAtomStr .. "'")
-            if (not qry) then
-               local angIDs={}
-               for j=1,2 do
-                  angIDs[j] = getOrCreateAngleId({a[j],a[j+1],a[j+2]})
-                     --rfpg.Q("select id from angle_string where atom_string='" .. rfpg.pgArrayOfStrings(a[j],a[j+1],a[j+2]) .."'")[1]
-               end
+            -- get central residue and neighbour if specified
+            local res = (subpos and (2<subpos and "{ NULL," .. '"' .. r1 .. '","' .. r12 .. '"}' or "{" ..'"' .. r12 .. '","' .. r1 .. '", NULL}') or "{ NULL, " .. '"' .. r1 .. '", NULL}')
+            local nameId = nil
+            if (dset[5]) then nameId = rfpg.Q("select id from dihedral_name where name='" .. dset[5] .."'")[1] end
+            getOrCreateDihedralId(a,res,nameId)
 
-               local nameId = nil
-               if (dset[5]) then nameId = rfpg.Q("select id from dihedral_name where name='" .. dset[5] .."'")[1] end
+         end
+      end 
+   end
 
-               -- get central residue and neighbour if specified
-               local res = (subpos and (2<subpos and "{ NULL," .. '"' .. r1 .. '","' .. r12 .. '"}' or "{" ..'"' .. r12 .. '","' .. r1 .. '", NULL}') or "{ NULL, " .. '"' .. r1 .. '", NULL}')
-
-               -- figure out how bonds and angles got ordered
-               local bndNdx={}
-               for i=1,3 do
-                  bndNdx[i] = (a[i] == utils.orderPair(a[i],a[i+1])[1] and '{1,2}' or '{2,1}')
-               end
-               local angNdx={}
-               angNdx[1] = (a[1] == utils.orderPair(a[1],a[3]) and "{" .. bndNdx[1] .. ',' .. bndNdx[2] .. "}" or "{" .. bndNdx[2] .. ',' .. bndNdx[1] .. "}")
-               angNdx[2] = (a[2] == utils.orderPair(a[2],a[4]) and "{" .. bndNdx[2] .. ',' .. bndNdx[3] .. "}" or "{" .. bndNdx[3] .. ',' .. bndNdx[2] .. "}")
-
-               -- order angles within dihedral and log
-               local dihedNdx
-               local dihedIDs
-               if (a[1] == utils.orderPair(a[1],a[4])) then
-                  dihedNdx = '{' .. angNdx[1] .. ',' .. angNdx[2] .. '}'
-                  dihedIDs = '{' .. angIDs[1] .. ',' .. angIDs[2] .. '}'
-               else
-                  dihedNdx = '{' .. angNdx[2] .. ',' .. angNdx[1] .. '}'
-                  dihedIDs = '{' .. angIDs[2] .. ',' .. angIDs[1] .. '}'
-               end
-
-               local dihedId = rfpg.Q('insert into dihedral_class(res_angles, angle_atom_order, res3' .. (nameId and ',name' or '') .. ") values ('" .. dihedIDs .. "','" .. dihedNdx .. "','" .. res .. (nameId and "'," .. nameId or "'" ) .. ") on conflict(res_angles) do update set res3='" .. res .. "' returning id")[1]
-               rfpg.Qcur("insert into dihedral_string (atom_string, id) values ('" .. dihedralAtomStr .. "'," .. dihedId .. ')')
+   for r,set in pairs(chemdata.sidechains) do
+      for i,v in ipairs(set) do
+         local a = {}
+         if (v[4]) then -- dihedral angle
+            for k=1,4 do
+               a[k] = r .. v[k]
             end
+            local nameId = nil
+            if (v[5]) then nameId = rfpg.Q("select id from dihedral_name where name='" .. v[5] .."'")[1] end
+            getOrCreateDihedralId(a,"{ NULL, " .. '"' .. r .. '", NULL}', nameId)
+         else  -- regular angle
+            for k=1,3 do
+               a[k] = r .. v[k]
+            end
+            getOrCreateAngleId(a)
          end
       end
-      
    end
+   
    rfpg.Qcur('commit')
 end
 
@@ -282,11 +313,12 @@ for i,arg in ipairs(toProcess) do
       local dsspCount = prot:countDSSPs()  -- useful to know below
       local coordsInternal
       local coords3D
-      
+
+      prot:setStartCoords()                  -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list (not done on loading pic file)
+
       if prot:countDihedra() > 0  then  -- did read internal coordinates, either from .pic file or rtm DSSP output
          
          --- test if we can generate PDB coordinates and match back:
-         prot:setStartCoords()                  -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list (not done on loading pic file)
          coordsInternal = prot:writeInternalCoords()  -- get output for internal coordinate data as loaded 
          prot:internalToAtomCoords()            -- generate PDB atom coordinates from internal coordinates (needs dihedron data structures to complete chain)
          prot:clearInternalCoords()             -- wipe internal coordinates as loaded
@@ -342,7 +374,7 @@ for i,arg in ipairs(toProcess) do
       print('we have happy data for ' .. arg)
       print(prot:tostring())
 
-     -- prot:writeDB(rfpg,args['u'])
+     prot:writeDb(rfpg,args['u'])
       
    end
 

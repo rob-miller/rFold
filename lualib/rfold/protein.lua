@@ -212,17 +212,17 @@ function Protein:writeDb(rfpg,update)
    local first=true
    local tct = "','"
    for k,v in ipairs(self['chainOrder']) do
-      local pdb_no = rfpg:Q("select pdb_no from pdb_chain where pdbid='" .. self['id'] .. "' and chain = '" .. v .. "' and filename = '" .. self['filename'] .. "'")
+      local pdb_no = rfpg.Q("select pdb_no from pdb_chain where pdbid='" .. self['id'] .. "' and chain = '" .. v .. "' and filename = '" .. self['filename'] .. "'")
+
       if not pdb_no then 
-         pdb_no  = rfpg:Q("insert into pdb_chain (pdbid, chain, filename) values ('".. self['id'] .. tct .. v .. tct .. self['filename'] .."') returning pdb_no")
+         pdb_no  = rfpg.Q("insert into pdb_chain (pdbid, chain, filename, chain_order) values ('".. self['id'] .. tct .. v .. tct .. self['filename'] .. "'," .. k .. ") returning pdb_no")
       elseif not update then
          goto skipChain
       end
+      pdb_no = pdb_no[1]
 
-      local colStr
       if first then
-         colStr = "(header,title) = ('" .. self['header'] .. tct .. self['title'] .. "')"
-         rfpg:Q("insert into pdb_chain " .. colStr .. " where pdb_no = " .. pdb_no .. " on conflict do update set " .. colStr)
+         rfpg.Qcur("update pdb_chain set (header,title) = ('".. self['header'] .. tct .. self['title'] .. "') where pdb_no = " .. pdb_no)
          first = false
       end
 
@@ -230,8 +230,8 @@ function Protein:writeDb(rfpg,update)
       
       local seqStr = chain:seqStr()
       local seqRes = chain['seqres'] or ''
-      colStr = "(sequence, seqres, chain_order) = ('" .. seqStr .. tct .. seqRes.. "', .. k)"
-      rfpg:Q("insert into pdb_chain " .. colStr .. " where pdb_no = " .. pdb_no .. " on conflict do update set " .. colStr)
+
+      rfpg.Qcur("update pdb_chain set (sequence, seqres) = ('" .. seqStr .. tct .. seqRes.. "') where pdb_no = " .. pdb_no)
 
       self['chains'][v]:writeDb(rfpg, pdb_no)
 
