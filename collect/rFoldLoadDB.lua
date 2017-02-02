@@ -45,10 +45,64 @@ local PDB_repository_base = '/media/data/pdb/'
 local mkdssp = 'dssp/rtm-dssp-2.2.1/mkdssp'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
+rfpg.dbReconnect(1)
 
+function atomPairValueString(a1,a2)
+   local t = utils.orderPair(a1,a2)
+   local vals = "'{" .. '"' .. t[1] .. '", "' .. t[2] .. '"' .. "}'"
+   return vals
+end
 
+function bondPairValueString(a1,a3,b1,b2)
+   local t = utils.orderPair(a1,a3)  -- order bond pair by end atom sorting
+   local vals
+   if (a1 == t[1]) then  -- orderis b1=a1-a2, b2=a2-a3
+      vals = "'{" .. b1 .. ", " .. b2 .. "}'"
+   else                    -- orderis b2=a2-a3, b1=a1-a2
+      vals = "'{" .. b2 .. ", " .. b1 .. "}'"
+   end
+   return vals
+end
 
+function getOrCreateAngleId(a)
+   local angleAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3])
+   local qry = rfpg.Q("select id from angle_string where atom_string = '" .. angleAtomStr .. "'")
+   local rid
+   
+   if (not qry) then
+      local b = {}
+      for k=1,2 do
+         local bondAtomStr = rfpg.pgArrayOfStrings(a[k],a[k+1])
+         qry = rfpg.Q("select id from bond_string where atom_string = '" .. bondAtomStr .. "'")
+         if (qry) then 
+            b[k] = qry[1]
+         else
+            local vals = atomPairValueString(a[k],a[k+1])
+            b[k] = rfpg.Q("insert into bond_class (res_atoms) values (" .. vals .. ") on conflict(res_atoms) do update set res_atoms = " .. vals .. " returning id;")[1]  -- id may exist already for different order, update will not change
+            rfpg.Qcur("insert into bond_string (atom_string, id) values ('" .. bondAtomStr .. "'," .. b[k] ..')')
+         end
+      end
+      
+      local bpvstr = bondPairValueString(a[1],a[3],b[1],b[2])
+      rid = rfpg.Q('insert into angle_class (res_bonds) values (' .. bpvstr .. ') on conflict(res_bonds) do update set res_bonds = ' .. bpvstr .. ' returning id' )[1]
+      rfpg.Qcur("insert into angle_string (atom_string,id) values ('" .. angleAtomStr .. "'," .. rid .. ')')
+   else
+      rid = qry[1]
+   end
+   return rid
+end
+
+--- deterministically populate database tables with serial IDs so IDs do not change with change in protein sets
 function verifyDb()
+   -- load dihedral_names
+   rfpg.Qcur("insert into dihedral_name (name) values ('psi') on conflict (name) do nothing")
+   rfpg.Qcur("insert into dihedral_name (name) values ('omega') on conflict (name) do nothing")
+   rfpg.Qcur("insert into dihedral_name (name) values ('phi') on conflict (name) do nothing")
+   for i=1,5 do
+      rfpg.Qcur("insert into dihedral_name (name) values ('chi" .. i .. "') on conflict (name) do nothing")
+   end
+      
+   -- load periodic_table
    local c=0
    for _ in pairs(chemdata.atomic_weight) do c = c + 1 end
 
@@ -61,33 +115,106 @@ function verifyDb()
          end
    end
 
+   -- load atom_bond_state (atom classes based on Heyrovska, Raji covalent radii paper https://arxiv.org/pdf/0804.2488.pdf )
    c=0
    for _ in pairs(chemdata.covalent_radii) do c = c + 1 end
-   rows = tonumber(rfpg.Q('select count(*) from atom_class;')[1]);
+   rows = tonumber(rfpg.Q('select count(*) from atom_bond_state;')[1]);
    if (rows < c) then
          for k,v in pairs(chemdata.covalent_radii) do
-            rfpg.Qcur("insert into atom_class (class, r_covalent, v_covalent) values ('" .. k .. "'," .. v .. "," .. chemdata.covalent_volume(k) .. ") on conflict (class) do update set r_covalent=" .. v .. ", v_covalent = " .. chemdata.covalent_volume(k) .. ";")
+            rfpg.Qcur("insert into atom_bond_state (state, r_covalent, v_covalent) values ('" .. k .. "'," .. v .. "," .. chemdata.covalent_volume(k) .. ") on conflict (state) do update set r_covalent=" .. v .. ", v_covalent = " .. chemdata.covalent_volume(k) .. ";")
          end
    end
 
-   for r1,r3 in pairs(chemdata.res3) do
-      local pdb_atoms = { 'N', 'CA', 'C', 'O', 'CB', 'OXT' }
-      local backbone = chemdata.residue_atom_class['X']
-      for i,pa in ipairs(pdb_atoms) do
-         if (not (r1 == 'G' and pa == 'CB')) then
-            --print('r1',r1)
-            --print('pa',pa)
-            --print('b[pa]', backbone[pa])
-            --print('pa[1]', string.sub(pa,1,1))
-            rfpg.Qcur("insert into atoms (name, class, atom) values ('" .. r1 .. pa .. "','" .. backbone[pa] .. "','" .. string.sub(pa,1,1) .. "') on conflict (name) do nothing;")
-         end
+   for r1,r3 in pairs(chemdata.res3) do  -- first round through all residues: sidechain atoms into res_atoms, backbone+Cbeta into res_atoms
+      -- load backbone and c-beta (Ala atoms) into res_atoms
+      local ala_atoms = { 'N', 'CA', 'C', 'O', 'CB', 'OXT' }
+      local backbone = chemdata.residue_atom_bond_state['X']
+      for i,pa in ipairs(ala_atoms) do
+         --if (not (r1 == 'G' and pa == 'CB')) then
+            rfpg.Qcur("insert into res_atoms (name, bond_state, atom) values ('" .. r1 .. pa .. "','" .. backbone[pa] .. "','" .. string.sub(pa,1,1) .. "') on conflict (name) do nothing;")
+         --end
       end
-      local sidechain = (r1 == 'G' or r1 == 'A' or r1 == 'X') and {} or chemdata.residue_atom_class[r1]
+      -- load sidechain atoms int res_atoms
+      local sidechain = (r1 == 'G' or r1 == 'A' or r1 == 'X') and {} or chemdata.residue_atom_bond_state[r1]
       for an,ac in pairs(sidechain) do
          --print('an[1]', string.sub(an,1,1))
-         rfpg.Qcur("insert into atoms (name, class, atom) values ('" .. r1 .. an .. "','" .. ac .. "','" .. string.sub(an,1,1) .. "') on conflict (name) do nothing;")
+         rfpg.Qcur("insert into res_atoms (name, bond_state, atom) values ('" .. r1 .. an .. "','" .. ac .. "','" .. string.sub(an,1,1) .. "') on conflict (name) do nothing;")
       end
-      --print()
+   end
+   
+   for r1,r3 in pairs(chemdata.res3) do  -- second round through all residues: populate res_bond_class
+      -- load res_bond_class, res_angle_class for backbone and c-beta (ala atoms)
+      -- if _ in any atom position in triple, then need to cycle that position for all 20 neighbouring residues
+      for r12,r32 in pairs(chemdata.res3) do
+         for i,aset in ipairs(chemdata.backbone_angles) do
+            local a = {}
+            for j=1,3 do
+               a[j] = string.gsub(aset[j], '_', r12)              -- substitute _ with each of 20 amino acids (r12)
+               if (a[j] == aset[j]) then a[j] = r1 .. a[j] end    -- if no substitution, atom key is for current r1 residue
+            end
+
+            getOrCreateAngleId(a)
+
+         end
+      end
+   end
+   
+   for r1,r3 in pairs(chemdata.res3) do  -- third round through all residues: populate dihedral_class
+      -- same scan for loading dihedral_class
+      for r12,r32 in pairs(chemdata.res3) do
+         for i,dset in ipairs(chemdata.backbone_dihedrals) do
+            local subpos=nil
+            local a = {}
+            for j=1,4 do
+               a[j] = string.gsub(dset[j], '_', r12)              -- substitute _ with each of 20 amino acids (r12)
+               if (a[j] == dset[j]) then                          -- if no substitution, atom key is for current r1 residue
+                  a[j] = r1 .. a[j]
+               else
+                  subpos = j
+               end
+            end
+
+            local dihedralAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3],a[4])
+            local qry = rfpg.Q("select id from dihedral_string where atom_string = '" .. dihedralAtomStr .. "'")
+            if (not qry) then
+               local angIDs={}
+               for j=1,2 do
+                  angIDs[j] = getOrCreateAngleId({a[j],a[j+1],a[j+2]})
+                     --rfpg.Q("select id from angle_string where atom_string='" .. rfpg.pgArrayOfStrings(a[j],a[j+1],a[j+2]) .."'")[1]
+               end
+
+               local nameId = nil
+               if (dset[5]) then nameId = rfpg.Q("select id from dihedral_name where name='" .. dset[5] .."'")[1] end
+
+               -- get central residue and neighbour if specified
+               local res = (subpos and (2<subpos and "{ NULL," .. '"' .. r1 .. '","' .. r12 .. '"}' or "{" ..'"' .. r12 .. '","' .. r1 .. '", NULL}') or "{ NULL, " .. '"' .. r1 .. '", NULL}')
+
+               -- figure out how bonds and angles got ordered
+               local bndNdx={}
+               for i=1,3 do
+                  bndNdx[i] = (a[i] == utils.orderPair(a[i],a[i+1])[1] and '{1,2}' or '{2,1}')
+               end
+               local angNdx={}
+               angNdx[1] = (a[1] == utils.orderPair(a[1],a[3]) and "{" .. bndNdx[1] .. ',' .. bndNdx[2] .. "}" or "{" .. bndNdx[2] .. ',' .. bndNdx[1] .. "}")
+               angNdx[2] = (a[2] == utils.orderPair(a[2],a[4]) and "{" .. bndNdx[2] .. ',' .. bndNdx[3] .. "}" or "{" .. bndNdx[3] .. ',' .. bndNdx[2] .. "}")
+
+               -- order angles within dihedral and log
+               local dihedNdx
+               local dihedIDs
+               if (a[1] == utils.orderPair(a[1],a[4])) then
+                  dihedNdx = '{' .. angNdx[1] .. ',' .. angNdx[2] .. '}'
+                  dihedIDs = '{' .. angIDs[1] .. ',' .. angIDs[2] .. '}'
+               else
+                  dihedNdx = '{' .. angNdx[2] .. ',' .. angNdx[1] .. '}'
+                  dihedIDs = '{' .. angIDs[2] .. ',' .. angIDs[1] .. '}'
+               end
+
+               local dihedId = rfpg.Q('insert into dihedral_class(res_angles, angle_atom_order, res3' .. (nameId and ',name' or '') .. ") values ('" .. dihedIDs .. "','" .. dihedNdx .. "','" .. res .. (nameId and "'," .. nameId or "'" ) .. ") on conflict(res_angles) do update set res3='" .. res .. "' returning id")[1]
+               rfpg.Qcur("insert into dihedral_string (atom_string, id) values ('" .. dihedralAtomStr .. "'," .. dihedId .. ')')
+            end
+         end
+      end
+      
    end
    rfpg.Qcur('commit')
 end
@@ -95,13 +222,15 @@ end
 
 
 local args = parsers.parseCmdLine(
+   '[ <pdbid[chain id]> | <pdb file> | <pic file> ] ...',
+   'convert PDB file to internal coordinates and load into database.  repository base: ' .. PDB_repository_base .. ' db: ' .. rfpg.db .. ' on ' .. rfpg.host .. ' ('  ..utils.getHostname() .. ')',
    {
       ['nd'] = 'do not run dssp on PDB input file',
       ['u'] = 'update database (default is skip if entry already exists)'
-   },{
+   },
+   {
       ['f'] = '<input file> : process files listed in <input file> (1 per line) followed by any on command line'
-     },
-   'convert PDB file to internal coordinates and load into database.  repository base: ' .. PDB_repository_base .. ' db: ' .. rfpg.db .. ' on ' .. rfpg.host .. ' ('  ..utils.getHostname() .. ')' 
+   }
 )
 
 local toProcess={}

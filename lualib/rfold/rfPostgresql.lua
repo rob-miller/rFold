@@ -25,16 +25,20 @@ local rfpg = {}
 -- modify this line to change database access parameters:
 rfpg.db, rfpg.user, rfpg.pass, rfpg.host = 'rFold','postgres','postgres','localhost'
 
-   
+rfpg.dbg=nil
+
 function rfpg.Q(sql)
+   if (rfpg.dbg) then print(sql) end
    return assert(rfpg.con:execute(sql),sql):fetch({})
 end
 
 function rfpg.Qa(sql)
+   if (rfpg.dbg) then print(sql) end
    return assert(rfpg.con:execute(sql)):fetch({},'a')
 end
 
 function rfpg.Qcur(sql)
+   if (rfpg.dbg) then print(sql) end
    return assert(rfpg.con:execute(sql))
 end
 
@@ -81,6 +85,23 @@ function rfpg.as2tn (astr)  -- postgresql array str to table of numbers
    return rslt
 end
 
+function rfpg.pgArrayOfStrings(...) -- return variable number of strings as postgres array syntax
+   local rstr = '{'
+   local start=1
+   for i,v in ipairs({...}) do
+      rstr = rstr .. (start and '"' or ',"') .. v .. '"'
+      start = nil
+   end
+   return rstr ..'}'
+end
+
+   
+
+
+
+
+
+---------------------------------
 
 function rfpg.dbReconnect(autocommit)
    rfpg.pg = luasql.postgres()

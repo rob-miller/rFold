@@ -207,6 +207,8 @@ function utils.writeFile(fname,s)
    file:close()
 end
 
+--- get our hostname
+-- @return string with hostname
 function utils.getHostname()
     local f = io.popen ("/bin/hostname")
     local hostname = f:read("*a") or ""
@@ -215,7 +217,15 @@ function utils.getHostname()
     return hostname
 end
 
-
+--- sort a pair of variables
+-- @param a1 first thing
+-- @param a2 second thing
+-- @return table with [1] and [2] set to a1/a2 according to lua table.sort()
+function utils.orderPair(a1, a2)
+   local t = { a1, a2 }
+   table.sort(t)
+   return t
+end
    
 return utils
 

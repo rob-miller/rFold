@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.8.2" last-position="105,187" last-zoom="1.45"
+<dbmodel pgmodeler-ver="0.8.2" last-position="79,295" last-zoom="1.45"
 	 default-schema="public" default-owner="postgres">
 <database name="rFold">
 </database>
@@ -14,7 +14,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="pdb_chain">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="280" y="160"/>
+	<position x="100" y="120"/>
 	<column name="pdb_no" not-null="true">
 		<type name="serial"/>
 	</column>
@@ -63,17 +63,17 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="residue">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="280" y="320"/>
+	<position x="100" y="260"/>
 	<column name="res_id" not-null="true">
 		<type name="serial"/>
 	</column>
 	<column name="res">
 		<type name="varchar"/>
 	</column>
-	<column name="pre_res">
+	<column name="prev_res">
 		<type name="varchar"/>
 	</column>
-	<column name="post_res">
+	<column name="next_res">
 		<type name="varchar"/>
 	</column>
 	<column name="res_ndx">
@@ -109,75 +109,81 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<table name="dihedral_code">
+<table name="dihedral_class">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="740" y="140"/>
-	<column name="code" not-null="true">
+	<position x="540" y="120"/>
+	<column name="id" not-null="true">
 		<type name="smallserial"/>
+	</column>
+	<column name="res_angles">
+		<type name="smallint" dimension="1"/>
+	</column>
+	<column name="angle_atom_order">
+		<type name="smallint" dimension="3"/>
+	</column>
+	<column name="res3">
+		<type name="varchar" dimension="1"/>
 	</column>
 	<column name="name">
-		<type name="varchar"/>
-	</column>
-	<column name="angle1">
 		<type name="smallint"/>
 	</column>
-	<column name="angle2">
-		<type name="smallint"/>
-	</column>
-	<constraint name="dihedral_code_pk" type="pk-constr" table="public.dihedral_code">
-		<columns names="code" ref-type="src-columns"/>
+	<constraint name="dihedral_code_pk" type="pk-constr" table="public.dihedral_class">
+		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="dihedral_code_uq_name" type="uq-constr" table="public.dihedral_code">
-		<columns names="name" ref-type="src-columns"/>
+	<constraint name="dihedral_code_uq_ang1_ang2" type="uq-constr" table="public.dihedral_class">
+		<columns names="res_angles" ref-type="src-columns"/>
 	</constraint>
 </table>
 
-<table name="angle_code">
+<table name="angle_class">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="740" y="300"/>
-	<column name="code" not-null="true">
+	<position x="540" y="260"/>
+	<column name="id" not-null="true">
 		<type name="smallserial"/>
 	</column>
-	<column name="bond1">
-		<type name="smallint"/>
+	<column name="res_bonds">
+		<type name="smallint" dimension="1"/>
 	</column>
-	<column name="bond2">
-		<type name="smallint"/>
-	</column>
-	<constraint name="bond_angle_class_pk" type="pk-constr" table="public.angle_code">
-		<columns names="code" ref-type="src-columns"/>
+	<constraint name="angle_class_pk" type="pk-constr" table="public.angle_class">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="angle_class_uq_res_bonds" type="uq-constr" table="public.angle_class">
+		<columns names="res_bonds" ref-type="src-columns"/>
 	</constraint>
 </table>
 
-<table name="bond_code">
+<table name="bond_class">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="740" y="400"/>
-	<column name="code" not-null="true">
+	<position x="560" y="420"/>
+	<column name="id" not-null="true">
 		<type name="smallserial"/>
 	</column>
-	<column name="atom1">
-		<type name="varchar"/>
+	<column name="res_atoms">
+		<type name="varchar" dimension="1"/>
 	</column>
-	<column name="atom2">
-		<type name="varchar"/>
-	</column>
-	<constraint name="bond_class_pk" type="pk-constr" table="public.bond_code">
-		<columns names="code" ref-type="src-columns"/>
+	<constraint name="bond_class_pk" type="pk-constr" table="public.bond_class">
+		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="bond_uniq" type="uq-constr" table="public.bond_code">
-		<columns names="atom1,atom2" ref-type="src-columns"/>
+	<constraint name="bond_class_uq_res_atoms" type="uq-constr" table="public.bond_class">
+		<columns names="res_atoms" ref-type="src-columns"/>
 	</constraint>
 </table>
 
 <table name="dihedral">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="500" y="120"/>
-	<column name="res_id" not-null="true">
+	<position x="300" y="80"/>
+	<column name="dihedral_id" not-null="true">
+		<type name="serial"/>
+	</column>
+	<column name="res_id">
 		<type name="bigint"/>
+	</column>
+	<column name="dihedral_class">
+		<type name="smallint"/>
 	</column>
 	<column name="angle1">
 		<type name="bigint"/>
@@ -188,14 +194,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="dangle">
 		<type name="double precision"/>
 	</column>
-	<column name="dihedral_code" not-null="true">
-		<type name="smallint"/>
-	</column>
-	<column name="res_dihedral_code">
-		<type name="smallint"/>
-	</column>
 	<constraint name="dihedral_pk" type="pk-constr" table="public.dihedral">
-		<columns names="res_id,dihedral_code" ref-type="src-columns"/>
+		<columns names="dihedral_id" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -210,9 +210,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="angle">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="500" y="240"/>
+	<position x="300" y="240"/>
 	<column name="angle_id" not-null="true">
 		<type name="serial"/>
+	</column>
+	<column name="dihedral_id">
+		<type name="bigint"/>
+	</column>
+	<column name="angle_code">
+		<type name="smallint"/>
+	</column>
+	<column name="res_id">
+		<type name="bigint"/>
 	</column>
 	<column name="bond1">
 		<type name="bigint"/>
@@ -220,17 +229,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="bond2">
 		<type name="bigint"/>
 	</column>
-	<column name="res_id">
-		<type name="bigint"/>
-	</column>
 	<column name="angle">
 		<type name="double precision"/>
-	</column>
-	<column name="angle_code">
-		<type name="smallint"/>
-	</column>
-	<column name="res_angle_code">
-		<type name="smallint"/>
 	</column>
 	<constraint name="angle_pk" type="pk-constr" table="public.angle">
 		<columns names="angle_id" ref-type="src-columns"/>
@@ -248,21 +248,21 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="bond">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="500" y="380"/>
+	<position x="300" y="400"/>
 	<column name="bond_id" not-null="true">
 		<type name="serial"/>
+	</column>
+	<column name="angle_id">
+		<type name="bigint"/>
+	</column>
+	<column name="bond_code">
+		<type name="smallint"/>
 	</column>
 	<column name="res_id">
 		<type name="bigint"/>
 	</column>
 	<column name="length">
 		<type name="double precision"/>
-	</column>
-	<column name="bond_code">
-		<type name="smallint"/>
-	</column>
-	<column name="res_bond_code">
-		<type name="smallint"/>
 	</column>
 	<constraint name="bond_pk" type="pk-constr" table="public.bond">
 		<columns names="bond_id" ref-type="src-columns"/>
@@ -277,29 +277,31 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<table name="atoms">
+<table name="res_atoms">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="760" y="500"/>
+	<position x="820" y="400"/>
 	<column name="name" not-null="true">
 		<type name="varchar"/>
+		<comment><![CDATA[includes 1-letter residue code]]></comment>
 	</column>
-	<column name="class">
+	<column name="bond_state">
 		<type name="varchar"/>
 	</column>
 	<column name="atom" not-null="true">
 		<type name="varchar"/>
 	</column>
-	<constraint name="atoms_pk_atom_name" type="pk-constr" table="public.atoms">
+	<constraint name="atoms_pk_atom_name" type="pk-constr" table="public.res_atoms">
 		<columns names="name" ref-type="src-columns"/>
 	</constraint>
 </table>
 
-<table name="atom_class">
+<table name="atom_bond_state">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="940" y="520"/>
-	<column name="class" not-null="true">
+	<comment><![CDATA[atom bonding class]]></comment>
+	<position x="820" y="460"/>
+	<column name="state" not-null="true">
 		<type name="varchar"/>
 	</column>
 	<column name="r_covalent">
@@ -308,15 +310,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="v_covalent">
 		<type name="double precision"/>
 	</column>
-	<constraint name="atom_class_pk_name" type="pk-constr" table="public.atom_class">
-		<columns names="class" ref-type="src-columns"/>
+	<constraint name="atom_class_pk_name" type="pk-constr" table="public.atom_bond_state">
+		<columns names="state" ref-type="src-columns"/>
 	</constraint>
 </table>
 
 <table name="periodic_table">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="940" y="580"/>
+	<position x="820" y="520"/>
 	<column name="atom" not-null="true">
 		<type name="varchar"/>
 	</column>
@@ -334,7 +336,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dssp">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="280" y="620"/>
+	<position x="100" y="480"/>
 	<column name="res_id" not-null="true">
 		<type name="bigint"/>
 	</column>
@@ -361,7 +363,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dssp_coordinates">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="280" y="520"/>
+	<position x="100" y="400"/>
 	<column name="res_id" not-null="true">
 		<type name="bigint"/>
 	</column>
@@ -382,46 +384,79 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
+<table name="dihedral_name">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="600" y="200"/>
+	<column name="id" not-null="true">
+		<type name="smallserial"/>
+	</column>
+	<column name="name">
+		<type name="varchar"/>
+	</column>
+	<constraint name="dihedral_name_pk" type="pk-constr" table="public.dihedral_name">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="dihedral_name_uq" type="uq-constr" table="public.dihedral_name">
+		<columns names="name" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="bond_string">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="560" y="480"/>
+	<column name="atom_string" not-null="true">
+		<type name="varchar" dimension="1"/>
+	</column>
+	<column name="id">
+		<type name="smallint"/>
+	</column>
+	<constraint name="bond_string_pk" type="pk-constr" table="public.bond_string">
+		<columns names="atom_string" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="angle_string">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="560" y="320"/>
+	<column name="atom_string" not-null="true">
+		<type name="varchar" dimension="1"/>
+	</column>
+	<column name="id">
+		<type name="smallint"/>
+	</column>
+	<constraint name="angle_string_pk" type="pk-constr" table="public.angle_string">
+		<columns names="atom_string" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="dihedral_string">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="600" y="80"/>
+	<column name="atom_string" not-null="true">
+		<type name="varchar" dimension="1"/>
+	</column>
+	<column name="id">
+		<type name="smallint"/>
+	</column>
+	<constraint name="dihedral_string_pk" type="pk-constr" table="public.dihedral_string">
+		<columns names="atom_string" ref-type="src-columns"/>
+	</constraint>
+</table>
+
 <constraint name="residue_fk_pdbno" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.pdb_chain" table="public.residue">
 	<columns names="pdb_no" ref-type="src-columns"/>
 	<columns names="pdb_no" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="dihedral_code_fk_angle1" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_code" table="public.dihedral_code">
-	<columns names="angle1" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="dihedral_code_fk_angle2" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_code" table="public.dihedral_code">
-	<columns names="angle2" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="bond_angle_fk_bond1" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_code" table="public.angle_code">
-	<columns names="bond1" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="bond_angle_fk_bond2" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_code" table="public.angle_code">
-	<columns names="bond2" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="bond_code_fk_atom1" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.atoms" table="public.bond_code">
-	<columns names="atom1" ref-type="src-columns"/>
-	<columns names="name" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="bond_cod_fk_atom2" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.atoms" table="public.bond_code">
-	<columns names="atom2" ref-type="src-columns"/>
-	<columns names="name" ref-type="dst-columns"/>
+<constraint name="dihedral_code_fk_name" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral_name" table="public.dihedral_class">
+	<columns names="name" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
 <constraint name="dihedral_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
@@ -430,10 +465,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="res_id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="dihedral_fk_class" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral_code" table="public.dihedral">
-	<columns names="dihedral_code" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
+<constraint name="dihedral_fk_dihedral_code" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral_class" table="public.dihedral">
+	<columns names="dihedral_class" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
 <constraint name="dihedral_fk_angle1" type="fk-constr" comparison-type="MATCH FULL"
@@ -448,12 +483,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="angle_id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="dihedral_fk_res_dihedral_code" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral_code" table="public.dihedral">
-	<columns names="res_dihedral_code" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
-</constraint>
-
 <constraint name="angle_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.residue" table="public.angle">
 	<columns names="res_id" ref-type="src-columns"/>
@@ -461,9 +490,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 </constraint>
 
 <constraint name="angle_fk_class" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_code" table="public.angle">
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_class" table="public.angle">
 	<columns names="angle_code" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
 <constraint name="angle_fk_bond1" type="fk-constr" comparison-type="MATCH FULL"
@@ -478,10 +507,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="bond_id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="angle_fk_res_angle_code" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_code" table="public.angle">
-	<columns names="res_angle_code" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
+<constraint name="angle_fk_dihedral_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral" table="public.angle">
+	<columns names="dihedral_id" ref-type="src-columns"/>
+	<columns names="dihedral_id" ref-type="dst-columns"/>
 </constraint>
 
 <constraint name="bond_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
@@ -491,25 +520,25 @@ CAUTION: Do not modify this file unless you know what you are doing.
 </constraint>
 
 <constraint name="bond_fk_class" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_code" table="public.bond">
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.bond_class" table="public.bond">
 	<columns names="bond_code" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="bond_fk_res_bond_code" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_code" table="public.bond">
-	<columns names="res_bond_code" ref-type="src-columns"/>
-	<columns names="code" ref-type="dst-columns"/>
+<constraint name="bond_fk_angle_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.angle" table="public.bond">
+	<columns names="angle_id" ref-type="src-columns"/>
+	<columns names="angle_id" ref-type="dst-columns"/>
 </constraint>
 
 <constraint name="atoms_fk_class" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.atom_class" table="public.atoms">
-	<columns names="class" ref-type="src-columns"/>
-	<columns names="class" ref-type="dst-columns"/>
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.atom_bond_state" table="public.res_atoms">
+	<columns names="bond_state" ref-type="src-columns"/>
+	<columns names="state" ref-type="dst-columns"/>
 </constraint>
 
 <constraint name="atoms_fk_atom" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.periodic_table" table="public.atoms">
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.periodic_table" table="public.res_atoms">
 	<columns names="atom" ref-type="src-columns"/>
 	<columns names="atom" ref-type="dst-columns"/>
 </constraint>
@@ -526,6 +555,24 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="res_id" ref-type="dst-columns"/>
 </constraint>
 
+<constraint name="bond_string_fk_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.bond_class" table="public.bond_string">
+	<columns names="id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="angle_string_fk_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_class" table="public.angle_string">
+	<columns names="id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="dihedral_string_fk_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.dihedral_class" table="public.dihedral_string">
+	<columns names="id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
 <relationship name="rel_residue_pdb_chain" type="relfk"
 	 src-table="public.residue"
 	 dst-table="public.pdb_chain"
@@ -538,7 +585,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 
 <relationship name="rel_dihedral_dihedral_angle_class" type="relfk"
 	 src-table="public.dihedral"
-	 dst-table="public.dihedral_code"
+	 dst-table="public.dihedral_class"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_dihedral_cp_residue" type="relfk"
@@ -548,17 +595,21 @@ CAUTION: Do not modify this file unless you know what you are doing.
 
 <relationship name="rel_dihedral_cp_bond_angle_class" type="relfk"
 	 src-table="public.angle"
-	 dst-table="public.angle_code"
+	 dst-table="public.angle_class"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_angle_cp_residue" type="relfk"
 	 src-table="public.bond"
 	 dst-table="public.residue"
-	 src-required="false" dst-required="false"/>
+	 src-required="false" dst-required="false">
+	<label ref-type="src-label">
+		<position x="0.04" y="11.8"/>
+	</label>
+</relationship>
 
 <relationship name="rel_angle_cp_bond_class" type="relfk"
 	 src-table="public.bond"
-	 dst-table="public.bond_code"
+	 dst-table="public.bond_class"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_angle_bond" type="relfk"
@@ -572,28 +623,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_atoms_atom_class" type="relfk"
-	 src-table="public.atoms"
-	 dst-table="public.atom_class"
+	 src-table="public.res_atoms"
+	 dst-table="public.atom_bond_state"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_atoms_periodic_table" type="relfk"
-	 src-table="public.atoms"
+	 src-table="public.res_atoms"
 	 dst-table="public.periodic_table"
-	 src-required="false" dst-required="false"/>
-
-<relationship name="rel_bond_code_atoms" type="relfk"
-	 src-table="public.bond_code"
-	 dst-table="public.atoms"
-	 src-required="false" dst-required="false"/>
-
-<relationship name="rel_angle_code_bond_code" type="relfk"
-	 src-table="public.angle_code"
-	 dst-table="public.bond_code"
-	 src-required="false" dst-required="false"/>
-
-<relationship name="rel_dihedral_code_angle_code" type="relfk"
-	 src-table="public.dihedral_code"
-	 dst-table="public.angle_code"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_dssp_residue" type="relfk"
@@ -604,6 +640,26 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <relationship name="rel_dssp_coordinates_residue" type="relfk"
 	 src-table="public.dssp_coordinates"
 	 dst-table="public.residue"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_dihedral_class_dihedral_name" type="relfk"
+	 src-table="public.dihedral_class"
+	 dst-table="public.dihedral_name"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_res_bond_string_res_bond_class" type="relfk"
+	 src-table="public.bond_string"
+	 dst-table="public.bond_class"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_res_angle_string_res_angle_class" type="relfk"
+	 src-table="public.angle_string"
+	 dst-table="public.angle_class"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_dihedral_string_dihedral_class" type="relfk"
+	 src-table="public.dihedral_string"
+	 dst-table="public.dihedral_class"
 	 src-required="false" dst-required="false"/>
 
 </dbmodel>
