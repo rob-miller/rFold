@@ -71,8 +71,8 @@ function utils.split_newlines(s)
 end
 
 --- execute line-by-line compare of 2 passed strings
--- @param s1t string containing newline characters
--- @param s2t string containing newline characters
+-- @param s1 string containing newline characters
+-- @param s2 string containing newline characters
 -- @return false if not perfect match, else number of lines compared
 function utils.lineByLineCompare(s1,s2)
    local s1t, s2t = {}, {}

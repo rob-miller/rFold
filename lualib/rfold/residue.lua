@@ -81,7 +81,7 @@ function residue.new (o)
 end
 
 --- callback from file parser, import table data for this Residue according to contents
--- @param t parsed file record data: DSSP record, or hedron / dihedron specification
+-- @param t parsed file record data: DSSP record, PDB ATOM record, or hedron / dihedron specification
 function Residue:load(t)
    if t['psi'] then -- dssp record
       self['dssp'] = t
@@ -106,6 +106,36 @@ function Residue:load(t)
          assert(nil, self:tostring() .. ' loading ' .. tostring(t) .. ' -- not recognised')
       end
    end
+end
+
+--- write residue data to rfold database
+-- @param rfpg open database handle
+-- @param res_id residue ID in residue table
+-- @param update optional flag, if false silently skip if [res_id [atom] ] entry exists already in atom_coordinates / dssp / dihedral / angle / bond tables 
+function Residue:writeDb(rfpg, res_id, update)
+   if self['dssp'] then
+      local chk = rfpg.Q("select 1 from dssp where res_id=" .. res_id)
+      if (not chk) then
+         rfpg.Qcur("insert into dssp (res_id, struc, struc2, phi, psi, omega) values (" .. res_id .. ",'" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. ")" )
+      elseif update then
+         rfpg.Qcur("update dssp set (struc, struc2, phi, psi, omega) = ('" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. ") where res_id= " .. res_id  )
+      end
+   end
+   if {} ~= self['atomCoords'] then  -- at chain level wrote atom_oordinates for initNCaC if present; here write all atom coordinates to db if present
+      for k,v in pairs(self['atomCoords']) do
+         local chk = rfpg.Q("select 1 from atom_coordinates where res_id = " .. res_id .. " and atom = '" .. k .. "'")
+         if not chk then
+            rfpg.Qcur("insert into atom_coordinates (res_id, atom, x, y, z) values (" .. res_id .. ",'" .. k .. "'," .. v[1][1] .. "," .. v[2][1] .. "," .. v[3][1] .. ")")
+         elseif update then
+            rfpg.Qcur("update atom_coordinates set (x, y, z) = (" .. v[1][1] .. "," .. v[2][1] .. "," .. v[3][1] .. ") where res_id = " .. res_id .. " and atom = '" .. k .. "'")
+         end
+      end
+   end
+
+   for k,d in pairs(self['dihedra']) do
+      d:writeDb(rfpg, res_id, update)
+   end
+
 end
 
 --- generate descriptive string for Residue: 1-letter amino acid code, sequence position
@@ -142,10 +172,10 @@ end
    
 --- delete internal coordinate data from this chain
 function Residue:clearInternalCoords()
-   for i,h in ipairs(self['hedra']) do
+   for k,h in pairs(self['hedra']) do -- 23 mar 17 : was ipairs 
       h:clearInternalCoords()
    end
-   for i,d in ipairs(self['dihedra']) do
+   for k,d in pairs(self['dihedra']) do  -- 23 mar 17 : was ipairs 
       d:clearInternalCoords()
    end
 end
@@ -535,5 +565,10 @@ function Residue:assemble( atomCoordsIn )
    
    return atomCoords
 end
+
+function Residue:printInfo()
+   for k,v in pairs(self['dihedra']) do v:printInfo() end
+end
+
 
 return residue

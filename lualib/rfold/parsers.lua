@@ -62,9 +62,10 @@ end
 --- parse specified flags and parameters from command line, pass remaining args through
 --
 -- ./parseCmdLine.lua -p1=hello -f1 -f1 fee fie fo fum
+-- @param argFormat format of command line argments for help e.g. '[ <pdbid[chain id]> | <pdb file> | <pic file> ] ...'
+-- @param info descriptive text for what the program does
 -- @param valid_flags { ['f1'] = "flag1 effect message", ['f2'] = "flag2 message" }
 -- @param valid_params { ['p1'] = "parameter1 explanation ...", ['p2'] = "parameter2 explanation ..." }
--- @param info descriptive text for what the program does
 -- @return table with 'param' values as specified, 'flag' values counting number of times flag seen, and remaining args in sequential numbered slots 
 function parsers.parseCmdLine (argFormat, info, valid_flags, valid_params)
    local args = {}
@@ -189,8 +190,8 @@ function parsers.parseProteinData (infile, callback, chain, infname)
          if (dsp['res'] == dsp['res']:lower()) then    -- cys partner encoding by dssp
             dsp['res'] = 'C'
          end
-         local ss = line:sub(17,17)
-         local ss2 = line:sub(19,26)
+         dsp['ss'] = line:sub(17,17)
+         dsp['ss2'] = line:sub(19,26)
          local nums = line:sub(106)
          assert(nums:ematch('^%s*(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$'), 'failed to parse dssp: '..line)
 
