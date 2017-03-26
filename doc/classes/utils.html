@@ -33,7 +33,6 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
-<li><a href="#Tables">Tables</a></li>
 <li><a href="#Fields">Fields</a></li>
 <li><a href="#Methods">Methods</a></li>
 </ul>
@@ -79,21 +78,6 @@
 	<td class="summary">extend string.match to test and capture patterns - goes into string: namespace</td>
 	</tr>
 </table>
-<h2><a href="#Tables">Tables</a></h2>
-<table class="function_list">
-	<tr>
-	<td class="name" nowrap><a href="#utils.res3">utils.res3</a></td>
-	<td class="summary">residue single letter to 3-letter name conversion</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils.res1">utils.res1</a></td>
-	<td class="summary">residue 3-letter name to single letter conversion</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils.sidechains">utils.sidechains</a></td>
-	<td class="summary">per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file</td>
-	</tr>
-</table>
 <h2><a href="#Fields">Fields</a></h2>
 <table class="function_list">
 	<tr>
@@ -103,6 +87,17 @@
 </table>
 <h2><a href="#Methods">Methods</a></h2>
 <table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#utils:split_newlines">utils:split_newlines (s)</a></td>
+	<td class="summary">split_newlines
+ http://lua-users.org/wiki/EnhancedFileLines</p>
+
+<p> Splits string s into array of lines, returning the result.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#utils:lineByLineCompare">utils:lineByLineCompare (s1, s2)</a></td>
+	<td class="summary">execute line-by-line compare of 2 passed strings</td>
+	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#utils:genKey">utils:genKey (atoms)</a></td>
 	<td class="summary">generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s</td>
@@ -117,7 +112,7 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#utils:addBase">utils:addBase (base, t)</a></td>
-	<td class="summary">convert table of atom-name-only (from utils.sidechains) to atomKey</td>
+	<td class="summary">convert table of atom-name-only (from chemdata.sidechains) to atomKey</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#utils:setAccuracy95">utils:setAccuracy95 (num)</a></td>
@@ -138,6 +133,14 @@
 	<tr>
 	<td class="name" nowrap><a href="#utils:writeFile">utils:writeFile (fname, s)</a></td>
 	<td class="summary">open a named file, write the passed string, close the file</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#utils:getHostname">utils:getHostname ()</a></td>
+	<td class="summary">get our hostname</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#utils:orderPair">utils:orderPair (a1, a2)</a></td>
+	<td class="summary">sort a pair of variables</td>
 	</tr>
 </table>
 
@@ -174,276 +177,6 @@
 
 </dd>
 </dl>
-    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
-
-    <dl class="function">
-    <dt>
-    <a name = "utils.res3"></a>
-    <strong>utils.res3</strong>
-    </dt>
-    <dd>
-    residue single letter to 3-letter name conversion
-
-
-    <h3>Fields:</h3>
-    <ul>
-        <li><span class="parameter">G</span>
-
-
-
-        </li>
-        <li><span class="parameter">A</span>
-
-
-
-        </li>
-        <li><span class="parameter">V</span>
-
-
-
-        </li>
-        <li><span class="parameter">L</span>
-
-
-
-        </li>
-        <li><span class="parameter">I</span>
-
-
-
-        </li>
-        <li><span class="parameter">M</span>
-
-
-
-        </li>
-        <li><span class="parameter">F</span>
-
-
-
-        </li>
-        <li><span class="parameter">P</span>
-
-
-
-        </li>
-        <li><span class="parameter">S</span>
-
-
-
-        </li>
-        <li><span class="parameter">T</span>
-
-
-
-        </li>
-        <li><span class="parameter">C</span>
-
-
-
-        </li>
-        <li><span class="parameter">N</span>
-
-
-
-        </li>
-        <li><span class="parameter">Q</span>
-
-
-
-        </li>
-        <li><span class="parameter">Y</span>
-
-
-
-        </li>
-        <li><span class="parameter">W</span>
-
-
-
-        </li>
-        <li><span class="parameter">D</span>
-
-
-
-        </li>
-        <li><span class="parameter">E</span>
-
-
-
-        </li>
-        <li><span class="parameter">H</span>
-
-
-
-        </li>
-        <li><span class="parameter">K</span>
-
-
-
-        </li>
-        <li><span class="parameter">R</span>
-
-
-
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "utils.res1"></a>
-    <strong>utils.res1</strong>
-    </dt>
-    <dd>
-    residue 3-letter name to single letter conversion
-
-
-    <h3>Fields:</h3>
-    <ul>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "utils.sidechains"></a>
-    <strong>utils.sidechains</strong>
-    </dt>
-    <dd>
-    per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file
-
-
-    <h3>Fields:</h3>
-    <ul>
-        <li><span class="parameter">[</span>
-
-
-
-        </li>
-        <li><span class="parameter">CB</span>
-
-
-
-        </li>
-        <li><span class="parameter">CG1</span>
-
-
-
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-</dl>
     <h2 class="section-header "><a name="Fields"></a>Fields</h2>
 
     <dl class="function">
@@ -465,6 +198,64 @@
     <h2 class="section-header "><a name="Methods"></a>Methods</h2>
 
     <dl class="function">
+    <dt>
+    <a name = "utils:split_newlines"></a>
+    <strong>utils:split_newlines (s)</strong>
+    </dt>
+    <dd>
+    split_newlines
+ http://lua-users.org/wiki/EnhancedFileLines</p>
+
+<p> Splits string s into array of lines, returning the result.
+ New-line character sequences ("\n", "\r\n", "\r"),
+ if any, are NOT included at the ends of the lines.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">s</span>
+         string containing newline characters
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        array of lines
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "utils:lineByLineCompare"></a>
+    <strong>utils:lineByLineCompare (s1, s2)</strong>
+    </dt>
+    <dd>
+    execute line-by-line compare of 2 passed strings
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">s1</span>
+         string containing newline characters
+        </li>
+        <li><span class="parameter">s2</span>
+         string containing newline characters
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        false if not perfect match, else number of lines compared
+    </ol>
+
+
+
+
+</dd>
     <dt>
     <a name = "utils:genKey"></a>
     <strong>utils:genKey (atoms)</strong>
@@ -545,7 +336,7 @@
     <strong>utils:addBase (base, t)</strong>
     </dt>
     <dd>
-    convert table of atom-name-only (from utils.sidechains) to atomKey
+    convert table of atom-name-only (from chemdata.sidechains) to atomKey
 
 
     <h3>Parameters:</h3>
@@ -554,7 +345,7 @@
          <seqpos><residue>
         </li>
         <li><span class="parameter">t</span>
-         table of atom names in ipairs from utils.sidechains e.g. { 'CA', 'CB', 'CG1' }
+         table of atom names in ipairs from chemdata.sidechains e.g. { 'CA', 'CB', 'CG1' }
         </li>
     </ul>
 
@@ -721,6 +512,53 @@
 
 
 </dd>
+    <dt>
+    <a name = "utils:getHostname"></a>
+    <strong>utils:getHostname ()</strong>
+    </dt>
+    <dd>
+    get our hostname
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        string with hostname
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "utils:orderPair"></a>
+    <strong>utils:orderPair (a1, a2)</strong>
+    </dt>
+    <dd>
+    sort a pair of variables
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">a1</span>
+         first thing
+        </li>
+        <li><span class="parameter">a2</span>
+         second thing
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        table with [1] and [2] set to a1/a2 according to lua table.sort()
+    </ol>
+
+
+
+
+</dd>
 </dl>
 
 
@@ -728,7 +566,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2016-06-10 13:13:37 </i>
+<i style="float:right;">Last updated 2017-03-26 17:12:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

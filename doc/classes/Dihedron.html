@@ -33,6 +33,8 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
+<li><a href="#Fields">Fields</a></li>
 <li><a href="#Methods">Methods</a></li>
 </ul>
 
@@ -63,18 +65,57 @@
 
 <h1>Class <code>Dihedron</code></h1>
 <p>dihedron structure class for rFold</p>
-<p> <strong>external dependencies</strong> : deque (https://github.com/catwell/cw-lua/tree/master/deque)</p>
+<p> a dihedron consists of two faces, or hedra
+ <br><strong>external dependencies</strong> : deque (https://github.com/catwell/cw-lua/tree/master/deque)</p>
 
 
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
 	<td class="name" nowrap><a href="#dihedron.new">dihedron.new (o)</a></td>
-	<td class="summary">Dihedron class object initialiser (not a class method)
- <br>
- The input object 'o' is a table with expected fields: <br>
- <br> [1..4] = atom tokens for 4 bonded atoms forming dihedral angle<br> 'dihedral1' = dihedral angle formed by 4 atoms
- <br></td>
+	<td class="summary">Dihedron class object initialiser (not a class method).</td>
+	</tr>
+</table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.res">Dihedron.res</a></td>
+	<td class="summary">Residue object which includes this dihedron; set by Residue:linkDihedra()</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.hedron1">Dihedron.hedron1</a></td>
+	<td class="summary">first Hedron object</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.hedron2">Dihedron.hedron2</a></td>
+	<td class="summary">second Hedron object</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.initialCoords">Dihedron.initialCoords</a></td>
+	<td class="summary">four 4x1 matrices holding atom coordinates comprising this dihedron</td>
+	</tr>
+</table>
+<h2><a href="#Fields">Fields</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.key">Dihedron.key</a></td>
+	<td class="summary">4 atom tokens separated by ':' identifying this dihedron : <strong>6FCA:6FCB:6FCG:6FCD2</strong></td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.key3">Dihedron.key3</a></td>
+	<td class="summary">3 atom tokens separated by ':' identifying first hedron : <strong>6FCA:6FCB:6FCG</strong></td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.key32">Dihedron.key32</a></td>
+	<td class="summary">3 atom tokens separated by ':' identifying second hedron : <strong>6FCB:6FCG:6FCD2</strong></td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.dihedral1">Dihedron.dihedral1</a></td>
+	<td class="summary">dihedral angle for this dihedron</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron.updated">Dihedron.updated</a></td>
+	<td class="summary">flag indicting that atom coordinates are up to date (do not need to be recalculated from dihedral1)</td>
 	</tr>
 </table>
 <h2><a href="#Methods">Methods</a></h2>
@@ -97,6 +138,14 @@
 	<td class="name" nowrap><a href="#Dihedron:dihedronFromAtoms">Dihedron:dihedronFromAtoms (atomCoords)</a></td>
 	<td class="summary">generate self[dihedral1] and self[initialCoords], populate hedra as needed from atomCoords</td>
 	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron:clearInternalCoords">Dihedron:clearInternalCoords ()</a></td>
+	<td class="summary">delete dihedral angle value for this dihedron, keep key</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Dihedron:writeDb">Dihedron:writeDb (rfpg, res_id, update)</a></td>
+	<td class="summary">write dihedron data to rfold database</td>
+	</tr>
 </table>
 
 <br/>
@@ -111,7 +160,7 @@
     <strong>dihedron.new (o)</strong>
     </dt>
     <dd>
-    Dihedron class object initialiser (not a class method)
+    Dihedron class object initialiser (not a class method).
  <br>
  The input object 'o' is a table with expected fields: <br>
  <br> [1..4] = atom tokens for 4 bonded atoms forming dihedral angle<br> 'dihedral1' = dihedral angle formed by 4 atoms
@@ -130,6 +179,167 @@
 
         minimally initialised Dihedron object
     </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Dihedron.res"></a>
+    <strong>Dihedron.res</strong>
+    </dt>
+    <dd>
+    Residue object which includes this dihedron; set by Residue:linkDihedra()
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.hedron1"></a>
+    <strong>Dihedron.hedron1</strong>
+    </dt>
+    <dd>
+    first Hedron object
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.hedron2"></a>
+    <strong>Dihedron.hedron2</strong>
+    </dt>
+    <dd>
+    second Hedron object
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.initialCoords"></a>
+    <strong>Dihedron.initialCoords</strong>
+    </dt>
+    <dd>
+    four 4x1 matrices holding atom coordinates comprising this dihedron
+
+
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Dihedron.key"></a>
+    <strong>Dihedron.key</strong>
+    </dt>
+    <dd>
+    4 atom tokens separated by ':' identifying this dihedron : <strong>6FCA:6FCB:6FCG:6FCD2</strong>
+
+
+    <ul>
+        <li><span class="parameter">key</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.key3"></a>
+    <strong>Dihedron.key3</strong>
+    </dt>
+    <dd>
+    3 atom tokens separated by ':' identifying first hedron : <strong>6FCA:6FCB:6FCG</strong>
+
+
+    <ul>
+        <li><span class="parameter">key3</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.key32"></a>
+    <strong>Dihedron.key32</strong>
+    </dt>
+    <dd>
+    3 atom tokens separated by ':' identifying second hedron : <strong>6FCB:6FCG:6FCD2</strong>
+
+
+    <ul>
+        <li><span class="parameter">key32</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.dihedral1"></a>
+    <strong>Dihedron.dihedral1</strong>
+    </dt>
+    <dd>
+    dihedral angle for this dihedron
+
+
+    <ul>
+        <li><span class="parameter">dihedral1</span>
+         float
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron.updated"></a>
+    <strong>Dihedron.updated</strong>
+    </dt>
+    <dd>
+    flag indicting that atom coordinates are up to date (do not need to be recalculated from dihedral1)
+
+
+    <ul>
+        <li><span class="parameter">updated</span>
+
+
+
+        </li>
+    </ul>
+
 
 
 
@@ -213,6 +423,46 @@
 
 
 </dd>
+    <dt>
+    <a name = "Dihedron:clearInternalCoords"></a>
+    <strong>Dihedron:clearInternalCoords ()</strong>
+    </dt>
+    <dd>
+    delete dihedral angle value for this dihedron, keep key
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Dihedron:writeDb"></a>
+    <strong>Dihedron:writeDb (rfpg, res_id, update)</strong>
+    </dt>
+    <dd>
+    write dihedron data to rfold database
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
+        </li>
+        <li><span class="parameter">res_id</span>
+         residue ID in db residue table
+        </li>
+        <li><span class="parameter">update</span>
+         optional flag, if false silently skip if entry exists already in dihedral / angle / bond tables
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
 </dl>
 
 
@@ -220,7 +470,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2016-06-10 13:13:37 </i>
+<i style="float:right;">Last updated 2017-03-26 17:12:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
