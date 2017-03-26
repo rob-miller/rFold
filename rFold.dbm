@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.8.2" last-position="79,295" last-zoom="1.45"
+<dbmodel pgmodeler-ver="0.8.2" last-position="0,98" last-zoom="1.45"
 	 default-schema="public" default-owner="postgres">
 <database name="rFold">
 </database>
@@ -70,13 +70,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="res">
 		<type name="varchar"/>
 	</column>
-	<column name="prev_res">
-		<type name="varchar"/>
-	</column>
-	<column name="next_res">
-		<type name="varchar"/>
-	</column>
-	<column name="res_ndx">
+	<column name="res_ndx" not-null="true">
 		<type name="smallint"/>
 	</column>
 	<column name="res_pos">
@@ -84,6 +78,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="pdb_no">
 		<type name="bigint"/>
+	</column>
+	<column name="prev_res">
+		<type name="varchar"/>
+	</column>
+	<column name="next_res">
+		<type name="varchar"/>
 	</column>
 	<constraint name="residue_pk" type="pk-constr" table="public.residue">
 		<columns names="res_id" ref-type="src-columns"/>
@@ -112,7 +112,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dihedral_class">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="540" y="120"/>
+	<position x="580" y="120"/>
 	<column name="id" not-null="true">
 		<type name="smallserial"/>
 	</column>
@@ -217,7 +217,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="dihedral_id">
 		<type name="bigint"/>
 	</column>
-	<column name="angle_code">
+	<column name="angle_class">
 		<type name="smallint"/>
 	</column>
 	<column name="res_id">
@@ -255,7 +255,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="angle_id">
 		<type name="bigint"/>
 	</column>
-	<column name="bond_code">
+	<column name="bond_class">
 		<type name="smallint"/>
 	</column>
 	<column name="res_id">
@@ -280,7 +280,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="res_atoms">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="820" y="400"/>
+	<position x="580" y="500"/>
 	<column name="name" not-null="true">
 		<type name="varchar"/>
 		<comment><![CDATA[includes 1-letter residue code]]></comment>
@@ -300,7 +300,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<schema name="public"/>
 	<role name="postgres"/>
 	<comment><![CDATA[atom bonding class]]></comment>
-	<position x="820" y="460"/>
+	<position x="800" y="480"/>
 	<column name="state" not-null="true">
 		<type name="varchar"/>
 	</column>
@@ -318,7 +318,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="periodic_table">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="820" y="520"/>
+	<position x="800" y="560"/>
 	<column name="atom" not-null="true">
 		<type name="varchar"/>
 	</column>
@@ -360,7 +360,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="dssp_coordinates">
+<table name="atom_coordinates">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="100" y="400"/>
@@ -379,7 +379,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="z">
 		<type name="double precision"/>
 	</column>
-	<constraint name="dssp_coordinates_pk_res_id_atom" type="pk-constr" table="public.dssp_coordinates">
+	<constraint name="atom_coordinates_pk_res_id_atom" type="pk-constr" table="public.atom_coordinates">
 		<columns names="res_id,atom" ref-type="src-columns"/>
 	</constraint>
 </table>
@@ -387,7 +387,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dihedral_name">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="600" y="200"/>
+	<position x="820" y="180"/>
 	<column name="id" not-null="true">
 		<type name="smallserial"/>
 	</column>
@@ -405,7 +405,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="bond_string">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="560" y="480"/>
+	<position x="780" y="400"/>
 	<column name="atom_string" not-null="true">
 		<type name="varchar" dimension="1"/>
 	</column>
@@ -420,7 +420,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="angle_string">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="560" y="320"/>
+	<position x="760" y="260"/>
 	<column name="atom_string" not-null="true">
 		<type name="varchar" dimension="1"/>
 	</column>
@@ -435,7 +435,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="dihedral_string">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="600" y="80"/>
+	<position x="820" y="100"/>
 	<column name="atom_string" not-null="true">
 		<type name="varchar" dimension="1"/>
 	</column>
@@ -491,7 +491,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 
 <constraint name="angle_fk_class" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.angle_class" table="public.angle">
-	<columns names="angle_code" ref-type="src-columns"/>
+	<columns names="angle_class" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -521,7 +521,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 
 <constraint name="bond_fk_class" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.bond_class" table="public.bond">
-	<columns names="bond_code" ref-type="src-columns"/>
+	<columns names="bond_class" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -549,8 +549,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="res_id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="dssp_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.residue" table="public.dssp_coordinates">
+<constraint name="atom_fk_res_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.residue" table="public.atom_coordinates">
 	<columns names="res_id" ref-type="src-columns"/>
 	<columns names="res_id" ref-type="dst-columns"/>
 </constraint>
@@ -638,7 +638,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_dssp_coordinates_residue" type="relfk"
-	 src-table="public.dssp_coordinates"
+	 src-table="public.atom_coordinates"
 	 dst-table="public.residue"
 	 src-required="false" dst-required="false"/>
 

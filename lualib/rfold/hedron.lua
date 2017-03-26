@@ -17,8 +17,12 @@ Copyright 2016 Robert T. Miller
 ]]
 
 --- hedron structure class for rFold
+-- 
+-- a hedron consists of 3 coplanar objects, specified as two bond lengths and the angle between them. 
 --
 -- @classmod Hedron
+
+--
 
 local utils = require 'rfold.utils'
 local geom3d = require 'rfold.geom3d'
@@ -27,14 +31,39 @@ local hedron = {} -- module
 
 local Hedron = {}  -- class table
 
+
+
 ------------------------------------------------------------------------------------------------
 -- hedron
 ------------------------------------------------------------------------------------------------
+-- class properties:
 
---- initialiser for hedron class (not a class method)
+--- 3 atom tokens separated by ':' identifying this hedron : **4SCA:4SC:4SO**
+-- @field key string
+
+--- distance between first and second atoms
+-- @field len1 float
+
+--- angle formed between 3 atoms
+-- @field angle2 float
+
+--- distance between second and third atoms
+-- @field len3 float
+
+--- three 4x1 matrices specifying coordinates of constituent atoms, initially atom3 on +Z axis
+-- @table atoms 
+
+--- three 4x1 matrices specifying coordinates of constituent atoms, reversed order - initially atom1 on +Z axis
+-- @table atomsR
+
+--- flag indicting that atom coordinates are up to date (do not need to be recalculated from len1-angle2-len3)
+-- @field updated
+
+
+--- initialiser for hedron class (not a class method).
 -- <br><br>
--- The input object 'o' is a table with expected fields: <br>
--- <br> [1..3] = atom tokens for 3 bonded atoms forming plane<br> 'len1' = atom1 to atom2 distance<br> 'angle2' = angle formed by 3 atoms<br> 'len3' = atom2 to atom3 distance
+-- The input object 'o' is a table with expected fields:
+-- <br> [1..3] = atom string tokens for 3 bonded atoms forming plane<br> 'len1' = atom1 to atom2 distance<br> 'angle2' = angle formed by 3 atoms<br> 'len3' = atom2 to atom3 distance
 -- <br>
 -- @param o table as defined above
 -- @return initialised hedron object
@@ -59,7 +88,7 @@ function hedron.new (o)
 end
 
 
---- generate descriptive string for Hedron: 3- followed by 'key' for this Hedron = 3 atom tokens separated by :'s
+--- generate descriptive string for Hedron. 3- followed by 'key' for this Hedron = 3 atom tokens separated by :'s
 -- @return descriptive string
 function Hedron:tostring()
    local s = '3-[' .. self['key'] .. ']'
@@ -67,10 +96,11 @@ function Hedron:tostring()
    return  s
 end
 
---- generate hedron space coordinates for 3 atoms with specified bond lengths and angle between on XZ plane (Y=0 for all atoms)
---<br>
--- Hedron coordinate system: a2 = 0,0,0 ; a3 on Z-axis ; a1 on XZ plane (-Z for angle >90)
--- reverse coordinates swap : a2 = 0,0,0 ; a1 on Z-axis ; a3 on XZ plane
+--- generate hedron space coordinates for 3 atoms. with specified bond lengths and angle between on XZ plane 
+-- (Y=0 for all atoms).
+-- <br>initialises [atoms] and [atomsR].
+-- <br>Hedron coordinate system: a2 = 0,0,0 ; a3 on Z-axis ; a1 on XZ plane (-Z for angle >90).
+-- <br>reverse coordinates swap : a2 = 0,0,0 ; a1 on Z-axis ; a3 on XZ plane.
 function Hedron:initPos()
 
    if not (self['len1'] and self['angle2'] and self['len3']) then
@@ -138,6 +168,48 @@ function Hedron:clearInternalCoords()
    self['len1'] = nil
    self['angle2'] = nil
    self['len3'] = nil
+end
+
+--- write hedron data to rfold database
+-- @param rfpg open database handle
+-- @param res_id residue ID in residue table
+-- @param did dihedral id
+-- @param update optional flag, if false silently skip if entry exists already in dihedral / angle / bond tables
+-- @return angleID identifier for new or updated entry in angle table
+function Hedron:writeDb(rfpg, res_id, did, update)
+   local akl = utils.splitKey(self['key'])
+   local al = {}
+   for i,ak in ipairs(akl) do
+      local a = utils.splitAtomKey(ak)
+      al[i] = a[2]..a[3]
+   end
+   local as = rfpg.pgArrayOfStrings(al[1],al[2],al[3])
+   local acid = rfpg.Q("select id from angle_string where atom_string='" .. as .. "'")[1]
+   local tst = rfpg.Q('select angle_id from angle where res_id = ' .. res_id .. ' and angle_class = ' .. acid)
+   local aid
+   if not tst then
+      aid = rfpg.Q('insert into angle (res_id, dihedral_id, angle_class, angle) values (' .. res_id .. ',' .. did .. ',' .. acid .. ',' .. self['angle2'] .. ') returning angle_id')[1]
+   elseif update then
+      aid = tst[1]
+      rfpg.Qcur('update angle set angle = ' .. self['angle2'] .. ' where angle_id = ' .. aid)
+   end
+
+   if aid then
+      local bids={}
+      for i=1,2 do
+         local bas = rfpg.pgArrayOfStrings(al[i],al[i+1])
+         local bcid = rfpg.Q("select id from bond_string where atom_string='" .. bas .. "'")[1]
+         tst = rfpg.Q('select bond_id from bond where res_id=' .. res_id .. ' and angle_id=' .. aid .. ' and bond_class=' .. bcid)
+         if not tst then
+            bids[i] = rfpg.Q('insert into bond (angle_id, bond_class, res_id, length) values (' .. aid .. ',' .. bcid .. ',' .. res_id .. ',' .. (1==i and self['len1'] or self['len3']) .. ') returning bond_id')[1]
+         elseif update then
+            bids[i] = tst[1]
+            rfpg.Qcur('update bond set length=' .. (1==i and self['len1'] or self['len3']) .. ' where bond_id=' .. bids[i])
+         end
+      end
+      rfpg.Qcur('update angle set bond1=' .. bids[1] .. ', bond2=' .. bids[2] .. ' where angle_id=' .. aid)
+   end
+   return aid 
 end
 
 return hedron

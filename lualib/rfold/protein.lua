@@ -68,6 +68,24 @@ function protein.get(id)
    end
 end
 
+--- generate a new key for the data stored in protein.proteins for the passed id key.
+-- <br> new key of form <id>-<n> where n is number uch that <id>-<n> is available
+-- <br> enables re-loading file for line-by-line compare to generated daa for test (probably need prot:setStartCoords())
+-- @param id Brookhaven / RCSB PDB alphanumeric ID or similar
+-- @return new key or nil if no entry exists for passed id
+function protein.stashId(id)
+   if not protein.proteins[id] then return nil end
+   local n=1
+   local s1 = id .. '-' .. n
+   while protein.proteins[s1] do
+      n = n+1
+      s1 = id .. '-' .. n
+   end
+   protein.proteins[s1] = protein.proteins[id]
+   protein.proteins[id] = nil
+   return s1
+end
+
 --- change the key for an entry in the protein.proteins table
 -- @param old old key
 -- @param new new key
@@ -218,11 +236,14 @@ function Protein:writeDb(rfpg,update)
          pdb_no  = rfpg.Q("insert into pdb_chain (pdbid, chain, filename, chain_order) values ('".. self['id'] .. tct .. v .. tct .. self['filename'] .. "'," .. k .. ") returning pdb_no")
       elseif not update then
          goto skipChain
+      else
+         rfpg.Qcur("update pdb_chain set (chain_order) = (" .. k .. ") where pdb_no = " .. pdb_no[1] ) 
       end
       pdb_no = pdb_no[1]
 
       if first then
-         rfpg.Qcur("update pdb_chain set (header,title) = ('".. self['header'] .. tct .. self['title'] .. "') where pdb_no = " .. pdb_no)
+         if self['header'] then rfpg.Qcur("update pdb_chain set (header) = ('".. self['header'] .. "') where pdb_no = " .. pdb_no) end
+         if self['title'] then rfpg.Qcur("update pdb_chain set (title) = ('".. self['title'] .. "') where pdb_no = " .. pdb_no) end
          first = false
       end
 
@@ -233,7 +254,7 @@ function Protein:writeDb(rfpg,update)
 
       rfpg.Qcur("update pdb_chain set (sequence, seqres) = ('" .. seqStr .. tct .. seqRes.. "') where pdb_no = " .. pdb_no)
 
-      self['chains'][v]:writeDb(rfpg, pdb_no)
+      self['chains'][v]:writeDb(rfpg, pdb_no, update)
 
       ::skipChain::
    end
@@ -302,6 +323,11 @@ function Protein:report()
    return s
 end
       
+function Protein:printInfo()
+   for k,v in pairs(self['chains']) do
+      v:printInfo()
+   end
+end
 
    
 return protein

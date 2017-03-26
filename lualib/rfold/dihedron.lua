@@ -18,7 +18,8 @@ Copyright 2016 Robert T. Miller
 
 --- dihedron structure class for rFold
 --
--- **external dependencies** : deque (https://github.com/catwell/cw-lua/tree/master/deque)
+-- a dihedron consists of two faces, or hedra
+-- <br>**external dependencies** : deque (https://github.com/catwell/cw-lua/tree/master/deque)
 --
 -- @classmod Dihedron
 
@@ -33,8 +34,38 @@ local Dihedron = {}  -- class table
 ------------------------------------------------------------------------------------------------
 -- dihedron
 ------------------------------------------------------------------------------------------------
+-- class properties:
 
---- Dihedron class object initialiser (not a class method)
+---  4 atom tokens separated by ':' identifying this dihedron : **6FCA:6FCB:6FCG:6FCD2**
+-- @field key string
+
+--- 3 atom tokens separated by ':' identifying first hedron : **6FCA:6FCB:6FCG**
+-- @field key3 string
+
+--- 3 atom tokens separated by ':' identifying second hedron : **6FCB:6FCG:6FCD2**
+-- @field key32 string
+
+--- dihedral angle for this dihedron
+-- @field dihedral1 float
+
+--- flag indicting that atom coordinates are up to date (do not need to be recalculated from dihedral1)
+-- @field updated
+
+--- Residue object which includes this dihedron; set by Residue:linkDihedra()
+-- @table res
+
+--- first Hedron object
+-- @table hedron1
+
+--- second Hedron object
+-- @table hedron2
+
+--- four 4x1 matrices holding atom coordinates comprising this dihedron
+-- @table initialCoords
+
+
+
+--- Dihedron class object initialiser (not a class method).
 -- <br>
 -- The input object 'o' is a table with expected fields: <br>
 -- <br> [1..4] = atom tokens for 4 bonded atoms forming dihedral angle<br> 'dihedral1' = dihedral angle formed by 4 atoms
@@ -247,8 +278,45 @@ function Dihedron:dihedronFromAtoms(atomCoords)
    
 end
 
+--- delete dihedral angle value for this dihedron, keep key
 function Dihedron:clearInternalCoords()
    self['dihedral1'] = nil
+end
+
+--- write dihedron data to rfold database
+-- @param rfpg open database handle
+-- @param res_id residue ID in db residue table
+-- @param update optional flag, if false silently skip if entry exists already in dihedral / angle / bond tables 
+function Dihedron:writeDb(rfpg, res_id, update)
+   --print(self:tostring())
+   local akl = utils.splitKey(self['key'])
+   local al = {}
+   for i,ak in ipairs(akl) do
+      local a = utils.splitAtomKey(ak)
+      al[i] = a[2]..a[3]
+   end
+   local as = rfpg.pgArrayOfStrings(al[1],al[2],al[3],al[4])
+   local dcid = rfpg.Q("select id from dihedral_string where atom_string='" .. as .. "'")[1]
+   local tst = rfpg.Q('select dihedral_id from dihedral where res_id = ' .. res_id .. ' and dihedral_class = ' .. dcid)
+   local did
+   if not tst then
+      did = rfpg.Q('insert into dihedral (res_id, dihedral_class, dangle) values (' .. res_id .. ',' .. dcid .. ',' .. self['dihedral1'] .. ') returning dihedral_id')[1]
+   elseif update then
+      did = tst[1]
+      rfpg.Qcur('update dihedral set dangle = ' .. self['dihedral1'] .. ' where dihedral_id = ' .. did)
+   end
+
+   if did then
+      local aid1 = self['hedron1']:writeDb(rfpg, res_id, did, update)
+      local aid2 = self['hedron2']:writeDb(rfpg, res_id, did, update)
+      rfpg.Qcur('update dihedral set angle1=' .. aid1 .. ', angle2=' .. aid2 .. ' where dihedral_id=' .. did)
+   end
+   
+end
+
+function Dihedron:printInfo()
+   print(self:tostring())
+   for k,v in pairs(self) do print(k,v) end
 end
 
 return dihedron

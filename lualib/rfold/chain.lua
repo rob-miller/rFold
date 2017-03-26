@@ -311,10 +311,66 @@ function Chain:writeInternalCoords()
    return s
 end
 
-function Chain:writeDb(rfpg, pdb_no)
-   --   xxx
+--- write chain data to rfold database
+-- @param rfpg open database handle
+-- @param pdb_no chain ID in pdb_chain table
+-- @param update optional flag, if false silently skip if [pdb_no, res_ndx] entry exists already in residue table 
+function Chain:writeDb(rfpg, pdb_no, update)
 
-   working here -- below is all to just list available data at this point
+   for i,r in self:orderedResidues() do
+
+      local res_id = rfpg.Q("select res_id from residue where pdb_no=" .. pdb_no .. " and res_ndx = " .. i )
+      if not res_id then
+         res_id = rfpg.Q( "insert into residue (res_ndx,pdb_no) values (" .. i .. "," .. pdb_no .. ") returning res_id" )
+      elseif not update then
+         goto skipResidue  -- can't happen? because existing chain would have been skipped
+      end
+      res_id = res_id[1]
+
+      local qc = "update residue set (res, res_pos"
+      local qv = " = ('" .. r['res'] .. "','" .. r['resn'] .. "'"
+      if r['prev'] then
+         qc = qc .. ", prev_res"
+         qv = qv .. ",'" .. r['prev']['res'] .. "'"
+      end
+      if r['next'] then
+         qc = qc .. ", next_res"
+         qv = qv .. ",'" .. r['next']['res'] .. "'"
+      end
+      
+      rfpg.Qcur( qc .. ')' .. qv .. ') where res_id = ' .. res_id )
+
+      if ({} ~= self['initNCaC'] and self['initNCaC'][i]) then  -- have init coords for chain segment, need to store
+         local akl =  r:NCaCKeySplit()
+         local initCoords = self['initNCaC'][i]
+         for ai,ak in ipairs(akl) do
+            local q
+            local v = initCoords[ak]
+            local haveRow = rfpg.Q("select 1 from atom_coordinates where res_id=" .. i .. " and atom = '" .. ak .. "'")
+            if (not haveRow) then
+               q = 'insert into atom_coordinates (res_id, atom, x, y, z) values (' .. i .. ",'" .. ak .. "',"
+            elseif update then
+               q = 'update atom_coordinates set (x, y, z) = ('
+            end
+            if q then -- ((not haveRow) or update)
+               for j=1,3 do q = q .. (j>1 and ',' or '')  .. v[j][1] end
+               q = q .. ')'
+               if (haveRow) then  -- update
+                  q = q .. ' where res_id=' .. i .. " and atom= '" .. ak .."'"
+               end
+               rfpg.Qcur(q)
+            end
+         end
+      end
+
+      r:writeDb(rfpg, res_id, update)
+      
+      ::skipResidue::
+   end
+   
+
+   --[[
+   below is all to just list available data at this point
    need to add 3x3 chain inital coords to db tables
    
    local s=''
@@ -341,6 +397,7 @@ function Chain:writeDb(rfpg, pdb_no)
    print('----------------------------------------------------')
 
    return s
+   --]]
 end
 
 
@@ -381,6 +438,12 @@ function Chain:countResidues()
       if r['ordered'] then o=o+1 end
    end
    return o,a
+end
+
+function Chain:printInfo()
+   for k,v in self:orderedResidues() do
+      v:printInfo()
+   end
 end
 
 return chain

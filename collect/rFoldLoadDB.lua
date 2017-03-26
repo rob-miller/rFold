@@ -47,6 +47,8 @@ local mkdssp = 'dssp/rtm-dssp-2.2.1/mkdssp'
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
 rfpg.dbReconnect(1)
 
+------- schema initialisation routines --------
+
 function atomPairValueString(a1,a2)
    local t = utils.orderPair(a1,a2)
    local vals = "'{" .. '"' .. t[1] .. '", "' .. t[2] .. '"' .. "}'"
@@ -64,7 +66,7 @@ function bondPairValueString(a1,a3,b1,b2)
    return vals
 end
 
---- ensure there is an angle_class entry and subsidiary bond_class entries in database for passed angle stringspecification
+--- ensure there is an angle_class entry and subsidiary bond_class entries in database for passed angle string specification
 -- @param(a) table 3 strings specifying order of residue-atoms comprising angle
 -- @return database ID for angle_class
 function getOrCreateAngleId(a)
@@ -101,7 +103,7 @@ end
 -- @param(a) table 4 strings specifying order of residue-atoms comprising dihedral angle
 -- @param(res) string indicating residue and adjacent neighbour if involved in bond
 -- @param(nameId) int optional database id referencing name of dihedral angle (e.g. psi or chi1)
-function getOrCreateDihedralId(a,res,nameId)
+function rfdb.getOrCreateDihedralId(a,res,nameId)
    local dihedralAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3],a[4])
    local qry = rfpg.Q("select id from dihedral_string where atom_string = '" .. dihedralAtomStr .. "'")
    if (not qry) then
@@ -153,10 +155,10 @@ function verifyDb()
    local rows = tonumber(rfpg.Q('select count(*) from periodic_table;')[1]);
    --print('periodic_table:', rows)
 
-   if (rows < c) then 
-         for k,v in pairs(chemdata.atomic_weight) do
-            rfpg.Qcur("insert into periodic_table (atom, weight, electronegativity) values ('" .. k .. "'," .. v .. "," .. chemdata.electronegativity[k] .. ") on conflict (atom) do update set weight=" .. v .. ", electronegativity = " .. chemdata.electronegativity[k] .. ";")
-         end
+   if (rows < c) then
+      for k,v in pairs(chemdata.atomic_weight) do
+         rfpg.Qcur("insert into periodic_table (atom, weight, electronegativity) values ('" .. k .. "'," .. v .. "," .. chemdata.electronegativity[k] .. ") on conflict (atom) do update set weight=" .. v .. ", electronegativity = " .. chemdata.electronegativity[k] .. ";")
+      end
    end
 
    -- load atom_bond_state (atom classes based on Heyrovska, Raji covalent radii paper https://arxiv.org/pdf/0804.2488.pdf )
@@ -164,9 +166,9 @@ function verifyDb()
    for _ in pairs(chemdata.covalent_radii) do c = c + 1 end
    rows = tonumber(rfpg.Q('select count(*) from atom_bond_state;')[1]);
    if (rows < c) then
-         for k,v in pairs(chemdata.covalent_radii) do
-            rfpg.Qcur("insert into atom_bond_state (state, r_covalent, v_covalent) values ('" .. k .. "'," .. v .. "," .. chemdata.covalent_volume(k) .. ") on conflict (state) do update set r_covalent=" .. v .. ", v_covalent = " .. chemdata.covalent_volume(k) .. ";")
-         end
+      for k,v in pairs(chemdata.covalent_radii) do
+         rfpg.Qcur("insert into atom_bond_state (state, r_covalent, v_covalent) values ('" .. k .. "'," .. v .. "," .. chemdata.covalent_volume(k) .. ") on conflict (state) do update set r_covalent=" .. v .. ", v_covalent = " .. chemdata.covalent_volume(k) .. ";")
+      end
    end
 
    for r1,r3 in pairs(chemdata.res3) do  -- first round through all residues: sidechain atoms into res_atoms, backbone+Cbeta into res_atoms
@@ -250,7 +252,11 @@ function verifyDb()
    rfpg.Qcur('commit')
 end
 
+--------- end schema initialisation routines ------------------
 
+
+
+--------- main ------ 
 
 local args = parsers.parseCmdLine(
    '[ <pdbid[chain id]> | <pdb file> | <pic file> ] ...',
@@ -338,7 +344,7 @@ for i,arg in ipairs(toProcess) do
          --- test if we can get internal coordinates and regenerate input pdb file
          prot:atomsToInternalCoords()     -- calculate bond lengths, bond angles and dihedral angles from input coordinates
          coords3D = prot:writePDB(true)   -- loaded PDB format text without REMARK RFOLD record (timestamp may not match)
-         prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
+         --prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list  
          prot:clearAtomCoords()
          prot:internalToAtomCoords()
          local s1 = prot:writePDB(true)
@@ -359,8 +365,12 @@ for i,arg in ipairs(toProcess) do
       if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, check dssp
          -- see if rtm mkdssp gets same internal coordinates
          local dsspstatus,dsspresult,dssperr = ps.pipe_simple(coords3D,mkdssp,unpack({'-i','-'}))
-         local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')
-         s1 = prot:writeInternalCoords()  -- get output for internal coordinate data as read from dssp
+         --local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')  -- this line re-initialises prot: because reloading same pdbid
+         pdbid = protein.stashId(pdbid)  -- so instead we stash protein.proteins[pdbid] entry as new name first
+         local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')  -- now we get new structure loaded
+         local prot2 = protein.get(pdbid2)
+         prot2:setStartCoords()
+         s1 = prot2:writeInternalCoords()  -- get output for internal coordinate data as read from dssp
          local c = utils.lineByLineCompare(coordsInternal,s1) 
          if not c then
             print(arg .. ' failed to generate matching DSSP internal coordinates from 3D coordinates.')
@@ -369,12 +379,16 @@ for i,arg in ipairs(toProcess) do
       --else    -- otherwise we have DSSP data already, must have read in, and already tested regenerate structure -> regenerate matching internal coordinates
       end
       
-
       --- if here then we have happy data for prot:
       print('we have happy data for ' .. arg)
       print(prot:tostring())
 
-     prot:writeDb(rfpg,args['u'])
+      --prot:setStartCoords()
+      prot:clearAtomCoords()
+      --coordsInternal = prot:writeInternalCoords()
+      --print(coordsInternal)
+      
+      prot:writeDb(rfpg,args['u'])
       
    end
 
