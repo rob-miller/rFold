@@ -197,6 +197,18 @@ function Chain:countDSSPs()
    return c
 end
 
+function Chain:countInitNCaCs()
+   local c=0
+   if {} ~= self['initNCaC'] then
+      local n = 1
+      for i,r in self:orderedResidues() do
+         if self['initNCaC'][i] then c = c + 1 end
+      end
+   end
+   return c
+end
+
+            
 --- delete protein space atom coordinate data from this chain
 function Chain:clearAtomCoords()
    for i,r in self:orderedResidues() do

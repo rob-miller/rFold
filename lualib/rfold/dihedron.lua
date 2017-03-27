@@ -54,10 +54,10 @@ local Dihedron = {}  -- class table
 --- Residue object which includes this dihedron; set by Residue:linkDihedra()
 -- @table res
 
---- first Hedron object
+--- first Hedron object; set by self:setHedra()
 -- @table hedron1
 
---- second Hedron object
+--- second Hedron object; set by self:setHedra()
 -- @table hedron2
 
 --- four 4x1 matrices holding atom coordinates comprising this dihedron
@@ -307,6 +307,7 @@ function Dihedron:writeDb(rfpg, res_id, update)
    end
 
    if did then
+      if not self['hedron1'] then self:setHedra() end
       local aid1 = self['hedron1']:writeDb(rfpg, res_id, did, update)
       local aid2 = self['hedron2']:writeDb(rfpg, res_id, did, update)
       rfpg.Qcur('update dihedral set angle1=' .. aid1 .. ', angle2=' .. aid2 .. ' where dihedral_id=' .. did)

@@ -116,9 +116,9 @@ function Residue:writeDb(rfpg, res_id, update)
    if self['dssp'] then
       local chk = rfpg.Q("select 1 from dssp where res_id=" .. res_id)
       if (not chk) then
-         rfpg.Qcur("insert into dssp (res_id, struc, struc2, phi, psi, omega) values (" .. res_id .. ",'" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. ")" )
+         rfpg.Qcur("insert into dssp (res_id, struc, struc2, phi, psi, omega, acc) values (" .. res_id .. ",'" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. "," .. self['dssp']['acc'] .. ")" )
       elseif update then
-         rfpg.Qcur("update dssp set (struc, struc2, phi, psi, omega) = ('" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. ") where res_id= " .. res_id  )
+         rfpg.Qcur("update dssp set (struc, struc2, phi, psi, omega, acc) = ('" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. "," .. self['dssp']['acc'] .. ") where res_id= " .. res_id  )
       end
    end
    if {} ~= self['atomCoords'] then  -- at chain level wrote atom_oordinates for initNCaC if present; here write all atom coordinates to db if present
@@ -341,6 +341,10 @@ function Residue:dihedraFromAtoms()
       --print(sCB .. self['atomCoords'][sCB]:transpose():pretty())
    end
 
+   if not self['atomCoords'][sCB] then  -- fabricate CB if not present in coordinate data
+      self['atomCoords'][sCB] = genGlyCB(self['atomCoords'][sN],self['atomCoords'][sCA],self['atomCoords'][sC])
+   end
+
    self:linkDihedra()
 
    --for k,d in utils.pairsByKeys(self['dihedra']) do
@@ -409,12 +413,12 @@ end
 local function keysort(a,b)
    if a==b then return false end  -- if = then not <
 
-   local aksan, aksa = a:match('^(%d+)%a(%w+):?')
-   local aksbn, aksb = b:match('^(%d+)%a(%w+):?')
+   local aksan, aksa = a:match('^(-?%d+)%a(%w+):?')
+   local aksbn, aksb = b:match('^(-?%d+)%a(%w+):?')
 
    if aksan ~= aksbn then return aksan < aksbn end   -- seqpos takes precedence
       
-   if aksa == aksb then return keysort(a:match('^%d+%a%w+:(.+)$'),b:match('^%d+%a%w+:(.+)$')) end  -- if first field = then go to next
+   if aksa == aksb then return keysort(a:match('^-?%d+%a%w+:(.+)$'),b:match('^-?%d+%a%w+:(.+)$')) end  -- if first field = then go to next
       
    if backboneSort[aksa] and backboneSort[aksb] then return backboneSort[aksa] < backboneSort[aksb] end
    if sidechainSort[aksa] and sidechainSort[aksb] then return sidechainSort[aksa] < sidechainSort[aksb] end

@@ -118,6 +118,8 @@ function protein.load(t)
       thisProtein['header'] = t['header'] --  .. t['pdbid']
    elseif t['title'] then
       thisProtein['title'] = t['title']
+   elseif t['compnd'] then
+      thisProtein['compnd'] = t['compnd']
    elseif t['filename'] then
       thisProtein['filename'] = t['filename']
    else
@@ -177,9 +179,15 @@ end
 -- @return descriptive string
 function Protein:tostring()
    local s = ''
-   for k,v in pairs(self['chains']) do
-      s = self.id .. ' ' .. k .. ' ' .. v:seqStr() .. '\n'
-      s = s .. '  ' .. #v['residues'] .. ' residues '  .. v:countDSSPs() .. ' dssps ' .. v:countDihedra() .. ' dihedra ' .. v:countHedra() ..  ' hedra '
+   for k,v in ipairs(self['chainOrder']) do
+      local chain = self['chains'][v]
+      s = s .. self.id .. ' ' .. v .. ' ' .. chain:seqStr() .. '\n'
+      local cs = chain:countInitNCaCs()
+      s = s .. '  ' .. #chain['residues'] .. ' residues '  .. chain:countDSSPs() .. ' dssps ' .. chain:countDihedra() .. ' dihedra ' .. chain:countHedra() ..  ' hedra ' .. cs .. ' initial coordinate set' .. (cs ~= 1 and 's' or '') .. '\n'
+      
+   --for k,v in pairs(self['chains']) do
+   --   s = self.id .. ' ' .. k .. ' ' .. v:seqStr() .. '\n'
+   --   s = s .. '  ' .. #v['residues'] .. ' residues '  .. v:countDSSPs() .. ' dssps ' .. v:countDihedra() .. ' dihedra ' .. v:countHedra() ..  ' hedra '
    end
    return s
 end
@@ -210,11 +218,12 @@ function Protein:writePDB(noRemark)
 end
 
 --- generate text data specifying hedra with length, angle, length ; dihedra with angle ; relevant PDB records for annotation and start coordinates
+-- @param noTitle do not write TITLE line if true; DSSP does not output so compare fails
 -- @return string containing structure specification in internal coordinates (complete)
-function Protein:writeInternalCoords()
+function Protein:writeInternalCoords(noTitle)
    local s = ''
    if self['header'] then s = s .. self['header'] ..'\n' end
-   if self['title'] then s = s .. self['title'] ..'\n' end
+   if (not noTitle) and self['title'] then s = s .. self['title'] ..'\n' end
    for k,v in ipairs(self['chainOrder']) do
       local chain = self['chains'][v]
       s = s .. chain:writeInternalCoords()

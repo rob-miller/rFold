@@ -103,7 +103,7 @@ end
 -- @param(a) table 4 strings specifying order of residue-atoms comprising dihedral angle
 -- @param(res) string indicating residue and adjacent neighbour if involved in bond
 -- @param(nameId) int optional database id referencing name of dihedral angle (e.g. psi or chi1)
-function rfdb.getOrCreateDihedralId(a,res,nameId)
+function getOrCreateDihedralId(a,res,nameId)
    local dihedralAtomStr = rfpg.pgArrayOfStrings(a[1],a[2],a[3],a[4])
    local qry = rfpg.Q("select id from dihedral_string where atom_string = '" .. dihedralAtomStr .. "'")
    if (not qry) then
@@ -308,6 +308,7 @@ for i,arg in ipairs(toProcess) do
       
       local pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
       local prot = protein.get(pdbid)
+
       --print(pdbid,prot,prot:countDihedra())
       --print(prot:tostring())
 
@@ -325,15 +326,12 @@ for i,arg in ipairs(toProcess) do
       if prot:countDihedra() > 0  then  -- did read internal coordinates, either from .pic file or rtm DSSP output
          
          --- test if we can generate PDB coordinates and match back:
-         coordsInternal = prot:writeInternalCoords()  -- get output for internal coordinate data as loaded 
+         coordsInternal = prot:writeInternalCoords(true)  -- get output for internal coordinate data as loaded 
          prot:internalToAtomCoords()            -- generate PDB atom coordinates from internal coordinates (needs dihedron data structures to complete chain)
          prot:clearInternalCoords()             -- wipe internal coordinates as loaded
          prot:atomsToInternalCoords()           -- generate internal coordinates from PDB atom coordinates
-         local s1 = prot:writeInternalCoords()  -- get output for internal coordinate data as generated
+         local s1 = prot:writeInternalCoords(true)  -- get output for internal coordinate data as generated
          
-         --print(coordsInternal)
-         --print('------------')
-         --print(s1)
          local c = utils.lineByLineCompare(coordsInternal,s1) 
          if not c then
             print((0 == dsspCount and 'PIC' or 'DSSP') .. ' file ' .. arg .. ' failed to re-generate matching internal coordinates from 3D coordinates.')
@@ -356,13 +354,13 @@ for i,arg in ipairs(toProcess) do
             print('PDB file ' .. arg .. ' failed to regenerate 3D coordinates from calculated internal coordinates')
             goto continue
          end
-         coordsInternal = prot:writeInternalCoords()  
+         coordsInternal = prot:writeInternalCoords(true)  
       end
 
       --- if here then 3D coordinate match internal coordinates and have both
-      -- now confirm mkdssp matches calculated internal coordinates
-
-      if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, check dssp
+      -- now confirm mkdssp matches calculated internal coordinates unless mkdssp disabled
+      
+      if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, get dssp results
          -- see if rtm mkdssp gets same internal coordinates
          local dsspstatus,dsspresult,dssperr = ps.pipe_simple(coords3D,mkdssp,unpack({'-i','-'}))
          --local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')  -- this line re-initialises prot: because reloading same pdbid
@@ -370,23 +368,27 @@ for i,arg in ipairs(toProcess) do
          local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')  -- now we get new structure loaded
          local prot2 = protein.get(pdbid2)
          prot2:setStartCoords()
-         s1 = prot2:writeInternalCoords()  -- get output for internal coordinate data as read from dssp
+         prot2:linkResidues()
+         s1 = prot2:writeInternalCoords(true)  -- get output for internal coordinate data as read from dssp
+         --utils.writeFile('dssp.out',dsspresult)
+         --utils.writeFile('coordsInternal.pic',coordsInternal)
+         --utils.writeFile('s1.pic',s1)
+         --utils.writeFile('coords3D.pdb',coords3D)
          local c = utils.lineByLineCompare(coordsInternal,s1) 
          if not c then
             print(arg .. ' failed to generate matching DSSP internal coordinates from 3D coordinates.')
             goto continue
          end
+         prot = prot2
       --else    -- otherwise we have DSSP data already, must have read in, and already tested regenerate structure -> regenerate matching internal coordinates
       end
       
       --- if here then we have happy data for prot:
       print('we have happy data for ' .. arg)
       print(prot:tostring())
+      --os.exit()
 
-      --prot:setStartCoords()
       prot:clearAtomCoords()
-      --coordsInternal = prot:writeInternalCoords()
-      --print(coordsInternal)
       
       prot:writeDb(rfpg,args['u'])
       

@@ -161,6 +161,14 @@ function parsers.parseProteinData (infile, callback, chain, infname)
             rdt['title'] = title
          end
          --print(pdbid)
+      elseif line:match('^COMPND') then
+         local compnd = line
+         if callback then
+            callback({['pdbid'] = pdbid, ['compnd'] = compnd })
+         else
+            rdt['compnd'] = compnd
+         end
+         --print(pdbid)
       elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec
          local trip = {}
          trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
@@ -183,15 +191,17 @@ function parsers.parseProteinData (infile, callback, chain, infname)
             end
          end
          --print(pdbid,chn,a1,a2,a3,a4,v1)
-      elseif line:ematch('^%s+(%d+)%s+(%d+)%s(%a?)%s(%a)%s') then    -- modified dssp output
+      elseif line:ematch('^%s+(%d+)%s+(-?%d+)%s(%a?)%s(%a)%s') then    -- modified dssp output
          local dsp = {}
          local ndx
          dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'] = tonumber(_1),tonumber(_2),_3,_4
          if (dsp['res'] == dsp['res']:lower()) then    -- cys partner encoding by dssp
             dsp['res'] = 'C'
          end
+         --print('dssp ',dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'])
          dsp['ss'] = line:sub(17,17)
          dsp['ss2'] = line:sub(19,26)
+         dsp['acc'] = tonumber(line:sub(36,38))
          local nums = line:sub(106)
          assert(nums:ematch('^%s*(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$'), 'failed to parse dssp: '..line)
 
@@ -255,7 +265,6 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match('^--$') then
       elseif line:match('^==== Secondary') then
       elseif line:match('^REFERENCE ') then
-      elseif line:match('^COMPND') then
       elseif line:match('^SOURCE') then
       elseif line:match('^AUTHOR') then
       elseif line:match(' TOTAL NUMBER OF ') then
@@ -264,7 +273,10 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match(' PER ') then
       elseif line:match('^%s+#') then
          -- dssp
-      elseif line:match('^%s*%d+%s+!*%s+') then
+      elseif line:match('^%s+%d+%s+%!%s+') then
+         -- dssp chain break
+      --elseif line:match('^%s+%d+%s+!*%s+') then
+      --   print('foo:',line)
          -- pdb
       elseif line:match('^SEQADV') then
       elseif line:match('^LINK') then
