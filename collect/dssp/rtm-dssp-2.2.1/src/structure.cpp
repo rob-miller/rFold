@@ -1086,7 +1086,9 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
   writeInternal3AtomLine(os, pdbId, mCB, mCA, mC);
   writeInternal4AtomLine(os, pdbId, mO, mC, mCA, mCB);
 
-  writeInternal3AtomLine(os, pdbId, mN, mCA, mCB);   // redundant because could reference sidechains from O, but chi1 defined from N and may want N-CA-CB available as reference triple for residue coordinate space
+  if (kGlycine != mType && kAlanine != mType &&
+      (GetSC("CG1") || GetSC("CG") || GetSC("OG") || GetSC("OG1") || GetSC("SG")) )  // only do for residues with CG
+    writeInternal3AtomLine(os, pdbId, mN, mCA, mCB);   // redundant because could reference sidechains from O, but chi1 defined from N and may want N-CA-CB available as reference triple for residue coordinate space
 
   const MAtom *oxt = GetSC("OXT");  // not sidechain but stashed there
   if (oxt) {
