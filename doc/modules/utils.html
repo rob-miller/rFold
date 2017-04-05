@@ -33,11 +33,17 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
 <li><a href="#Fields">Fields</a></li>
-<li><a href="#Methods">Methods</a></li>
 </ul>
 
 
+<h2>Modules</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><a href="../modules/geom3d.html">geom3d</a></li>
+  <li><a href="../modules/parsers.html">parsers</a></li>
+  <li><strong>utils</strong></li>
+</ul>
 <h2>Classes</h2>
 <ul class="$(kind=='Topics' and '' or 'nowrap'">
   <li><a href="../classes/Protein.html">Protein</a></li>
@@ -45,9 +51,6 @@
   <li><a href="../classes/Residue.html">Residue</a></li>
   <li><a href="../classes/Dihedron.html">Dihedron</a></li>
   <li><a href="../classes/Hedron.html">Hedron</a></li>
-  <li><a href="../classes/geom3d.html">geom3d</a></li>
-  <li><a href="../classes/parsers.html">parsers</a></li>
-  <li><strong>utils</strong></li>
 </ul>
 <h2>Topics</h2>
 <ul class="$(kind=='Topics' and '' or 'nowrap'">
@@ -62,10 +65,9 @@
 
 <div id="content">
 
-<h1>Class <code>utils</code></h1>
+<h1>Module <code>utils</code></h1>
 <p>utility functions:
- modified extended string:match(); atom token,hedron and dihedron key manipulators
- not a class but works better with ldoc if we say it is</p>
+ modified extended string:match(); atom token,hedron and dihedron key manipulators</p>
 <p>
 
 </p>
@@ -77,70 +79,63 @@
 	<td class="name" nowrap><a href="#string:ematch">string:ematch (pat)</a></td>
 	<td class="summary">extend string.match to test and capture patterns - goes into string: namespace</td>
 	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#genKey">genKey (atoms)</a></td>
+	<td class="summary">generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#splitKey">splitKey (k)</a></td>
+	<td class="summary">split 3- (hedron) or 4- (dihedron) element string key into atom token constituents</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#splitAtomKey">splitAtomKey (k)</a></td>
+	<td class="summary">split atom token of form (sequence postion)(residue)(atom string) into constituents</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#addBase">addBase (base, t)</a></td>
+	<td class="summary">convert table of atom-name-only (from utils.sidechains) to atomKey</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#setAccuracy95">setAccuracy95 (num)</a></td>
+	<td class="summary">round number to value presented for %9.5lf in C</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#setAccuracy83">setAccuracy83 (num)</a></td>
+	<td class="summary">round number to value presented for %8.3lf in C</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#pairsByKeys">pairsByKeys (t, f)</a></td>
+	<td class="summary">sort table by keys, from pil 1st ed 19.3</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#atomString">atomString (ndx, name, res, chain, resn, ax, ay, az, occ, tempFact)</a></td>
+	<td class="summary">generate a PDB ATOM record</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#writeFile">writeFile (fname, s)</a></td>
+	<td class="summary">open a named file, write the passed string, close the file</td>
+	</tr>
+</table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#res3">res3</a></td>
+	<td class="summary">residue single letter to 3-letter name conversion</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#res1">res1</a></td>
+	<td class="summary">residue 3-letter name to single letter conversion</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#sidechains">sidechains</a></td>
+	<td class="summary">per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file</td>
+	</tr>
 </table>
 <h2><a href="#Fields">Fields</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#utils.warn">utils.warn</a></td>
+	<td class="name" nowrap><a href="#warn">warn</a></td>
 	<td class="summary">global flags</td>
-	</tr>
-</table>
-<h2><a href="#Methods">Methods</a></h2>
-<table class="function_list">
-	<tr>
-	<td class="name" nowrap><a href="#utils:split_newlines">utils:split_newlines (s)</a></td>
-	<td class="summary">split_newlines
- http://lua-users.org/wiki/EnhancedFileLines</p>
-
-<p> Splits string s into array of lines, returning the result.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:lineByLineCompare">utils:lineByLineCompare (s1, s2)</a></td>
-	<td class="summary">execute line-by-line compare of 2 passed strings</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:genKey">utils:genKey (atoms)</a></td>
-	<td class="summary">generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:splitKey">utils:splitKey (k)</a></td>
-	<td class="summary">split 3- (hedron) or 4- (dihedron) element string key into atom token constituents</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:splitAtomKey">utils:splitAtomKey (k)</a></td>
-	<td class="summary">split atom token of form (sequence postion)(residue)(atom string) into constituents</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:addBase">utils:addBase (base, t)</a></td>
-	<td class="summary">convert table of atom-name-only (from chemdata.sidechains) to atomKey</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:setAccuracy95">utils:setAccuracy95 (num)</a></td>
-	<td class="summary">round number to value presented for %9.5lf in C</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:setAccuracy83">utils:setAccuracy83 (num)</a></td>
-	<td class="summary">round number to value presented for %8.3lf in C</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:pairsByKeys">utils:pairsByKeys (t, f)</a></td>
-	<td class="summary">sort table by keys, from pil 1st ed 19.3</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:atomString">utils:atomString (ndx, name, res, chain, resn, ax, ay, az, occ, tempFact)</a></td>
-	<td class="summary">generate a PDB ATOM record</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:writeFile">utils:writeFile (fname, s)</a></td>
-	<td class="summary">open a named file, write the passed string, close the file</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:getHostname">utils:getHostname ()</a></td>
-	<td class="summary">get our hostname</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#utils:orderPair">utils:orderPair (a1, a2)</a></td>
-	<td class="summary">sort a pair of variables</td>
 	</tr>
 </table>
 
@@ -149,7 +144,7 @@
 
 
     <h2 class="section-header "><a name="Functions"></a>Functions</h2>
-    Methods
+
     <dl class="function">
     <dt>
     <a name = "string:ematch"></a>
@@ -176,89 +171,9 @@
 
 
 </dd>
-</dl>
-    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
-
-    <dl class="function">
     <dt>
-    <a name = "utils.warn"></a>
-    <strong>utils.warn</strong>
-    </dt>
-    <dd>
-    global flags
-
-
-
-
-
-
-
-</dd>
-</dl>
-    <h2 class="section-header "><a name="Methods"></a>Methods</h2>
-
-    <dl class="function">
-    <dt>
-    <a name = "utils:split_newlines"></a>
-    <strong>utils:split_newlines (s)</strong>
-    </dt>
-    <dd>
-    split_newlines
- http://lua-users.org/wiki/EnhancedFileLines</p>
-
-<p> Splits string s into array of lines, returning the result.
- New-line character sequences ("\n", "\r\n", "\r"),
- if any, are NOT included at the ends of the lines.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">s</span>
-         string containing newline characters
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-        array of lines
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "utils:lineByLineCompare"></a>
-    <strong>utils:lineByLineCompare (s1, s2)</strong>
-    </dt>
-    <dd>
-    execute line-by-line compare of 2 passed strings
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">s1</span>
-         string containing newline characters
-        </li>
-        <li><span class="parameter">s2</span>
-         string containing newline characters
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-        false if not perfect match, else number of lines compared
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "utils:genKey"></a>
-    <strong>utils:genKey (atoms)</strong>
+    <a name = "genKey"></a>
+    <strong>genKey (atoms)</strong>
     </dt>
     <dd>
     generate a string key for hedon or dihedron consisting of atom tokens separated by ':'s
@@ -282,8 +197,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:splitKey"></a>
-    <strong>utils:splitKey (k)</strong>
+    <a name = "splitKey"></a>
+    <strong>splitKey (k)</strong>
     </dt>
     <dd>
     split 3- (hedron) or 4- (dihedron) element string key into atom token constituents
@@ -307,8 +222,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:splitAtomKey"></a>
-    <strong>utils:splitAtomKey (k)</strong>
+    <a name = "splitAtomKey"></a>
+    <strong>splitAtomKey (k)</strong>
     </dt>
     <dd>
     split atom token of form (sequence postion)(residue)(atom string) into constituents
@@ -332,11 +247,11 @@
 
 </dd>
     <dt>
-    <a name = "utils:addBase"></a>
-    <strong>utils:addBase (base, t)</strong>
+    <a name = "addBase"></a>
+    <strong>addBase (base, t)</strong>
     </dt>
     <dd>
-    convert table of atom-name-only (from chemdata.sidechains) to atomKey
+    convert table of atom-name-only (from utils.sidechains) to atomKey
 
 
     <h3>Parameters:</h3>
@@ -345,7 +260,7 @@
          <seqpos><residue>
         </li>
         <li><span class="parameter">t</span>
-         table of atom names in ipairs from chemdata.sidechains e.g. { 'CA', 'CB', 'CG1' }
+         table of atom names in ipairs from utils.sidechains e.g. { 'CA', 'CB', 'CG1' }
         </li>
     </ul>
 
@@ -360,8 +275,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:setAccuracy95"></a>
-    <strong>utils:setAccuracy95 (num)</strong>
+    <a name = "setAccuracy95"></a>
+    <strong>setAccuracy95 (num)</strong>
     </dt>
     <dd>
     round number to value presented for %9.5lf in C
@@ -385,8 +300,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:setAccuracy83"></a>
-    <strong>utils:setAccuracy83 (num)</strong>
+    <a name = "setAccuracy83"></a>
+    <strong>setAccuracy83 (num)</strong>
     </dt>
     <dd>
     round number to value presented for %8.3lf in C
@@ -410,8 +325,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:pairsByKeys"></a>
-    <strong>utils:pairsByKeys (t, f)</strong>
+    <a name = "pairsByKeys"></a>
+    <strong>pairsByKeys (t, f)</strong>
     </dt>
     <dd>
     sort table by keys, from pil 1st ed 19.3
@@ -438,8 +353,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:atomString"></a>
-    <strong>utils:atomString (ndx, name, res, chain, resn, ax, ay, az, occ, tempFact)</strong>
+    <a name = "atomString"></a>
+    <strong>atomString (ndx, name, res, chain, resn, ax, ay, az, occ, tempFact)</strong>
     </dt>
     <dd>
     generate a PDB ATOM record
@@ -490,8 +405,8 @@
 
 </dd>
     <dt>
-    <a name = "utils:writeFile"></a>
-    <strong>utils:writeFile (fname, s)</strong>
+    <a name = "writeFile"></a>
+    <strong>writeFile (fname, s)</strong>
     </dt>
     <dd>
     open a named file, write the passed string, close the file
@@ -512,48 +427,289 @@
 
 
 </dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
     <dt>
-    <a name = "utils:getHostname"></a>
-    <strong>utils:getHostname ()</strong>
+    <a name = "res3"></a>
+    <strong>res3</strong>
     </dt>
     <dd>
-    get our hostname
+    residue single letter to 3-letter name conversion
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">G</span>
 
 
 
-    <h3>Returns:</h3>
-    <ol>
+        </li>
+        <li><span class="parameter">A</span>
 
-        string with hostname
-    </ol>
+
+
+        </li>
+        <li><span class="parameter">V</span>
+
+
+
+        </li>
+        <li><span class="parameter">L</span>
+
+
+
+        </li>
+        <li><span class="parameter">I</span>
+
+
+
+        </li>
+        <li><span class="parameter">M</span>
+
+
+
+        </li>
+        <li><span class="parameter">F</span>
+
+
+
+        </li>
+        <li><span class="parameter">P</span>
+
+
+
+        </li>
+        <li><span class="parameter">S</span>
+
+
+
+        </li>
+        <li><span class="parameter">T</span>
+
+
+
+        </li>
+        <li><span class="parameter">C</span>
+
+
+
+        </li>
+        <li><span class="parameter">N</span>
+
+
+
+        </li>
+        <li><span class="parameter">Q</span>
+
+
+
+        </li>
+        <li><span class="parameter">Y</span>
+
+
+
+        </li>
+        <li><span class="parameter">W</span>
+
+
+
+        </li>
+        <li><span class="parameter">D</span>
+
+
+
+        </li>
+        <li><span class="parameter">E</span>
+
+
+
+        </li>
+        <li><span class="parameter">H</span>
+
+
+
+        </li>
+        <li><span class="parameter">K</span>
+
+
+
+        </li>
+        <li><span class="parameter">R</span>
+
+
+
+        </li>
+    </ul>
+
 
 
 
 
 </dd>
     <dt>
-    <a name = "utils:orderPair"></a>
-    <strong>utils:orderPair (a1, a2)</strong>
+    <a name = "res1"></a>
+    <strong>res1</strong>
     </dt>
     <dd>
-    sort a pair of variables
+    residue 3-letter name to single letter conversion
 
 
-    <h3>Parameters:</h3>
+    <h3>Fields:</h3>
     <ul>
-        <li><span class="parameter">a1</span>
-         first thing
+        <li><span class="parameter">[</span>
+
+
+
         </li>
-        <li><span class="parameter">a2</span>
-         second thing
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">[</span>
+
+
+
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
 
-        table with [1] and [2] set to a1/a2 according to lua table.sort()
-    </ol>
+
+
+
+</dd>
+    <dt>
+    <a name = "sidechains"></a>
+    <strong>sidechains</strong>
+    </dt>
+    <dd>
+    per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates spcification file
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">[</span>
+
+
+
+        </li>
+        <li><span class="parameter">CB</span>
+
+
+
+        </li>
+        <li><span class="parameter">CG1</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "warn"></a>
+    <strong>warn</strong>
+    </dt>
+    <dd>
+    global flags
+
+
+
 
 
 
@@ -566,7 +722,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2017-04-05 13:48:36 </i>
+<i style="float:right;">Last updated 2016-06-07 15:52:21 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

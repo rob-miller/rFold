@@ -33,6 +33,7 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
+<li><a href="#Fields">Fields</a></li>
 <li><a href="#Methods">Methods</a></li>
 </ul>
 
@@ -91,8 +92,52 @@
 	<td class="summary">remove an entry from the protein.proteins table so garbage collector can free memory</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#protein.clean">protein.clean ()</a></td>
+	<td class="summary">remove all entries from the protein.proteins table so garbage collector can free memory</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#protein.load">protein.load (t)</a></td>
 	<td class="summary">add the passed table data to the protein specified (pdbid) in the table (not a class method - may create new Protein)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#protein.copyDSSP">protein.copyDSSP (src, dst)</a></td>
+	<td class="summary">copy DSSP data from src protein object to dst protein object (not a class method)
+ will fall over if protein objects do not otherwise match</td>
+	</tr>
+</table>
+<h2><a href="#Fields">Fields</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Protein.id">Protein.id</a></td>
+	<td class="summary">4 position PDB identifier for this protein</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.chains">Protein.chains</a></td>
+	<td class="summary">array of chain objects indexed by chain ID</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.chainOrder">Protein.chainOrder</a></td>
+	<td class="summary">array of chain IDs indexed by integer order of chains in PDB file</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.header">Protein.header</a></td>
+	<td class="summary">pdb HEADER record if supplied</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.title">Protein.title</a></td>
+	<td class="summary">pdb TITLE record if supplied</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.title">Protein.title</a></td>
+	<td class="summary">pdb TITLE record if supplied</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.compnd">Protein.compnd</a></td>
+	<td class="summary">pdb COMPND record if supplied</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein.filename">Protein.filename</a></td>
+	<td class="summary">location of file this protein data was read from</td>
 	</tr>
 </table>
 <h2><a href="#Methods">Methods</a></h2>
@@ -114,21 +159,33 @@
 	<td class="summary">sum dssp counts for chains</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#Protein:tosequence">Protein:tosequence ()</a></td>
+	<td class="summary">generate sequence strings for chains in this protein</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#Protein:tostring">Protein:tostring ()</a></td>
 	<td class="summary">generate descriptive string for Protein : id, sequence, counts of residues, DSSP entries, hedra and dihedra</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#Protein:writePDB">Protein:writePDB (noRemark)</a></td>
+	<td class="name" nowrap><a href="#Protein:writePDB">Protein:writePDB (noRemark, range)</a></td>
 	<td class="summary">generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:writePDB() result
   note Residue structures need dihedron data structures to write complete chain</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#Protein:writeInternalCoords">Protein:writeInternalCoords ()</a></td>
+	<td class="name" nowrap><a href="#Protein:writeInternalCoords">Protein:writeInternalCoords (noTitle, range)</a></td>
 	<td class="summary">generate text data specifying hedra with length, angle, length ; dihedra with angle ; relevant PDB records for annotation and start coordinates</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#Protein:writeDb">Protein:writeDb (rfpg, update)</a></td>
+	<td class="name" nowrap><a href="#Protein:writeDb">Protein:writeDb (rfpg, update, src)</a></td>
 	<td class="summary">write protein data to rfold database</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:reportDb">Protein:reportDb (rfpg)</a></td>
+	<td class="summary">query database for info about this protein</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Protein:dbLoad">Protein:dbLoad (rfpg)</a></td>
+	<td class="summary">populate protein object from database using supplied pdb id</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Protein:linkResidues">Protein:linkResidues ()</a></td>
@@ -292,6 +349,20 @@
 
 </dd>
     <dt>
+    <a name = "protein.clean"></a>
+    <strong>protein.clean ()</strong>
+    </dt>
+    <dd>
+    remove all entries from the protein.proteins table so garbage collector can free memory
+
+
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "protein.load"></a>
     <strong>protein.load (t)</strong>
     </dt>
@@ -303,6 +374,186 @@
     <ul>
         <li><span class="parameter">t</span>
          table with field 'pdbid' and preferably chain identifier field 'chn', passed here as callback from file parser
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "protein.copyDSSP"></a>
+    <strong>protein.copyDSSP (src, dst)</strong>
+    </dt>
+    <dd>
+    copy DSSP data from src protein object to dst protein object (not a class method)
+ will fall over if protein objects do not otherwise match
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">src</span>
+         Protein object with DSSP data
+        </li>
+        <li><span class="parameter">dst</span>
+         Protein object to get DSSP data
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Protein.id"></a>
+    <strong>Protein.id</strong>
+    </dt>
+    <dd>
+    4 position PDB identifier for this protein
+
+
+    <ul>
+        <li><span class="parameter">id</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.chains"></a>
+    <strong>Protein.chains</strong>
+    </dt>
+    <dd>
+    array of chain objects indexed by chain ID
+
+
+    <ul>
+        <li><span class="parameter">chains</span>
+         array of chain objects
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.chainOrder"></a>
+    <strong>Protein.chainOrder</strong>
+    </dt>
+    <dd>
+    array of chain IDs indexed by integer order of chains in PDB file
+
+
+    <ul>
+        <li><span class="parameter">chainOrder</span>
+         array of char chain IDs
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.header"></a>
+    <strong>Protein.header</strong>
+    </dt>
+    <dd>
+    pdb HEADER record if supplied
+
+
+    <ul>
+        <li><span class="parameter">header</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.title"></a>
+    <strong>Protein.title</strong>
+    </dt>
+    <dd>
+    pdb TITLE record if supplied
+
+
+    <ul>
+        <li><span class="parameter">title</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.title"></a>
+    <strong>Protein.title</strong>
+    </dt>
+    <dd>
+    pdb TITLE record if supplied
+
+
+    <ul>
+        <li><span class="parameter">title</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.compnd"></a>
+    <strong>Protein.compnd</strong>
+    </dt>
+    <dd>
+    pdb COMPND record if supplied
+
+
+    <ul>
+        <li><span class="parameter">compnd</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein.filename"></a>
+    <strong>Protein.filename</strong>
+    </dt>
+    <dd>
+    location of file this protein data was read from
+
+
+    <ul>
+        <li><span class="parameter">filename</span>
+         string
         </li>
     </ul>
 
@@ -387,6 +638,25 @@
 
 </dd>
     <dt>
+    <a name = "Protein:tosequence"></a>
+    <strong>Protein:tosequence ()</strong>
+    </dt>
+    <dd>
+    generate sequence strings for chains in this protein
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        chain sequence strings, 1n separated
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "Protein:tostring"></a>
     <strong>Protein:tostring ()</strong>
     </dt>
@@ -407,7 +677,7 @@
 </dd>
     <dt>
     <a name = "Protein:writePDB"></a>
-    <strong>Protein:writePDB (noRemark)</strong>
+    <strong>Protein:writePDB (noRemark, range)</strong>
     </dt>
     <dd>
     generate PDB format text data, adding HEADER, CAVEAT and END records to Chain:writePDB() result
@@ -417,7 +687,10 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">noRemark</span>
-        print('protein topdb ')
+         boolean do not write REMARK records indicating this is RFOLD output
+        </li>
+        <li><span class="parameter">range</span>
+         start:fin filter for residues to output
         </li>
     </ul>
 
@@ -433,12 +706,21 @@
 </dd>
     <dt>
     <a name = "Protein:writeInternalCoords"></a>
-    <strong>Protein:writeInternalCoords ()</strong>
+    <strong>Protein:writeInternalCoords (noTitle, range)</strong>
     </dt>
     <dd>
     generate text data specifying hedra with length, angle, length ; dihedra with angle ; relevant PDB records for annotation and start coordinates
 
 
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">noTitle</span>
+         do not write TITLE line if true; DSSP does not output so compare fails
+        </li>
+        <li><span class="parameter">range</span>
+         start:fin filter for residues to output
+        </li>
+    </ul>
 
     <h3>Returns:</h3>
     <ol>
@@ -452,7 +734,7 @@
 </dd>
     <dt>
     <a name = "Protein:writeDb"></a>
-    <strong>Protein:writeDb (rfpg, update)</strong>
+    <strong>Protein:writeDb (rfpg, update, src)</strong>
     </dt>
     <dd>
     write protein data to rfold database
@@ -465,6 +747,54 @@
         </li>
         <li><span class="parameter">update</span>
          optional flag, if false (default at protein level only) silently skip if [pdbid,chain,filename] entry exists already in pdb_chain
+        </li>
+        <li><span class="parameter">src</span>
+         string to put in pdb_chain:src column
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:reportDb"></a>
+    <strong>Protein:reportDb (rfpg)</strong>
+    </dt>
+    <dd>
+    query database for info about this protein
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        report string for printing
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Protein:dbLoad"></a>
+    <strong>Protein:dbLoad (rfpg)</strong>
+    </dt>
+    <dd>
+    populate protein object from database using supplied pdb id
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
         </li>
     </ul>
 
@@ -597,7 +927,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2017-03-26 17:12:27 </i>
+<i style="float:right;">Last updated 2017-04-05 13:48:36 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

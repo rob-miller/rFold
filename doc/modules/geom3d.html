@@ -32,10 +32,16 @@
 
 <h2>Contents</h2>
 <ul>
-<li><a href="#Methods">Methods</a></li>
+<li><a href="#Functions">Functions</a></li>
 </ul>
 
 
+<h2>Modules</h2>
+<ul class="$(kind=='Topics' and '' or 'nowrap'">
+  <li><strong>geom3d</strong></li>
+  <li><a href="../modules/parsers.html">parsers</a></li>
+  <li><a href="../modules/utils.html">utils</a></li>
+</ul>
 <h2>Classes</h2>
 <ul class="$(kind=='Topics' and '' or 'nowrap'">
   <li><a href="../classes/Protein.html">Protein</a></li>
@@ -43,9 +49,6 @@
   <li><a href="../classes/Residue.html">Residue</a></li>
   <li><a href="../classes/Dihedron.html">Dihedron</a></li>
   <li><a href="../classes/Hedron.html">Hedron</a></li>
-  <li><strong>geom3d</strong></li>
-  <li><a href="../classes/parsers.html">parsers</a></li>
-  <li><a href="../classes/utils.html">utils</a></li>
 </ul>
 <h2>Topics</h2>
 <ul class="$(kind=='Topics' and '' or 'nowrap'">
@@ -60,61 +63,59 @@
 
 <div id="content">
 
-<h1>Class <code>geom3d</code></h1>
+<h1>Module <code>geom3d</code></h1>
 <p>3D geometry module : rotation,transformation matrix generation and manipulation</p>
 <p> <strong>external dependencies</strong> : numlua (https://github.com/carvalho/numlua) -- needed to pull the lua_number2int fix for this repository</p>
 
-<p> not a class but works better with ldoc if we say it is</p>
 
-
-<h2><a href="#Methods">Methods</a></h2>
+<h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:get14mtx">geom3d:get14mtx ()</a></td>
+	<td class="name" nowrap><a href="#get14mtx">get14mtx ()</a></td>
 	<td class="summary">initialises a 1x4 matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:get41mtx">geom3d:get41mtx ()</a></td>
+	<td class="name" nowrap><a href="#get41mtx">get41mtx ()</a></td>
 	<td class="summary">initialises a 4x1 matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:get44mtx">geom3d:get44mtx ()</a></td>
+	<td class="name" nowrap><a href="#get44mtx">get44mtx ()</a></td>
 	<td class="summary">initialises a 4x4 matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:genMt">geom3d:genMt (x, y, z)</a></td>
+	<td class="name" nowrap><a href="#genMt">genMt (x, y, z)</a></td>
 	<td class="summary">generate 3D transformation matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:genMrx">geom3d:genMrx (angr)</a></td>
+	<td class="name" nowrap><a href="#genMrx">genMrx (angr)</a></td>
 	<td class="summary">generate 3D X axis rotation matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:genMry">geom3d:genMry (angr)</a></td>
+	<td class="name" nowrap><a href="#genMry">genMry (angr)</a></td>
 	<td class="summary">generate 3D Y axis rotation matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:genMrz">geom3d:genMrz (angr)</a></td>
+	<td class="name" nowrap><a href="#genMrz">genMrz (angr)</a></td>
 	<td class="summary">generate 3D Z axis rotation matrix</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:getSphericalCoordinates">geom3d:getSphericalCoordinates (m)</a></td>
+	<td class="name" nowrap><a href="#getSphericalCoordinates">getSphericalCoordinates (m)</a></td>
 	<td class="summary">given m[ x y z ], return m[ theta phi distance 1 ]</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:getDistance3d">geom3d:getDistance3d (m1, m2)</a></td>
+	<td class="name" nowrap><a href="#getDistance3d">getDistance3d (m1, m2)</a></td>
 	<td class="summary">calculate distance between two points (1D vectors)</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:getAngleS3">geom3d:getAngleS3 (d0, d1, d2)</a></td>
+	<td class="name" nowrap><a href="#getAngleS3">getAngleS3 (d0, d1, d2)</a></td>
 	<td class="summary">calculate angle a1a2a3 from lengths of 3 sides of triangle</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:matrixAreEqual">geom3d:matrixAreEqual (m1, m2)</a></td>
+	<td class="name" nowrap><a href="#matrixAreEqual">matrixAreEqual (m1, m2)</a></td>
 	<td class="summary">test two matrices for equality</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#geom3d:coordSpace">geom3d:coordSpace (a1, a2, a3, r)</a></td>
+	<td class="name" nowrap><a href="#coordSpace">coordSpace (a1, a2, a3, r)</a></td>
 	<td class="summary">generate transformation matrix to coordinate space defined by 3 points</td>
 	</tr>
 </table>
@@ -123,12 +124,12 @@
 <br/>
 
 
-    <h2 class="section-header "><a name="Methods"></a>Methods</h2>
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
 
     <dl class="function">
     <dt>
-    <a name = "geom3d:get14mtx"></a>
-    <strong>geom3d:get14mtx ()</strong>
+    <a name = "get14mtx"></a>
+    <strong>get14mtx ()</strong>
     </dt>
     <dd>
     initialises a 1x4 matrix
@@ -146,8 +147,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:get41mtx"></a>
-    <strong>geom3d:get41mtx ()</strong>
+    <a name = "get41mtx"></a>
+    <strong>get41mtx ()</strong>
     </dt>
     <dd>
     initialises a 4x1 matrix
@@ -165,8 +166,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:get44mtx"></a>
-    <strong>geom3d:get44mtx ()</strong>
+    <a name = "get44mtx"></a>
+    <strong>get44mtx ()</strong>
     </dt>
     <dd>
     initialises a 4x4 matrix
@@ -184,8 +185,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:genMt"></a>
-    <strong>geom3d:genMt (x, y, z)</strong>
+    <a name = "genMt"></a>
+    <strong>genMt (x, y, z)</strong>
     </dt>
     <dd>
     generate 3D transformation matrix
@@ -215,8 +216,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:genMrx"></a>
-    <strong>geom3d:genMrx (angr)</strong>
+    <a name = "genMrx"></a>
+    <strong>genMrx (angr)</strong>
     </dt>
     <dd>
     generate 3D X axis rotation matrix
@@ -240,8 +241,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:genMry"></a>
-    <strong>geom3d:genMry (angr)</strong>
+    <a name = "genMry"></a>
+    <strong>genMry (angr)</strong>
     </dt>
     <dd>
     generate 3D Y axis rotation matrix
@@ -265,8 +266,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:genMrz"></a>
-    <strong>geom3d:genMrz (angr)</strong>
+    <a name = "genMrz"></a>
+    <strong>genMrz (angr)</strong>
     </dt>
     <dd>
     generate 3D Z axis rotation matrix
@@ -290,8 +291,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:getSphericalCoordinates"></a>
-    <strong>geom3d:getSphericalCoordinates (m)</strong>
+    <a name = "getSphericalCoordinates"></a>
+    <strong>getSphericalCoordinates (m)</strong>
     </dt>
     <dd>
     given m[ x y z ], return m[ theta phi distance 1 ]
@@ -315,8 +316,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:getDistance3d"></a>
-    <strong>geom3d:getDistance3d (m1, m2)</strong>
+    <a name = "getDistance3d"></a>
+    <strong>getDistance3d (m1, m2)</strong>
     </dt>
     <dd>
     calculate distance between two points (1D vectors)
@@ -343,8 +344,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:getAngleS3"></a>
-    <strong>geom3d:getAngleS3 (d0, d1, d2)</strong>
+    <a name = "getAngleS3"></a>
+    <strong>getAngleS3 (d0, d1, d2)</strong>
     </dt>
     <dd>
     calculate angle a1a2a3 from lengths of 3 sides of triangle
@@ -374,8 +375,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:matrixAreEqual"></a>
-    <strong>geom3d:matrixAreEqual (m1, m2)</strong>
+    <a name = "matrixAreEqual"></a>
+    <strong>matrixAreEqual (m1, m2)</strong>
     </dt>
     <dd>
     test two matrices for equality
@@ -402,8 +403,8 @@
 
 </dd>
     <dt>
-    <a name = "geom3d:coordSpace"></a>
-    <strong>geom3d:coordSpace (a1, a2, a3, r)</strong>
+    <a name = "coordSpace"></a>
+    <strong>coordSpace (a1, a2, a3, r)</strong>
     </dt>
     <dd>
     generate transformation matrix to coordinate space defined by 3 points
@@ -442,7 +443,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2017-04-05 13:48:36 </i>
+<i style="float:right;">Last updated 2016-06-07 15:52:21 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

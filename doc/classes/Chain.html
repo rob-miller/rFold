@@ -33,6 +33,7 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
+<li><a href="#Fields">Fields</a></li>
 <li><a href="#Methods">Methods</a></li>
 </ul>
 
@@ -74,12 +75,45 @@
 	<td class="name" nowrap><a href="#chain.new">chain.new (o)</a></td>
 	<td class="summary">Chain class object initialiser (not a class method)</td>
 	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#chain.reportDbChain">chain.reportDbChain (rfpg, pdbid, chainid)</a></td>
+	<td class="summary">query database for info about specified chain (not a class method)</td>
+	</tr>
+</table>
+<h2><a href="#Fields">Fields</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Chain.residues">Chain.residues</a></td>
+	<td class="summary">array of residue ordered and disordered objects indexed by sequence position</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain.initNCaC">Chain.initNCaC</a></td>
+	<td class="summary">array of atomCoordinates (4x1 float matrices) for initial N,Ca,C residues of all ordered segments of this chain indexed by atomKeys (resPos res atom)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain.id">Chain.id</a></td>
+	<td class="summary">chain ID from PDB file</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain.pdbid">Chain.pdbid</a></td>
+	<td class="summary">4-position PDB identifier</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain.firstPos">Chain.firstPos</a></td>
+	<td class="summary">signed integer indicating sequence position of first residue in chain</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain.seqres">Chain.seqres</a></td>
+	<td class="summary">PDB file SEQRES data for this chain</td>
+	</tr>
 </table>
 <h2><a href="#Methods">Methods</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#Chain:getResidue">Chain:getResidue (ires, iresn)</a></td>
-	<td class="summary">find or initialise Residue object for specified amino acid and sequence position</td>
+	<td class="name" nowrap><a href="#Chain:getResidue">Chain:getResidue (ires, iresn, disordered)</a></td>
+	<td class="summary">find or initialise Residue object (ordered by definition) for specified amino acid and sequence position
+ will set firstPos (first residue in this chain) if appropriate (if not set already)
+ else any missing residues between firstPos and this one will be set to {} (disordered)</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Chain:load">Chain:load (t)</a></td>
@@ -90,8 +124,16 @@
 	<td class="summary">initialiser for Chain:oResIter()</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#Chain:countOrderedResidues">Chain:countOrderedResidues ()</a></td>
+	<td class="summary">count ordered residues in chain according to orderedResidues()</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#Chain:allResidues">Chain:allResidues (a)</a></td>
 	<td class="summary">initialiser for Chain:aResIter()</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain:countAllResidues">Chain:countAllResidues ()</a></td>
+	<td class="summary">count all residues in chain according to allResidues()</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Chain:setPrevNext">Chain:setPrevNext (i, r)</a></td>
@@ -140,12 +182,24 @@
  first Residue startPos is set from DSSP or other source to match PDB file, subsequent startPos's read from previous residue backbone atom coordinates in protein coordinate space</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#Chain:writePDB">Chain:writePDB (ndx)</a></td>
+	<td class="name" nowrap><a href="#Chain:writePDB">Chain:writePDB (ndx, range)</a></td>
 	<td class="summary">trigger each Residue in Chain to generate PDB ATOM records, add TER record at end of chain</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain:writeInternalCoords">Chain:writeInternalCoords (range)</a></td>
+	<td class="summary">generate PIC hedra and dihedra records for each residue in chain</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Chain:writeDb">Chain:writeDb (rfpg, pdb_no, update)</a></td>
 	<td class="summary">write chain data to rfold database</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain:dbLoad">Chain:dbLoad (rfpg)</a></td>
+	<td class="summary">populate chain object from database using supplied pdb and chain id</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Chain:reportDb">Chain:reportDb (rfpg)</a></td>
+	<td class="summary">query database for info about this chain</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Chain:setStartCoords">Chain:setStartCoords ()</a></td>
@@ -175,7 +229,7 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">o</span>
-         table with field 'id' = chain ID; ' ' or '' is valid
+         table with field 'id' = chain ID; ' ' or '' is val
         </li>
     </ul>
 
@@ -189,16 +243,169 @@
 
 
 </dd>
+    <dt>
+    <a name = "chain.reportDbChain"></a>
+    <strong>chain.reportDbChain (rfpg, pdbid, chainid)</strong>
+    </dt>
+    <dd>
+    query database for info about specified chain (not a class method)
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
+        </li>
+        <li><span class="parameter">pdbid</span>
+         4 character PDB code
+        </li>
+        <li><span class="parameter">chainid</span>
+         1 character chain identiifier
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        report string for printing
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Chain.residues"></a>
+    <strong>Chain.residues</strong>
+    </dt>
+    <dd>
+    array of residue ordered and disordered objects indexed by sequence position
+
+
+    <ul>
+        <li><span class="parameter">residues</span>
+         array of residue objects
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain.initNCaC"></a>
+    <strong>Chain.initNCaC</strong>
+    </dt>
+    <dd>
+    array of atomCoordinates (4x1 float matrices) for initial N,Ca,C residues of all ordered segments of this chain indexed by atomKeys (resPos res atom)
+
+
+    <ul>
+        <li><span class="parameter">initNCaC</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain.id"></a>
+    <strong>Chain.id</strong>
+    </dt>
+    <dd>
+    chain ID from PDB file
+
+
+    <ul>
+        <li><span class="parameter">id</span>
+         char
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain.pdbid"></a>
+    <strong>Chain.pdbid</strong>
+    </dt>
+    <dd>
+    4-position PDB identifier
+
+
+    <ul>
+        <li><span class="parameter">pdbid</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain.firstPos"></a>
+    <strong>Chain.firstPos</strong>
+    </dt>
+    <dd>
+    signed integer indicating sequence position of first residue in chain
+
+
+    <ul>
+        <li><span class="parameter">firstPos</span>
+         integer
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain.seqres"></a>
+    <strong>Chain.seqres</strong>
+    </dt>
+    <dd>
+    PDB file SEQRES data for this chain
+
+
+    <ul>
+        <li><span class="parameter">seqres</span>
+         string
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
 </dl>
     <h2 class="section-header "><a name="Methods"></a>Methods</h2>
 
     <dl class="function">
     <dt>
     <a name = "Chain:getResidue"></a>
-    <strong>Chain:getResidue (ires, iresn)</strong>
+    <strong>Chain:getResidue (ires, iresn, disordered)</strong>
     </dt>
     <dd>
-    find or initialise Residue object for specified amino acid and sequence position
+    find or initialise Residue object (ordered by definition) for specified amino acid and sequence position
+ will set firstPos (first residue in this chain) if appropriate (if not set already)
+ else any missing residues between firstPos and this one will be set to {} (disordered)
 
 
     <h3>Parameters:</h3>
@@ -208,6 +415,9 @@
         </li>
         <li><span class="parameter">iresn</span>
          sequence position of residue in this chain
+        </li>
+        <li><span class="parameter">disordered</span>
+         optional boolean to indicate disordered residue (default is ordered)
         </li>
     </ul>
 
@@ -262,6 +472,25 @@
 
 </dd>
     <dt>
+    <a name = "Chain:countOrderedResidues"></a>
+    <strong>Chain:countOrderedResidues ()</strong>
+    </dt>
+    <dd>
+    count ordered residues in chain according to orderedResidues()
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        count of ordered residues
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "Chain:allResidues"></a>
     <strong>Chain:allResidues (a)</strong>
     </dt>
@@ -276,6 +505,25 @@
         </li>
     </ul>
 
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain:countAllResidues"></a>
+    <strong>Chain:countAllResidues ()</strong>
+    </dt>
+    <dd>
+    count all residues in chain according to allResidues()
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        count of all residues
+    </ol>
 
 
 
@@ -478,7 +726,7 @@
 </dd>
     <dt>
     <a name = "Chain:writePDB"></a>
-    <strong>Chain:writePDB (ndx)</strong>
+    <strong>Chain:writePDB (ndx, range)</strong>
     </dt>
     <dd>
     trigger each Residue in Chain to generate PDB ATOM records, add TER record at end of chain
@@ -487,7 +735,10 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ndx</span>
-        print('chain topdb '  .. ndx)
+         counter for lines in pdb output file
+        </li>
+        <li><span class="parameter">range</span>
+         optional begin:end filter for residues to print
         </li>
     </ul>
 
@@ -495,6 +746,31 @@
     <ol>
 
         string of PDB format records for ATOMS in Chain, plus TER record
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain:writeInternalCoords"></a>
+    <strong>Chain:writeInternalCoords (range)</strong>
+    </dt>
+    <dd>
+    generate PIC hedra and dihedra records for each residue in chain
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">range</span>
+         optional begin:end filter for residues to print
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        string of PIC format records for residues in Chain
     </ol>
 
 
@@ -522,6 +798,51 @@
         </li>
     </ul>
 
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain:dbLoad"></a>
+    <strong>Chain:dbLoad (rfpg)</strong>
+    </dt>
+    <dd>
+    populate chain object from database using supplied pdb and chain id
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Chain:reportDb"></a>
+    <strong>Chain:reportDb (rfpg)</strong>
+    </dt>
+    <dd>
+    query database for info about this chain
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        report string for printing
+    </ol>
 
 
 
@@ -571,7 +892,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2017-03-26 17:12:27 </i>
+<i style="float:right;">Last updated 2017-04-05 13:48:36 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

@@ -33,6 +33,7 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
+<li><a href="#Fields">Fields</a></li>
 <li><a href="#Methods">Methods</a></li>
 </ul>
 
@@ -73,6 +74,45 @@
 	<td class="summary">Residue class object initialiser (not a class method)</td>
 	</tr>
 </table>
+<h2><a href="#Fields">Fields</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Residue.hedra">Residue.hedra</a></td>
+	<td class="summary">array of hedron objects indexed by hedron keys ([resPos res atom] x3)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.dihedra">Residue.dihedra</a></td>
+	<td class="summary">array of dihedron objects indexed by dihedron keys ([resPos res atom] x4)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.backbone">Residue.backbone</a></td>
+	<td class="summary">array of { dihedron object, position 1..4 in dihedron specifying atom } for backbone atoms indexed by integer position of print order in PDB format file; set by linkDihedra()</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.sidechain">Residue.sidechain</a></td>
+	<td class="summary">array of { dihedron object, position 1..4 in dihedron specifying atom } for sidechain atoms indexed by integer position of print order in PDB format file; set by linkDihedra()</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.atomCoords">Residue.atomCoords</a></td>
+	<td class="summary">array of 4x1 float matrices indexed by atomKey strings (resPos res atom)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.ordered">Residue.ordered</a></td>
+	<td class="summary">boolean indicating residue is ordered</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.res">Residue.res</a></td>
+	<td class="summary">residue character GAVLIMFPSTCNQYWDEHKRX</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.resn">Residue.resn</a></td>
+	<td class="summary">residue sequence position as in PDB or DSSP file</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue.dssp">Residue.dssp</a></td>
+	<td class="summary">DSSP data for this residue as read by parseProteinData(), or subset (ss, ss2, psi, phi, omg, acc) if loaded from database</td>
+	</tr>
+</table>
 <h2><a href="#Methods">Methods</a></h2>
 <table class="function_list">
 	<tr>
@@ -82,6 +122,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#Residue:writeDb">Residue:writeDb (rfpg, res_id, update)</a></td>
 	<td class="summary">write residue data to rfold database</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Residue:dbLoad">Residue:dbLoad (rfpg)</a></td>
+	<td class="summary">populate residue object from database using supplied database res_id</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Residue:tostring">Residue:tostring ()</a></td>
@@ -172,6 +216,181 @@
 
 </dd>
 </dl>
+    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Residue.hedra"></a>
+    <strong>Residue.hedra</strong>
+    </dt>
+    <dd>
+    array of hedron objects indexed by hedron keys ([resPos res atom] x3)
+
+
+    <ul>
+        <li><span class="parameter">hedra</span>
+         array of hedron objects
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.dihedra"></a>
+    <strong>Residue.dihedra</strong>
+    </dt>
+    <dd>
+    array of dihedron objects indexed by dihedron keys ([resPos res atom] x4)
+
+
+    <ul>
+        <li><span class="parameter">dihedra</span>
+         array of dihedron objects
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.backbone"></a>
+    <strong>Residue.backbone</strong>
+    </dt>
+    <dd>
+    array of { dihedron object, position 1..4 in dihedron specifying atom } for backbone atoms indexed by integer position of print order in PDB format file; set by linkDihedra()
+
+
+    <ul>
+        <li><span class="parameter">backbone</span>
+         {dihedron, i}
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.sidechain"></a>
+    <strong>Residue.sidechain</strong>
+    </dt>
+    <dd>
+    array of { dihedron object, position 1..4 in dihedron specifying atom } for sidechain atoms indexed by integer position of print order in PDB format file; set by linkDihedra()
+
+
+    <ul>
+        <li><span class="parameter">sidechain</span>
+         {dihedron, i}
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.atomCoords"></a>
+    <strong>Residue.atomCoords</strong>
+    </dt>
+    <dd>
+    array of 4x1 float matrices indexed by atomKey strings (resPos res atom)
+
+
+    <ul>
+        <li><span class="parameter">atomCoords</span>
+         float[4][1]
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.ordered"></a>
+    <strong>Residue.ordered</strong>
+    </dt>
+    <dd>
+    boolean indicating residue is ordered
+
+
+    <ul>
+        <li><span class="parameter">ordered</span>
+         boolean
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.res"></a>
+    <strong>Residue.res</strong>
+    </dt>
+    <dd>
+    residue character GAVLIMFPSTCNQYWDEHKRX
+
+
+    <ul>
+        <li><span class="parameter">res</span>
+         char
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.resn"></a>
+    <strong>Residue.resn</strong>
+    </dt>
+    <dd>
+    residue sequence position as in PDB or DSSP file
+
+
+    <ul>
+        <li><span class="parameter">resn</span>
+         integer
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue.dssp"></a>
+    <strong>Residue.dssp</strong>
+    </dt>
+    <dd>
+    DSSP data for this residue as read by parseProteinData(), or subset (ss, ss2, psi, phi, omg, acc) if loaded from database
+
+
+    <ul>
+        <li><span class="parameter">dssp</span>
+         array
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
     <h2 class="section-header "><a name="Methods"></a>Methods</h2>
 
     <dl class="function">
@@ -213,6 +432,26 @@
         </li>
         <li><span class="parameter">update</span>
          optional flag, if false silently skip if [res<em>id [atom] ] entry exists already in atom</em>coordinates / dssp / dihedral / angle / bond tables
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Residue:dbLoad"></a>
+    <strong>Residue:dbLoad (rfpg)</strong>
+    </dt>
+    <dd>
+    populate residue object from database using supplied database res_id
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">rfpg</span>
+         open database handle
         </li>
     </ul>
 
@@ -475,7 +714,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.3</a></i>
-<i style="float:right;">Last updated 2017-03-26 17:12:27 </i>
+<i style="float:right;">Last updated 2017-04-05 13:48:36 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
