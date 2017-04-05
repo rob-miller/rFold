@@ -1,7 +1,7 @@
 --[[
    utils.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 2016, 2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -118,8 +118,8 @@ end
 -- @param k string key to split
 -- @return table of sequential fields
 function utils.splitKey(k)
-   if k:ematch('^(%w+):(%w+):(%w+):(%w+)$') then return { _1, _2, _3, _4 }
-   elseif k:ematch('^(%w+):(%w+):(%w+)$') then return { _1, _2, _3 }
+   if k:ematch('^(-?%w+):(-?%w+):(-?%w+):(-?%w+)$') then return { _1, _2, _3, _4 }
+   elseif k:ematch('^(-?%w+):(-?%w+):(-?%w+)$') then return { _1, _2, _3 }
    else assert(nil,'utils.splitKey fail on '..k) end
 end
 

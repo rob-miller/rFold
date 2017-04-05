@@ -1,7 +1,7 @@
 --[[
    parsers.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 2016,2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -124,7 +124,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
    local fname=nil
    if infile:match('%.gz$') then
       fh,err = io.popen('zcat ' .. infile)
-      fname = infile:match('%.gz$')
+      fname = infile:match('(%S+).gz$')
    elseif infile:match('.[\r\n].') then
       stringArray = utils.split_newlines(infile)
       --print('stringArray count',#stringArray)
@@ -155,10 +155,11 @@ function parsers.parseProteinData (infile, callback, chain, infname)
          --print(pdbid)
       elseif line:match('^TITLE') then  -- pdb only -- dssp does not pass
          local title = line
+         title = title:gsub("'",'-PRIME')
          if callback then
             callback({['pdbid'] = pdbid, ['title'] = title })
          else
-            rdt['title'] = title
+            if not rdt['title'] then rdt['title'] = title end
          end
          --print(pdbid)
       elseif line:match('^COMPND') then
@@ -216,7 +217,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
          dsp['ca']['x'], dsp['ca']['y'], dsp['ca']['z'], dsp['c']['x'], dsp['c']['y'], dsp['c']['z'] = tonumber(_7),tonumber(_8),tonumber(_9),tonumber(_10),tonumber(_11),tonumber(_12)
          dsp['cb']['x'], dsp['cb']['y'], dsp['cb']['z'],dsp['o']['x'], dsp['o']['y'], dsp['o']['z'] = tonumber(_13),tonumber(_14),tonumber(_15),tonumber(_16),tonumber(_17),tonumber(_18)
          dsp['bca'] = tonumber(_19)
-         if not chain or chain == dspp['chn'] then
+         if not chain or chain == dsp['chn'] then
             if callback then
                callback(dsp)
             else
@@ -275,9 +276,8 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
          -- dssp
       elseif line:match('^%s+%d+%s+%!%s+') then
          -- dssp chain break
-      --elseif line:match('^%s+%d+%s+!*%s+') then
-      --   print('foo:',line)
-         -- pdb
+      elseif line:match('^%s+%d+%s+!%*%s+') then
+         -- dssp chain termination
       elseif line:match('^SEQADV') then
       elseif line:match('^LINK') then
       elseif line:match('^KEYWDS') then
@@ -295,22 +295,24 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
          for res3 in psr:gmatch("%a+") do
             local r1 = chemdata.res1[res3]
             if not r1 then
-               io.stderr:write("SEQRES code '" .. res3 .."' not recognised, file: " .. infile .. "\n")
+               -- io.stderr:write("SEQRES code '" .. res3 .."' not recognised, file: " .. infile .. "\n")
                r1 = 'x'
                -- os.exit()
             end
             s = s .. r1
          end
          sr['seqres'] = s
-         if callback then
-            callback(sr)
-         else
-            if not rdt['seqres'] then
-               rdt['seqres'] = { sr['chn'] }
-            elseif not rdt['seqres'][ sr['chn'] ] then
-               rdt['seqres'][ sr['chn'] ] = s
+         if (not chain) or (chain == sr['chn']) then
+            if callback then
+               callback(sr)
             else
-               rdt['seqres'][ sr['chn'] ] = rdt['seqres'][ sr['chn'] ] .. s
+               if not rdt['seqres'] then
+                  rdt['seqres'] = { sr['chn'] }
+               elseif not rdt['seqres'][ sr['chn'] ] then
+                  rdt['seqres'][ sr['chn'] ] = s
+               else
+                  rdt['seqres'][ sr['chn'] ] = rdt['seqres'][ sr['chn'] ] .. s
+               end
             end
          end
       elseif line:match('^HET ') then

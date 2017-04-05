@@ -45,7 +45,7 @@ local PDB_repository_base = '/media/data/pdb/'
 local mkdssp = 'dssp/rtm-dssp-2.2.1/mkdssp'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
-rfpg.dbReconnect(1)
+--rfpg.dbReconnect(1)
 
 ------- schema initialisation routines --------
 
@@ -140,6 +140,19 @@ end
 
 --- deterministically populate database tables for bond, angle and dihedral angle classes with serial IDs so IDs do not change with change in protein sets
 function verifyDb()
+
+   --[[
+   local warn
+   local dihed_count = tonumber(rfpg.Q('select count(*) from dihedral_class')[1])
+   local angle_count = tonumber(rfpg.Q('select count(*) from angle_class')[1])
+   if (dihed_count < 500) or (angle_count < 500) then
+      warn=true
+      print('creating support tables in database')
+   end
+   --]]
+   
+   rfpg.Qcur('begin')
+   
    -- load dihedral_names
    rfpg.Qcur("insert into dihedral_name (name) values ('psi') on conflict (name) do nothing")
    rfpg.Qcur("insert into dihedral_name (name) values ('omega') on conflict (name) do nothing")
@@ -250,10 +263,33 @@ function verifyDb()
    end
    
    rfpg.Qcur('commit')
+   --if warn then print('done creating support tables.') end
 end
 
 --------- end schema initialisation routines ------------------
 
+--------- begin schema support routines ------------------
+
+function dropIndexes()
+   rfpg.Qcur('DROP INDEX IF EXISTS public.pdb_chain_pdb_ndx CASCADE')
+   rfpg.Qcur('DROP INDEX IF EXISTS public.residue_ndx_res_respos CASCADE')
+   rfpg.Qcur('DROP INDEX IF EXISTS public.residue_ndx_pdb_no CASCADE')
+   rfpg.Qcur('DROP INDEX IF EXISTS public.dihedral_ndx_res_id CASCADE')
+   rfpg.Qcur('DROP INDEX IF EXISTS public.angle_ndx_dihedral_id CASCADE')
+   rfpg.Qcur('DROP INDEX IF EXISTS public.bond_ndx_angle_id CASCADE')
+end
+
+function restoreIndexes()
+   rfpg.Qcur('CREATE INDEX pdb_chain_pdb_ndx ON public.pdb_chain USING btree ( pdbid )')
+   rfpg.Qcur('CREATE INDEX residue_ndx_res_respos ON public.residue USING btree ( res, res_ndx ASC NULLS LAST )')
+   rfpg.Qcur('CREATE INDEX residue_ndx_pdb_no ON public.residue USING btree ( pdb_no )')
+   rfpg.Qcur('CREATE INDEX dihedral_ndx_res_id ON public.dihedral USING btree ( res_id )')
+   rfpg.Qcur('CREATE INDEX angle_ndx_dihedral_id ON public.angle USING btree ( dihedral_id )')
+   rfpg.Qcur('CREATE INDEX bond_ndx_angle_id ON public.bond USING btree ( angle_id )')
+end
+
+
+--------- end schema support routines ------------------
 
 
 --------- main ------ 
@@ -266,14 +302,27 @@ local args = parsers.parseCmdLine(
       ['u'] = 'update database (default is skip if entry already exists)'
    },
    {
-      ['f'] = '<input file> : process files listed in <input file> (1 per line) followed by any on command line'
+      ['f'] = '<input file> : process files listed in <input file> (1 per line) followed by any on command line',
+      ['s'] = '<skip count> : number of PDB[chain] lines in <input file> to skip'
    }
 )
 
 local toProcess={}
+local skipCount = (args['s'] and tonumber(args['s'][#args['s']]) or 0)
+
 if args['f'] then
    for i,f in ipairs(args['f']) do
-      local fh=io.open(f)
+      local fh
+      local fname
+      if f:match('%.gz$') then
+         fh,err = io.popen('zcat ' .. f)
+         fname = f:match('(%S+).gz$')
+      else
+         fh=io.open(f)
+         fname = f
+      end
+      table.insert(toProcess, 'src=' .. fname)
+
       for line in fh:lines() do
          table.insert(toProcess, line)
       end
@@ -283,185 +332,199 @@ end
 for i,a in ipairs(args) do table.insert(toProcess, a) end
 
 
+local count=0
+local count2=0
 
 for i,a in ipairs(toProcess) do
    if a:match('^IDs%s') then toProcess[i]='' end     -- header line for Dunbrack list : 'IDs         length Exptl.  resolution  R-factor FreeRvalue'
-   if a:match('^#') then toProcess[i]='' end         -- comment line starts with '#'
+   if a:match('^#') then                             -- comment line starts with '#'
+      count = count+1                                --- assume commented out a skipped entry
+      toProcess[i]=''
+   end         
    if a:ematch('^(%d%w%w%w)(%w?)%s+') then           -- looks like pdbcode with optional chain, read as compressed file from PDB_repository_base
-      local pdbid, chn = _1:lower(), _2
-      local subdir = pdbid:match('^%w(%w%w)%w$')
-      toProcess[i] = PDB_repository_base .. '/' .. subdir .. '/pdb' .. pdbid:lower() .. '.ent.gz'
-      if (chn) then
-         toProcess[i] = toProcess[i] .. ' ' .. chn
+      if skipCount > 0 then
+         skipCount = skipCount-1
+         count=count+1
+         toProcess[i]=''
+      else
+         local pdbid, chn = _1:lower(), _2
+         local subdir = pdbid:match('^%w(%w%w)%w$')
+         toProcess[i] = PDB_repository_base .. subdir .. '/pdb' .. pdbid:lower() .. '.ent.gz'
+         if (chn) then
+            toProcess[i] = toProcess[i] .. ' ' .. chn
+         end
       end
    end
 end
 
 verifyDb()
 
+--dropIndexes() -- indexes definitely help loading
+
+local src
+
 for i,arg in ipairs(toProcess) do
    if '' ~= arg then
-      --print(arg)
-      if 'quit' == arg then os.exit() end    -- so can insert 'quit' in input file of PDB IDs for testing and debugging
-      local file,chain = arg:match('^(%S+)%s?(%w?)%s*$')
-      if chain == '' then chain = nil end
+      --print('arg= ' .. arg)
+      if 'quit' == arg then    -- so can insert 'quit' in input file of PDB IDs for testing and debugging
+         -- restoreIndexes()
+         os.exit()
+      end
+
+      local pdbid 
+      local prot 
+      local pdbid2
+      local prot2
       
-      local pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
-      local prot = protein.get(pdbid)
-
-      --print(pdbid,prot,prot:countDihedra())
-      --print(prot:tostring())
-
-
-      --- need dihedra and (optionally not) DSSP data
-      -- have either PDB coords (pdb file), dihedra data only (pic file), or dihedra and DSSP data (rtm mkdssp output file)
-      -- want to test for data consistency each way, essentially repeating buildProtein.lua test mode
-
-      local dsspCount = prot:countDSSPs()  -- useful to know below
+      local dsspCount 
       local coordsInternal
       local coords3D
+      local s1
+      local s2
+      local loadedPDB
+      local loadedPIC
+      local file
+      local chain
 
-      prot:setStartCoords()                  -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list (not done on loading pic file)
+      local tsrc = arg:match('^src=(.+)$')
+      if tsrc then
+         src = tsrc
+         --print('src= ' .. src)
+         goto continue
+      end
+      
+      
+      file,chain = arg:match('^(%S+)%s?(%w?)%s*$')   -- needs space at end if doing on command line, e.g. '7RSAA '
+      if chain == '' then chain = nil end
+      if chain and chain:match('%d') then goto continue end -- no numeric chain IDs so 1qqp is out
+      
+      -- load current file
+      pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
+      prot = protein.get(pdbid)
+      count=count+1
+      count2=count2+1
+      io.write(count .. ' (' .. count2 .. ') ' .. pdbid .. ' ' .. (chain and chain or '') .. ' : ')
+      --print(pdbid,prot,prot:countDihedra())
+      --print(prot:tostring())
+      --goto continue
+      
+      --- need dihedra and (optionally not) DSSP data
+      -- have either PDB coords (pdb file), dihedra data only (pic file), or dihedra and DSSP data (rtm mkdssp output file)
+      -- want to test for data consistency each way
+
+      dsspCount = prot:countDSSPs()
+      
+      prot:setStartCoords()                  -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list 
 
       if prot:countDihedra() > 0  then  -- did read internal coordinates, either from .pic file or rtm DSSP output
-         
+         loadedPIC = true
          --- test if we can generate PDB coordinates and match back:
          coordsInternal = prot:writeInternalCoords(true)  -- get output for internal coordinate data as loaded 
          prot:internalToAtomCoords()            -- generate PDB atom coordinates from internal coordinates (needs dihedron data structures to complete chain)
          prot:clearInternalCoords()             -- wipe internal coordinates as loaded
          prot:atomsToInternalCoords()           -- generate internal coordinates from PDB atom coordinates
-         local s1 = prot:writeInternalCoords(true)  -- get output for internal coordinate data as generated
+         s1 = prot:writeInternalCoords(true)  -- get output for internal coordinate data as generated
          
-         local c = utils.lineByLineCompare(coordsInternal,s1) 
-         if not c then
-            print((0 == dsspCount and 'PIC' or 'DSSP') .. ' file ' .. arg .. ' failed to re-generate matching internal coordinates from 3D coordinates.')
+         if not utils.lineByLineCompare(coordsInternal,s1) then
+            print('Reject: ' .. (0 == dsspCount and 'PIC' or 'DSSP') .. ' file ' .. arg .. ' failed to regenerate matching internal coordinates from calculated 3D coordinates.')
             goto continue
          end
+         
          coords3D = prot:writePDB(true)
       else                             -- did read PDB file
+         loadedPDB=true
          --- test if we can get internal coordinates and regenerate input pdb file
          prot:atomsToInternalCoords()     -- calculate bond lengths, bond angles and dihedral angles from input coordinates
          coords3D = prot:writePDB(true)   -- loaded PDB format text without REMARK RFOLD record (timestamp may not match)
-         --prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list  
          prot:clearAtomCoords()
          prot:internalToAtomCoords()
-         local s1 = prot:writePDB(true)
-         --print(coords3D)
-         --print('------------')
-         --print(s1)
-         local c = utils.lineByLineCompare(coords3D,s1)
-         if not c then
-            print('PDB file ' .. arg .. ' failed to regenerate 3D coordinates from calculated internal coordinates')
+         s1 = prot:writePDB(true)
+
+         if not utils.lineByLineCompare(coords3D,s1) then
+            print('Reject: PDB file ' .. arg .. ' failed to regenerate matching 3D coordinates from calculated internal coordinates')
             goto continue
          end
+         
          coordsInternal = prot:writeInternalCoords(true)  
       end
 
-      --- if here then 3D coordinate match internal coordinates and have both
-      -- now confirm mkdssp matches calculated internal coordinates unless mkdssp disabled
+      --- if here then can interconvert 3D coordinates <-> internal coordinates and have both in prot: object and formatted output strings coordsInternal / coords3D
+      -- now get mkdssp secondary structure assignments and check mkdssp also matches calculated internal coordinates unless mkdssp disabled or initial input was dssp file
+
+      pdbid2 = protein.stashId(pdbid)  -- loading new file with same PDB code will wipe existing data, so change protein.proteins[] tag here
       
-      if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, get dssp results
-         -- see if rtm mkdssp gets same internal coordinates
+      if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, need dssp results
          local dsspstatus,dsspresult,dssperr = ps.pipe_simple(coords3D,mkdssp,unpack({'-i','-'}))
-         --local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')  -- this line re-initialises prot: because reloading same pdbid
-         pdbid = protein.stashId(pdbid)  -- so instead we stash protein.proteins[pdbid] entry as new name first
-         local pdbid2 = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, 'dssp_pipe')  -- now we get new structure loaded
-         local prot2 = protein.get(pdbid2)
+         pdbid = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, prot['filename'])  -- now we get new structure loaded from dssp data
+
+         dsspstatus=nil
+         dsspresult=nil
+         dssperr=nil
+         
+         prot2 = protein.get(pdbid)  -- dssp data in prot2: object
          prot2:setStartCoords()
          prot2:linkResidues()
          s1 = prot2:writeInternalCoords(true)  -- get output for internal coordinate data as read from dssp
-         --utils.writeFile('dssp.out',dsspresult)
-         --utils.writeFile('coordsInternal.pic',coordsInternal)
-         --utils.writeFile('s1.pic',s1)
-         --utils.writeFile('coords3D.pdb',coords3D)
-         local c = utils.lineByLineCompare(coordsInternal,s1) 
-         if not c then
-            print(arg .. ' failed to generate matching DSSP internal coordinates from 3D coordinates.')
+
+         if not utils.lineByLineCompare(coordsInternal,s1)  then
+            print('Reject: ' .. arg .. ' failed to generate matching DSSP internal coordinates from 3D coordinates.')
             goto continue
          end
-         prot = prot2
-      --else    -- otherwise we have DSSP data already, must have read in, and already tested regenerate structure -> regenerate matching internal coordinates
+
+         protein.copyDSSP(prot2,prot)   -- DSSP does not pass as many PDB records so prefer .pdb or .pic
+         protein.drop(pdbid)           -- dssp loaded data no longer needed or desired
+         prot2=nil
       end
       
       --- if here then we have happy data for prot:
-      print('we have happy data for ' .. arg)
-      print(prot:tostring())
+      -- print('we have happy data for ' .. arg)
+      --print('input:    ' .. prot:tostring())
       --os.exit()
 
       prot:clearAtomCoords()
+      rfpg.Qcur('begin')
+      prot:writeDb(rfpg,args['u'],src)
+      --print(prot:reportDb(rfpg))
+
+      prot2 = protein.get(pdbid)  -- initialise a new prot object with pdbid just loaded to database
+      if chain then prot2['chain'] = chain end
       
-      prot:writeDb(rfpg,args['u'])
+      --print('cleared : ' .. prot2:tostring())  
+      prot2:dbLoad(rfpg)
+      --print('database: ' .. prot2:tostring())
+
       
-   end
-
-   ::continue::
-end
-
-
---[[
-
-         if args['w'] then
-               utils.writeFile(pdbid .. '.gpdb',s)
-            else
-               print(s)
-            end
-         end
-         
-      else                             -- did read PDB, generate internal coordinates
-         prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
-         
-         prot:atomsToInternalCoords()          -- calculate bond lengths, bond angles and dihedral angles from input coordinates
-         if args['a'] then
-            --hedron_default = prot:addHedronData(hedron_default)
-            --dihedron_default = prot:addDihedronData(dihedron_default)
-         elseif args['t'] then
-            io.write('testing ' .. a .. ' ... ')
-            io.flush()
-            local s0 = prot:writePDB(true)     -- PDB format text without REMARK RFOLD record (timestamp may not match)
-            prot:clearAtomCoords()
-            prot:internalToAtomCoords()
-            local s1 = prot:writePDB(true)
-            local c = lineByLine(s0,s1) 
-            if c then
-               print('passed: ' .. c .. ' pdb lines compared, ' .. prot:report())
-            else
-               print('failed')
-            end
-         else
-            local s = prot:writeInternalCoords()
-            if args['w'] then
-               utils.writeFile(pdbid .. '.pic',s)
-            else
-               print(s)
-            end
-         end         
+      if loadedPIC then
+         s1 = prot2:writeInternalCoords(true)
+      elseif loadedPDB then 
+         prot2:internalToAtomCoords()
+         s2 = prot2:writePDB(true)
       end
-      protein.drop(pdbid)
-   end
-end
---]]
-
---[[
-local function lineByLine(s1,s2)
-   local s1t, s2t = {}, {}
-   for line in s1:gmatch("[^\r\n]+") do s1t[#s1t+1] = line end
-   for line in s2:gmatch("[^\r\n]+") do s2t[#s2t+1] = line end
-
-   local ecnt = 2
-   for i,lin in ipairs(s1t) do
-      if lin ~= s2t[i] then
-         print()
-         print(lin)
-         print(s2t[i])
-         ecnt = ecnt-1
-         if 0>ecnt then return false end
+      
+      if loadedPIC and not utils.lineByLineCompare(coordsInternal,s1)  then
+         print('Reject: ' .. arg .. ' failed to load back matching internal coordinates from database.')
+         rfpg.Qcur('rollback')
+         --utils.writeFile('loaded.pic',coordsInternal)
+         --utils.writeFile('db.pic',s1)
+         --os.exit()
+      elseif loadedPDB and not utils.lineByLineCompare(coords3D,s2)  then
+         print('Reject: ' .. arg .. ' failed to calculate matching 3D coordinates from database internal coordinates.')
+         rfpg.Qcur('rollback')
+         --utils.writeFile('loaded.pdb',coords3D)
+         --utils.writeFile('db.pdb',s2)
+         --os.exit()
+      else
+         rfpg.Qcur('commit')
+         print('Success: loaded ' .. arg .. (src and ' [src= ' .. src ..']' or '') )
       end
+      
+      ::continue::
+      --protein.drop(pdbid2)
+      protein.clean()
    end
-   if #s1t ~= #s2t then
-      print(' different linecounts.')
-      return false
-   end
-   --return true
-   return #s1t
+   --collectgarbage()
+   --print(collectgarbage('count'))
 end
---]]
+
+--restoreIndexes()
+

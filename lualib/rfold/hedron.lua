@@ -1,7 +1,7 @@
 --[[
    hedron.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 2016,2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -172,11 +172,11 @@ end
 
 --- write hedron data to rfold database
 -- @param rfpg open database handle
--- @param res_id residue ID in residue table
 -- @param did dihedral id
--- @param update optional flag, if false silently skip if entry exists already in dihedral / angle / bond tables
+-- @param update optional flag, if false skip with warning if entry exists already in dihedral / angle / bond tables
 -- @return angleID identifier for new or updated entry in angle table
-function Hedron:writeDb(rfpg, res_id, did, update)
+function Hedron:writeDb(rfpg, res_id, update)
+   --print(self['key'])
    local akl = utils.splitKey(self['key'])
    local al = {}
    for i,ak in ipairs(akl) do
@@ -185,30 +185,50 @@ function Hedron:writeDb(rfpg, res_id, did, update)
    end
    local as = rfpg.pgArrayOfStrings(al[1],al[2],al[3])
    local acid = rfpg.Q("select id from angle_string where atom_string='" .. as .. "'")[1]
-   local tst = rfpg.Q('select angle_id from angle where res_id = ' .. res_id .. ' and angle_class = ' .. acid)
+   local tst = rfpg.Q('select angle_id from angle where res_id = ' .. res_id .. " and key = '" .. self['key'] .. "' and angle_class = " .. acid .. ' and angle=' .. self['angle2'])
    local aid
-   if not tst then
-      aid = rfpg.Q('insert into angle (res_id, dihedral_id, angle_class, angle) values (' .. res_id .. ',' .. did .. ',' .. acid .. ',' .. self['angle2'] .. ') returning angle_id')[1]
-   elseif update then
-      aid = tst[1]
-      rfpg.Qcur('update angle set angle = ' .. self['angle2'] .. ' where angle_id = ' .. aid)
+   if tst then
+      aid = tst[1]   -- already set as we want it, no update
+   else
+      tst = rfpg.Q('select angle_id from angle where res_id = ' .. res_id .. " and key = '" .. self['key'] .. "' and angle_class = " .. acid )
+      if not tst then
+         aid = rfpg.Q('insert into angle (res_id, key, angle_class, angle) values (' .. res_id .. ",'" .. self['key'] .. "'," .. acid .. ',' .. self['angle2'] .. ') returning angle_id')[1]
+      elseif update then
+         aid = tst[1]
+         rfpg.Qcur('update angle set angle = ' .. self['angle2'] .. ' where angle_id = ' .. aid)
+      else
+         aid = tst[1]
+         local v = rfpg.Q('select value from angle where angle_id=' .. aid)[1]
+         io.stderr('res_id ' .. res_id .. ' hedra key ' .. self['key'] .. ' new angle= ' .. self['angle2'] .. ' already in database with different value= ' .. v .. ' angle_id= ' .. angle_id .. '\n')
+      end
    end
 
-   if aid then
-      local bids={}
-      for i=1,2 do
-         local bas = rfpg.pgArrayOfStrings(al[i],al[i+1])
-         local bcid = rfpg.Q("select id from bond_string where atom_string='" .. bas .. "'")[1]
-         tst = rfpg.Q('select bond_id from bond where res_id=' .. res_id .. ' and angle_id=' .. aid .. ' and bond_class=' .. bcid)
+   local bids={}
+   for i=1,2 do
+      local bas = rfpg.pgArrayOfStrings(al[i],al[i+1])
+      local bcid = rfpg.Q("select id from bond_string where atom_string='" .. bas .. "'")[1]
+      local len = (1==i and self['len1'] or self['len3'])
+      
+      tst = rfpg.Q('select bond_id from bond where angle_id=' .. aid .. ' and bond_class=' .. bcid .. ' and length =' .. len )
+      if tst then
+         bids[i] = tst[1]
+      else
+         tst = rfpg.Q('select bond_id from bond where angle_id=' .. aid .. ' and bond_class=' .. bcid )
          if not tst then
-            bids[i] = rfpg.Q('insert into bond (angle_id, bond_class, res_id, length) values (' .. aid .. ',' .. bcid .. ',' .. res_id .. ',' .. (1==i and self['len1'] or self['len3']) .. ') returning bond_id')[1]
+            bids[i] = rfpg.Q('insert into bond (angle_id, bond_class, length) values (' .. aid .. ',' .. bcid .. ',' .. len .. ') returning bond_id')[1]
          elseif update then
             bids[i] = tst[1]
-            rfpg.Qcur('update bond set length=' .. (1==i and self['len1'] or self['len3']) .. ' where bond_id=' .. bids[i])
+            rfpg.Qcur('update bond set length=' .. len .. ' where bond_id=' .. bids[i])
+         else
+            bids[i] = tst[1]
+            local v = rfpg.Q('select length from bond where bond_id=' .. bids[i])[1]
+            io.stderr:write('res_id ' .. res_id .. ' hedra key ' .. self['key'] .. ' bond string= ' .. bas .. ' new len= ' .. len .. ' already in database with different value= ' .. v .. ' bond_id= ' .. bids[i] .. '\n')
+            os.exit()
          end
       end
-      rfpg.Qcur('update angle set bond1=' .. bids[1] .. ', bond2=' .. bids[2] .. ' where angle_id=' .. aid)
    end
+   rfpg.Qcur('update angle set bond1=' .. bids[1] .. ', bond2=' .. bids[2] .. ' where angle_id=' .. aid)
+
    return aid 
 end
 

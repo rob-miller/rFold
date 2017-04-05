@@ -1,7 +1,7 @@
 --[[
    residue.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 201,20176 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -36,6 +36,34 @@ local Residue = {}  -- class table
 ------------------------------------------------------------------------------------------------
 -- residue
 ------------------------------------------------------------------------------------------------
+-- class properties
+
+--- array of hedron objects indexed by hedron keys ([resPos res atom] x3)
+--@field hedra array of hedron objects
+
+--- array of dihedron objects indexed by dihedron keys ([resPos res atom] x4)
+--@field dihedra array of dihedron objects
+
+--- array of { dihedron object, position 1..4 in dihedron specifying atom } for backbone atoms indexed by integer position of print order in PDB format file; set by linkDihedra()
+-- @field backbone {dihedron, i}
+
+--- array of { dihedron object, position 1..4 in dihedron specifying atom } for sidechain atoms indexed by integer position of print order in PDB format file; set by linkDihedra()
+-- @field sidechain {dihedron, i}
+
+--- array of 4x1 float matrices indexed by atomKey strings (resPos res atom) 
+-- @field atomCoords float[4][1]
+
+--- boolean indicating residue is ordered
+-- @field ordered boolean
+
+--- residue character GAVLIMFPSTCNQYWDEHKRX
+-- @field res char
+
+--- residue sequence position as in PDB or DSSP file
+-- @field resn integer
+
+--- DSSP data for this residue as read by parseProteinData(), or subset (ss, ss2, psi, phi, omg, acc) if loaded from database
+-- @field dssp array 
 
 local backboneSort = { N = 1, CA = 2, C = 3, O = 4 }
 local sidechainSort = { CB = 1,
@@ -116,14 +144,14 @@ function Residue:writeDb(rfpg, res_id, update)
    if self['dssp'] then
       local chk = rfpg.Q("select 1 from dssp where res_id=" .. res_id)
       if (not chk) then
-         rfpg.Qcur("insert into dssp (res_id, struc, struc2, phi, psi, omega, acc) values (" .. res_id .. ",'" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. "," .. self['dssp']['acc'] .. ")" )
+         rfpg.Qcur("insert into dssp (res_id, struc, struc2, psi, phi, omega, acc) values (" .. res_id .. ",'" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['psi'] .. "," .. self['dssp']['phi'] .. "," .. self['dssp']['omg'] .. "," .. self['dssp']['acc'] .. ")" )
       elseif update then
-         rfpg.Qcur("update dssp set (struc, struc2, phi, psi, omega, acc) = ('" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['phi'] .. "," .. self['dssp']['psi'] .. "," .. self['dssp']['omg'] .. "," .. self['dssp']['acc'] .. ") where res_id= " .. res_id  )
+         rfpg.Qcur("update dssp set (struc, struc2, psi, phi, omega, acc) = ('" .. self['dssp']['ss'] .. "','" .. self['dssp']['ss2'] .. "'," .. self['dssp']['psi'] .. "," .. self['dssp']['phi'] .. "," .. self['dssp']['omg'] .. "," .. self['dssp']['acc'] .. ") where res_id= " .. res_id  )
       end
    end
    if {} ~= self['atomCoords'] then  -- at chain level wrote atom_oordinates for initNCaC if present; here write all atom coordinates to db if present
       for k,v in pairs(self['atomCoords']) do
-         local chk = rfpg.Q("select 1 from atom_coordinates where res_id = " .. res_id .. " and atom = '" .. k .. "'")
+         local chk = rfpg.Q("select 1 from atom_coordinates where res_id = " .. res_id .. " and atom = '" .. k .. "' and not init")
          if not chk then
             rfpg.Qcur("insert into atom_coordinates (res_id, atom, x, y, z) values (" .. res_id .. ",'" .. k .. "'," .. v[1][1] .. "," .. v[2][1] .. "," .. v[3][1] .. ")")
          elseif update then
@@ -138,6 +166,70 @@ function Residue:writeDb(rfpg, res_id, update)
 
 end
 
+--- populate residue object from database using supplied database res_id
+-- @param rfpg open database handle
+function Residue:dbLoad(rfpg)
+   local resid = self['res_id']  -- if res_id not pre-set need to know pdb_no to find it
+   --print(resid)
+   local cur = rfpg.Qcur('select atom, x, y, z from atom_coordinates where res_id=' .. resid .. ' and not init')
+   local atomData = cur:fetch({},'a')
+   while atomData do
+      local atom = geom3d.get41mtx()
+      atom[1][1] = tonumber(atomData['x'])
+      atom[2][1] = tonumber(atomData['y'])
+      atom[3][1] = tonumber(atomData['z'])
+      self['atomCoords'][ atomData['atom'] ] = atom
+      --print(atomData['atom'])
+      atomData = cur:fetch({},'a')
+   end
+
+   cur = rfpg.Qcur('select struc, struc2, psi, phi, omega, acc from dssp where res_id=' .. resid)
+   local dsspData = cur:fetch({},'a')
+   if dsspData then self['dssp'] = {} end
+   while dsspData do
+      self['dssp']['ss'] = dsspData['struc']
+      self['dssp']['ss2'] = dsspData['struc2']
+      self['dssp']['psi'] = dsspData['psi']
+      self['dssp']['phi'] = dsspData['phi']
+      self['dssp']['omg'] = dsspData['omega']
+      self['dssp']['acc'] = dsspData['acc']
+      dsspData = cur:fetch({},'a')      
+   end
+
+   cur = rfpg.Qcur('select key, angle1, angle2, dangle from dihedral where res_id=' .. resid)
+   local dihedralData = cur:fetch({},'a')
+   while dihedralData do
+      local k = dihedralData['key']
+      local d = utils.splitKey(k)  -- generates [1..4] entries for each atom
+      d['dihedral1'] = tonumber(dihedralData['dangle'])
+      self['dihedra'][k] = dihedron.new(d)
+      --self['dihedra'][k]:dbLoad(rfpg)
+
+      local angles = { tonumber(dihedralData['angle1']), tonumber(dihedralData['angle2']) }
+      for i,aid in ipairs(angles) do
+         local cur2 = rfpg.Qcur('select a.key, a.angle, b1.length as len1, b2.length as len2 from angle a, bond b1, bond b2 where a.angle_id=' .. angles[i] .. ' and a.bond1 = b1.bond_id and a.bond2 = b2.bond_id')
+         local hedronData = cur2:fetch({},'a')
+         while hedronData do
+            --for k,v in pairs(hedronData) do print(k,v) end
+            local k = hedronData['key']
+            local h = utils.splitKey(k)
+            local ak = utils.splitAtomKey(h[1])
+            --print(ak[1],self['resn'],k)
+            if ak[1] == self['resn'] then
+               h['len1'] = hedronData['len1']
+               h['angle2'] = hedronData['angle']
+               h['len3'] = hedronData['len2']
+               self['hedra'][k] = hedron.new(h)
+            end
+            hedronData = cur2:fetch({},'a')
+         end
+      end
+      
+      dihedralData = cur:fetch({},'a')
+   end
+end
+
+      
 --- generate descriptive string for Residue: 1-letter amino acid code, sequence position
 -- @return descriptive string
 function Residue:tostring()
@@ -316,7 +408,15 @@ function Residue:dihedraFromAtoms()
 
    self['hedra'][utils.genKey(sCA,sC,sO)] = hedron.new({ sCA,sC,sO })
    self['hedra'][utils.genKey(sCB,sCA,sC)] = hedron.new({ sCB,sCA,sC })
-   self['hedra'][utils.genKey(sN,sCA,sCB)] = hedron.new({ sN,sCA,sCB })
+
+   --if ('G' ~= self['res']) and ('A' ~= self['res']) then
+   if (self['atomCoords'][skbase .. 'CG']
+          or self['atomCoords'][skbase .. 'CG1']
+          or self['atomCoords'][skbase .. 'OG']
+          or self['atomCoords'][skbase .. 'OG1']
+          or self['atomCoords'][skbase .. 'SG'] ) then
+      self['hedra'][utils.genKey(sN,sCA,sCB)] = hedron.new({ sN,sCA,sCB })   -- only needed for sidechain CG residues (not gly or ala or any missing rest of side chain)
+   end  
 
    -- terminal OXT if present
    local sOXT = skbase .. 'OXT'
@@ -333,7 +433,9 @@ function Residue:dihedraFromAtoms()
          if 4 > table.getn(t) then
             self['hedra'][utils.genKey(nt[1],nt[2],nt[3])] = hedron.new(nt)
          else
-            self['dihedra'][utils.genKey(nt[1],nt[2],nt[3],nt[4])] = dihedron.new(nt)
+            if self['atomCoords'][nt[4]] then  -- skip if missing sidechain atom at end
+               self['dihedra'][utils.genKey(nt[1],nt[2],nt[3],nt[4])] = dihedron.new(nt)
+            end
          end
       end
    elseif 'G' == self['res'] and not self['atomCoords'][sCB] then  -- only G,A do not have entries in chemdata.sidechains

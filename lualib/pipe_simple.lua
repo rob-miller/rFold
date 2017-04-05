@@ -10,6 +10,13 @@ local ps = {}
 
 local posix = require("posix")
 
+function typecheck(v)
+   if type(v) ~= 'number' then
+      print(v)
+   end
+end
+
+
 --
 -- Simple popen3() implementation
 --
@@ -17,6 +24,10 @@ function ps.popen3(path, ...)
    local r1, w1 = posix.pipe()
    local r2, w2 = posix.pipe()
    local r3, w3 = posix.pipe()
+
+   typecheck(r1)
+   typecheck(w2)
+   typecheck(w3)
 
    assert((w1 ~= nil or r2 ~= nil or r3 ~= nil), "pipe() failed")
 
@@ -38,6 +49,10 @@ function ps.popen3(path, ...)
       posix._exit(1)
       return
    end
+
+   typecheck(r1)
+   typecheck(w2)
+   typecheck(w3)
 
    posix.close(r1)
    posix.close(w2)
@@ -77,6 +92,8 @@ function ps.pipe_simple(input, cmd, ...)
       i = i + 1
    end
 
+   posix.close(r)
+   
    --
    -- Read ps.popen3's stderr via Posix file handle
    --
@@ -88,6 +105,8 @@ function ps.pipe_simple(input, cmd, ...)
       stderr[i] = buf
       i = i + 1
    end
+
+   posix.close(e)
 
    --
    -- Clean-up child (no zombies) and get return status

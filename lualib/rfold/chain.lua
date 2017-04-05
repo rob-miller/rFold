@@ -1,7 +1,7 @@
 --[[
    chain.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 2016,2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -23,6 +23,7 @@ Copyright 2016 Robert T. Miller
 local utils = require 'rfold.utils'
 local chemdata = require 'rfold.chemdata'
 local residue = require 'rfold.residue'
+local geom3d = require 'rfold.geom3d'
 
 local chain = {}  -- module
 local Chain = {}  -- class table
@@ -30,9 +31,28 @@ local Chain = {}  -- class table
 ------------------------------------------------------------------------------------------------
 -- Chain
 ------------------------------------------------------------------------------------------------
+-- class properties
+
+--- array of residue ordered and disordered objects indexed by sequence position
+-- @field residues array of residue objects
+
+--- array of atomCoordinates (4x1 float matrices) for initial N,Ca,C residues of all ordered segments of this chain indexed by atomKeys (resPos res atom)
+-- @field initNCaC
+
+--- chain ID from PDB file
+-- @field id char
+
+--- 4-position PDB identifier
+-- @field pdbid string
+
+--- signed integer indicating sequence position of first residue in chain
+-- @field firstPos integer
+
+--- PDB file SEQRES data for this chain
+-- @field seqres string
 
 --- Chain class object initialiser (not a class method)
--- @param o table with field 'id' = chain ID; ' ' or '' is valid
+-- @param o table with field 'id' = chain ID; ' ' or '' is val
 -- @return minimally initialised Chain object
 function chain.new (o)
    assert((o and o['id']),'chain.new() called without id')
@@ -50,28 +70,79 @@ function chain.new (o)
    return o
 end
 
---- find or initialise Residue object for specified amino acid and sequence position
+--- query database for info about specified chain (not a class method)
+-- @param rfpg open database handle
+-- @param pdbid 4 character PDB code
+-- @param chainid 1 character chain identiifier
+-- @return report string for printing
+function chain.reportDbChain(rfpg,pdbid,chainid)
+   local s=' ' .. chainid
+   local pdbno = rfpg.Q("select pdb_no from pdb_chain where pdbid='" .. pdbid .. "' and chain='" .. chainid .. "'")
+   if pdbno then
+      pdbno = pdbno[1]
+      local rTotal = rfpg.Q("select count(*) from residue where residue.pdb_no=" .. pdbno )[1]
+      local rOrdered = rfpg.Q("select count(*) from residue where residue.pdb_no=" .. pdbno .. ' and ordered is true' )[1]
+      s = s .. ' ordered residues: ' .. rOrdered .. ' total residues: ' .. rTotal 
+      local d = rfpg.Q("select count(dssp.*) from dssp,residue where residue.pdb_no=" .. pdbno .. " and dssp.res_id = residue.res_id")[1]
+      s = s .. ' DSSPs: ' .. d
+      local dh = rfpg.Q("select count(dihedral.*) from dihedral,residue where residue.pdb_no=" .. pdbno .. " and dihedral.res_id = residue.res_id")[1]
+      s = s .. ' dihedra: ' .. dh 
+      --local h = rfpg.Q("select count(angle.*) from angle,residue where residue.pdb_no=" .. pdbno .. " and angle.res_id=residue.res_id")[1]
+      local h = rfpg.Q('select count(*) from (select distinct angle.key from angle, residue where residue.pdb_no=' .. pdbno .. ' and angle.res_id=residue.res_id) as c')[1]
+      s = s .. ' hedra: ' .. h
+
+      --[[
+         select count(*) from (
+   select distinct angle.key 
+    from angle, dihedral, residue 
+    where residue.pdb_no=6 and dihedral.res_id=residue.res_id and angle.dihedral_id = dihedral.dihedral_id
+    ) as c;
+      --]]
+      --local ac = rfpg.Q("select count(atom_coordinates.*) from atom_coordinates,residue where residue.pdb_no=" .. pdbno .. " and atom_coordinates.res_id = residue.res_id")[1]
+      --s = s .. ac .. ' atom coordinates ' 
+      local cs = rfpg.Q("select count(atom_coordinates.*) from atom_coordinates,residue where residue.pdb_no=" .. pdbno .. " and atom_coordinates.res_id = residue.res_id and init is true")[1] /3
+      s = s .. ' initial coordinate sets: ' .. cs
+      local fp = rfpg.Q('select res_pos from residue where pdb_no=' .. pdbno .. ' order by res_ndx limit 1')[1]
+      s = s .. ' firstPos: ' .. fp
+   end
+
+   return s
+end
+
+
+-- class methods follow
+
+
+--- find or initialise Residue object (ordered by definition) for specified amino acid and sequence position
+-- will set firstPos (first residue in this chain) if appropriate (if not set already)
+-- else any missing residues between firstPos and this one will be set to {} (disordered)
 -- @param ires uppercase 1-letter amino acid code
 -- @param iresn sequence position of residue in this chain
+-- @param disordered optional boolean to indicate disordered residue (default is ordered)
 -- @return Residue object, minimally initialised and referenced from self['residues'][iresn]
-function Chain:getResidue( ires, iresn )
+function Chain:getResidue( ires, iresn, disordered )
    if 'X' == ires then return nil end   -- dssp missing/disordered residue
-   if (not self['residues'][iresn]) or (not self['residues'][iresn]['ordered'])  then   -- no residue or only placeholder at this position
-      self['residues'][iresn] = residue.new{ resn = iresn, res = ires, ordered = true }
-      -- lua needs arrays starting at 1 with no gaps, so fill in as needed here with ' ' instead of residue opbject
-      if not self['firstPos'] then
-         self['firstPos'] = iresn
-         if 1 < iresn then   
-            for i=1,iresn-1 do self['residues'][i] = {} end
+   if disordered then 
+      self['residues'][iresn] = {}
+      if not self['firstPos'] then self['firstPos'] = iresn end
+   else
+      if (not self['residues'][iresn]) or (not self['residues'][iresn]['ordered'])  then   -- no residue or only placeholder at this position
+         self['residues'][iresn] = residue.new{ resn = iresn, res = ires, ordered = true }
+         -- lua needs arrays starting at 1 with no gaps, so fill in as needed here with ' ' instead of residue opbject
+         if not self['firstPos'] then
+            self['firstPos'] = iresn
+            if 1 < iresn then   
+               for i=1,iresn-1 do self['residues'][i] = {} end
+            end
+         elseif not self['residues'][iresn-1] then -- there is a gap before this position (possibly this is atom record indicating start after chain break)
+            for i=self['firstPos'],iresn-1 do
+               if not self['residues'][i] then self['residues'][i] = {} end
+            end
          end
-      elseif not self['residues'][iresn-1] then -- there is a gap before this position (possibly this is atom record indicating start after chain break)
-         for i=self['firstPos'],iresn-1 do
-            if not self['residues'][i] then self['residues'][i] = {} end
-         end
+      elseif ires ~= self['residues'][iresn]['res'] then
+         print(iresn,ires,self['residues'][iresn]['resn'],self['residues'][iresn]['res'])
+         assert(nil,'stored residue ' .. self['residues'][iresn]['res'] .. iresn .. ' does not match new residue ' .. ires .. iresn)
       end
-   elseif ires ~= self['residues'][iresn]['res'] then
-      print(iresn,ires,self['residues'][iresn]['resn'],self['residues'][iresn]['res'])
-      assert(nil,'stored residue ' .. self['residues'][iresn]['res'] .. iresn .. ' does not match new residue ' .. ires .. iresn)
    end
    return self['residues'][iresn]
 end
@@ -128,9 +199,19 @@ end
 --- initialiser for Chain:oResIter()
 -- @param a array of residues to iterate in numeric order
 function Chain:orderedResidues()
-   return ordResIter, self['residues'], self['firstPos']-1
+   return ordResIter, self['residues'],self['firstPos']-1
 end
-   
+
+--- count ordered residues in chain according to orderedResidues()
+-- @return count of ordered residues
+function Chain:countOrderedResidues()
+   local c=0
+   for i,r in self:orderedResidues() do
+      c=c+1
+   end
+   return c
+end
+
 --- custom iterator for residue array to process all residue positions (including disordered) and start at sequence positions other than 1
 -- @param a array of residues to iterate in numeric order
 -- @param i initial value
@@ -147,9 +228,20 @@ end
 --- initialiser for Chain:aResIter()
 -- @param a array of residues to iterate in numeric order
 function Chain:allResidues()
+   if not self['firstPos'] then return nil end
    return allResIter, self['residues'], self['firstPos']-1
 end
-   
+
+--- count all residues in chain according to allResidues()
+-- @return count of all residues
+function Chain:countAllResidues()
+   local c=0
+   for i,r in self:allResidues() do
+      c=c+1
+   end
+   return c
+end
+
 
 --- implement assign 'prev' and 'next' for passed Residues[] index and residue
 function Chain:setPrevNext(i,r)
@@ -199,7 +291,7 @@ end
 
 function Chain:countInitNCaCs()
    local c=0
-   if {} ~= self['initNCaC'] then
+   if nil ~= next(self['initNCaC']) then
       local n = 1
       for i,r in self:orderedResidues() do
          if self['initNCaC'][i] then c = c + 1 end
@@ -282,16 +374,27 @@ function Chain:assembleResidues()
 end
 
 --- trigger each Residue in Chain to generate PDB ATOM records, add TER record at end of chain
+-- @param ndx counter for lines in pdb output file
+-- @param range optional begin:end filter for residues to print
 -- @return string of PDB format records for ATOMS in Chain, plus TER record
-function Chain:writePDB(ndx)
+function Chain:writePDB(ndx,range)
    --print('chain topdb '  .. ndx)
    local s = ''
    local ls
    local lastRes
+   local start
+   local fin
+   if range then
+      start,fin = range:match('(%d+):(%d+)')
+      start = tonumber(start)
+      fin = tonumber(fin)
+   end
    for i,r in self:orderedResidues() do
-      ls,ndx = r:writePDB(self['id'],ndx)
-      s = s .. ls
-      lastRes=i
+      if (not start or start <= i) and (not fin or fin >= i) then
+         ls,ndx = r:writePDB(self['id'],ndx)
+         s = s .. ls
+         lastRes=i
+      end
    end
    local res = self['residues'][lastRes]
    ndx = ndx + 1
@@ -300,10 +403,13 @@ function Chain:writePDB(ndx)
    return s,ndx
 end
 
-function Chain:writeInternalCoords()
+--- generate PIC hedra and dihedra records for each residue in chain
+-- @param range optional begin:end filter for residues to print
+-- @return string of PIC format records for residues in Chain
+function Chain:writeInternalCoords(range)
    local s = ''
 
-   if {} ~= self['initNCaC'] then
+   if nil ~= next(self['initNCaC']) then
       local n = 1
       for i,r in self:orderedResidues() do
          if self['initNCaC'][i] then
@@ -317,8 +423,20 @@ function Chain:writeInternalCoords()
          end
       end
    end
+
+   local start
+   local fin
+   if range then
+      start,fin = range:match('(%d+):(%d+)')
+      start = tonumber(start)
+      fin = tonumber(fin)
+      print('start',start,'fin',fin)
+   end
+
    for i,r in self:orderedResidues() do
-      s = s .. r:writeInternalCoords(self['pdbid'], self['id'])
+      if (not start or start <= i) and (not fin or fin >= i) then
+         s = s .. r:writeInternalCoords(self['pdbid'], self['id'])
+      end
    end
    return s
 end
@@ -329,53 +447,58 @@ end
 -- @param update optional flag, if false silently skip if [pdb_no, res_ndx] entry exists already in residue table 
 function Chain:writeDb(rfpg, pdb_no, update)
 
-   for i,r in self:orderedResidues() do
-
-      local res_id = rfpg.Q("select res_id from residue where pdb_no=" .. pdb_no .. " and res_ndx = " .. i )
+   local ndx=0
+   for i,r in self:allResidues() do   -- note i = res_pos = varchar (from pdb so could be weird)
+      --print(r:tostring())
+      ndx = ndx+1
+      local res_id = rfpg.Q("select res_id from residue where pdb_no=" .. pdb_no .. " and res_pos = '" .. i .. "'" )
       if not res_id then
-         res_id = rfpg.Q( "insert into residue (res_ndx,pdb_no) values (" .. i .. "," .. pdb_no .. ") returning res_id" )
+         res_id = rfpg.Q( "insert into residue (res_ndx,pdb_no) values (" .. ndx .. ',' .. pdb_no .. ") returning res_id" )
       elseif not update then
          goto skipResidue  -- can't happen? because existing chain would have been skipped
       end
       res_id = res_id[1]
 
-      local qc = "update residue set (res, res_pos"
-      local qv = " = ('" .. r['res'] .. "','" .. r['resn'] .. "'"
-      if r['prev'] then
-         qc = qc .. ", prev_res"
-         qv = qv .. ",'" .. r['prev']['res'] .. "'"
-      end
-      if r['next'] then
-         qc = qc .. ", next_res"
-         qv = qv .. ",'" .. r['next']['res'] .. "'"
+      if r['ordered'] then  -- allResidues() iterator above includes disordered residues
+         local qc = "update residue set (res, res_pos, ordered"
+         local qv = " = ('" .. r['res'] .. "','" .. r['resn'] .. "'" .. (r['ordered'] and ', true' or ', NULL')
+         if r['prev'] and r['prev']['res'] then
+            qc = qc .. ", prev_res"
+            qv = qv .. ",'" .. r['prev']['res'] .. "'"
+         end
+         if r['next'] and r['next']['res'] then
+            qc = qc .. ", next_res"
+            qv = qv .. ",'" .. r['next']['res'] .. "'"
+         end
+      
+         rfpg.Qcur( qc .. ')' .. qv .. ') where res_id = ' .. res_id )
       end
       
-      rfpg.Qcur( qc .. ')' .. qv .. ') where res_id = ' .. res_id )
-
-      if ({} ~= self['initNCaC'] and self['initNCaC'][i]) then  -- have init coords for chain segment, need to store
+      if (nil ~= next(self['initNCaC']) and self['initNCaC'][i]) then  -- have init coords for chain segment, need to store
          local akl =  r:NCaCKeySplit()
          local initCoords = self['initNCaC'][i]
          for ai,ak in ipairs(akl) do
             local q
             local v = initCoords[ak]
-            local haveRow = rfpg.Q("select 1 from atom_coordinates where res_id=" .. i .. " and atom = '" .. ak .. "'")
+            local haveRow = rfpg.Q("select 1 from atom_coordinates where res_id=" .. res_id .. " and atom = '" .. ak .. "'")
             if (not haveRow) then
-               q = 'insert into atom_coordinates (res_id, atom, x, y, z) values (' .. i .. ",'" .. ak .. "',"
+               q = 'insert into atom_coordinates (res_id, atom, init, x, y, z) values (' .. res_id .. ",'" .. ak .. "', true,"
             elseif update then
-               q = 'update atom_coordinates set (x, y, z) = ('
+               q = 'update atom_coordinates set (init, x, y, z) = ( true,'
             end
             if q then -- ((not haveRow) or update)
                for j=1,3 do q = q .. (j>1 and ',' or '')  .. v[j][1] end
                q = q .. ')'
                if (haveRow) then  -- update
-                  q = q .. ' where res_id=' .. i .. " and atom= '" .. ak .."'"
+                  q = q .. ' where res_id=' .. res_id .. " and atom= '" .. ak .."'"
                end
                rfpg.Qcur(q)
+               
             end
          end
       end
 
-      r:writeDb(rfpg, res_id, update)
+      if r['ordered'] then r:writeDb(rfpg, res_id, update) end
       
       ::skipResidue::
    end
@@ -410,6 +533,63 @@ function Chain:writeDb(rfpg, pdb_no, update)
 
    return s
    --]]
+end
+
+--- populate chain object from database using supplied pdb and chain id 
+-- @param rfpg open database handle
+function Chain:dbLoad(rfpg)
+   local pdbno = self['pdb_no'] and self['pdb_no'] or rfpg.Q("select pdb_no from pdb_chain where pdbid='" .. self['pdbid'] .. "' and chain= '" .. self['id'] .. "'")[1]
+   --print(self['pdbid'],self['id'],pdbno)
+   local cur = rfpg.Qcur('select res_id, res, res_pos, ordered from residue where pdb_no = ' .. pdbno .. ' order by res_ndx')
+   local resData = cur:fetch({},'a')
+   while resData do
+      local resPos = tonumber(resData['res_pos'])
+      --print(resPos, resData['res'], resData['ordered'], resData['res_id'])
+      if resPos then   -- if not disordered
+         self['residues'][resPos] = self:getResidue(resData['res'],resPos,(not resData['ordered']))
+         self['residues'][resPos]['res_id'] = resData['res_id']
+         
+         local cur2 =    rfpg.Qcur('select atom, x, y, z from atom_coordinates where res_id = ' .. resData['res_id'] .. ' and init is true')
+         local initCoords = {}
+         
+         local atomData = cur2:fetch({},'a')
+         
+         while atomData do
+            local atom = geom3d.get41mtx()
+            atom[1][1] = tonumber(atomData['x'])
+            atom[2][1] = tonumber(atomData['y'])
+            atom[3][1] = tonumber(atomData['z'])
+            initCoords[ atomData['atom'] ] = atom
+            --print(atomData['atom'])
+            atomData = cur2:fetch({},'a')
+         end
+
+         if nil ~= next(initCoords) then
+            self['initNCaC'][resPos] = initCoords
+         end
+      end
+      resData = cur:fetch({},'a')
+   end
+
+   for i,r in self:orderedResidues() do
+      r:dbLoad(rfpg)
+   end
+   --[[
+   for i,r in ipairs(self['residues']) do
+      print(i)
+      if next(r) then r:dbLoad(rfpg) end
+   end
+   --]]
+   
+   self:linkResidues()
+end   
+
+
+--- query database for info about this chain
+-- @param rfpg open database handle
+-- @return report string for printing
+function Chain:reportDb(rfpg)
+   return chain.reportDbChain(rfpg,self['pdbid'],self['id'])
 end
 
 

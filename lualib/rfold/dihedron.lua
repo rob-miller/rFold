@@ -1,7 +1,7 @@
 --[[
    dihedron.lua
    
-Copyright 2016 Robert T. Miller
+Copyright 2016,2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
@@ -128,12 +128,14 @@ function Dihedron:setHedra()
    end
 
    if not hedron1 then
-      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedron ' .. h1key .. ' a4= ' .. self[4])
+      --assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedron ' .. h1key .. ' a4= ' .. self[4])
+      io.stderr:write('residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedron ' .. h1key .. ' a4= ' .. self[4] .. '\n')
    end
 
    hedron2 = getHedron(res,h2key)
    if not hedron2 then 
-      assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron ' .. h2key .. ' a1= ' .. self[1])
+      --assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron ' .. h2key .. ' a1= ' .. self[1])
+      io.stderr:write('residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron ' .. h2key .. ' a1= ' .. self[1] .. '\n')
    end
 
    self['hedron1'] = hedron1
@@ -153,6 +155,8 @@ function Dihedron:initPos()
    local hedron1 = self['hedron1']
    local hedron2 = self['hedron2']
 
+   if not (hedron1 and hedron2) then return end -- error bad PDB data!
+   
    local complete = true
    for i=1,3 do
       if not hedron1['atoms'][i] then complete=false end
@@ -232,6 +236,8 @@ function Dihedron:dihedronFromAtoms(atomCoords)
    local hedron1 = self['hedron1']
    local hedron2 = self['hedron2']
 
+   if not (hedron1 and hedron2) then return end -- error bad PDB data!
+   
    --local initial = {}
    --local a4preRotation
    
@@ -289,18 +295,19 @@ end
 -- @param update optional flag, if false silently skip if entry exists already in dihedral / angle / bond tables 
 function Dihedron:writeDb(rfpg, res_id, update)
    --print(self:tostring())
+   if not self['dihedral1'] then return end
    local akl = utils.splitKey(self['key'])
    local al = {}
    for i,ak in ipairs(akl) do
       local a = utils.splitAtomKey(ak)
-      al[i] = a[2]..a[3]
+      al[i] = a[2]..a[3]  -- just residue and atom, not residue position
    end
    local as = rfpg.pgArrayOfStrings(al[1],al[2],al[3],al[4])
    local dcid = rfpg.Q("select id from dihedral_string where atom_string='" .. as .. "'")[1]
    local tst = rfpg.Q('select dihedral_id from dihedral where res_id = ' .. res_id .. ' and dihedral_class = ' .. dcid)
    local did
    if not tst then
-      did = rfpg.Q('insert into dihedral (res_id, dihedral_class, dangle) values (' .. res_id .. ',' .. dcid .. ',' .. self['dihedral1'] .. ') returning dihedral_id')[1]
+      did = rfpg.Q('insert into dihedral (res_id, key, dihedral_class, dangle) values (' .. res_id .. ",'" .. self['key'] .. "'," .. dcid .. ',' .. self['dihedral1'] .. ') returning dihedral_id')[1]
    elseif update then
       did = tst[1]
       rfpg.Qcur('update dihedral set dangle = ' .. self['dihedral1'] .. ' where dihedral_id = ' .. did)
@@ -308,12 +315,14 @@ function Dihedron:writeDb(rfpg, res_id, update)
 
    if did then
       if not self['hedron1'] then self:setHedra() end
-      local aid1 = self['hedron1']:writeDb(rfpg, res_id, did, update)
-      local aid2 = self['hedron2']:writeDb(rfpg, res_id, did, update)
+      local aid1 = self['hedron1']:writeDb(rfpg, res_id, update)
+      local aid2 = self['hedron2']:writeDb(rfpg, res_id, update)
       rfpg.Qcur('update dihedral set angle1=' .. aid1 .. ', angle2=' .. aid2 .. ' where dihedral_id=' .. did)
    end
    
 end
+
+
 
 function Dihedron:printInfo()
    print(self:tostring())

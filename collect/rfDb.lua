@@ -36,6 +36,7 @@ Copyright 2017 Robert T. Miller
 local parsers = require 'rfold.parsers'
 local protein = require "rfold.protein"
 local utils = require 'rfold.utils'
+local chain = require 'rfold.chain'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
 rfpg.dbReconnect(1)
@@ -49,9 +50,20 @@ local args = parsers.parseCmdLine(
    },
    {
       ['w'] = 'pic|gpdb|<filename(.pic|.gpdb)> : write specified format to pdbid.<format> or <filename>',
-      ['f'] = '<input file> : process IDs listed in <input file> (1 per line) followed by any on command line'      
+      ['f'] = '<input file> : process IDs listed in <input file> (1 per line) followed by any on command line',
+      ['r'] = '<firstResidue:lastResidue> : only output residues within the range specified '
    }
 )
+
+
+if args['l'] then
+   local cur = rfpg.Qcur('select pdb_no, pdbid, chain, filename from pdb_chain order by pdbid, chain, filename')
+   local pdb = cur:fetch({},'a')
+   while pdb  do
+      print(pdb['pdb_no'] .. ' ' .. pdb['pdbid'] .. ' ' .. pdb['filename'] .. ' : ' .. chain.reportDbChain(rfpg,pdb['pdbid'],pdb['chain']))
+      pdb = cur:fetch({},'a')
+   end
+end
 
 local toProcess={}
 if args['f'] then
@@ -65,35 +77,38 @@ end
 
 for i,a in ipairs(args) do table.insert(toProcess, a) end 
 
-if args['l'] then
-   local lastPdbId=''
-   local started
-   local pdb = rfpg.Q('select pdbid, chain from pdb_chain order by pdb_no, pdbid, chain')
-   if lastPdbId ~= pdb[1] then
-      if started then io.write('\n') end
-      lastPdbId = pdb[1]
-      io.write(pdb[1])
+for i,a in ipairs(toProcess) do
+   if a:match('^IDs%s') then toProcess[i]='' end     -- header line for Dunbrack list : 'IDs         length Exptl.  resolution  R-factor FreeRvalue'
+   if a:match('^#') then toProcess[i]='' end         -- comment line starts with '#'
+   if a:ematch('^(%d%w%w%w)(%w?)%s+') then           -- looks like pdbcode with optional chain, read as compressed file from PDB_repository_base
+      local pdbid, chn = _1, _2
+      toProcess[i] = pdbid .. (chn and chn or '') 
    end
-   io.write('\t' .. pdb[2])
-         
-   --for i,p in ipairs(pdbList) do
-    --  print(i,p)
-      --for j,datum in ipairs(p) do
-      --   io.write(j .. ' ')
-      --end
-      --io.write('\n')
-   --end
 end
 
 
---[[
 for i,arg in ipairs(toProcess) do
    if '' ~= arg then
-      --print(arg)
+
       if 'quit' == arg then os.exit() end    -- so can insert 'quit' in input file of PDB IDs for testing and debugging
-      local file,chain = arg:match('^(%S+)%s?(%w?)%s*$')
+
+      local pdb,chain = arg:match('^(%d%w%w%w)(%w?)%s*$')
       if chain == '' then chain = nil end
+
+
+      print('pdb= ' .. pdb .. ' chain= ' .. (chain and chain or ''))
+      local prot = protein.get(pdb)
+      --print(prot:tostring())
+      prot:dbLoad(rfpg)
+      print('loaded:')
+      print(prot:tostring())
+
+      print(prot:writeInternalCoords(nil,args['r'][1]))   -- needs to be the i'th file being processed....
       
+      --prot:internalToAtomCoords()
+      --print(prot:writePDB(true,args['r'][1]))
+      
+         --[[
       local pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
       local prot = protein.get(pdbid)
       --print(pdbid,prot,prot:countDihedra())
@@ -107,5 +122,8 @@ for i,arg in ipairs(toProcess) do
       local dsspCount = prot:countDSSPs()  -- useful to know below
       local coordsInternal
       local coords3D
+         -- ]]
+      --end
+   end
+end
 
---]]
