@@ -172,7 +172,7 @@ end
 
 --- write hedron data to rfold database
 -- @param rfpg open database handle
--- @param did dihedral id
+-- @param res_id residue id
 -- @param update optional flag, if false skip with warning if entry exists already in dihedral / angle / bond tables
 -- @return angleID identifier for new or updated entry in angle table
 function Hedron:writeDb(rfpg, res_id, update)

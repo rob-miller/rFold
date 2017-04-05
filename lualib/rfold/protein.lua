@@ -354,7 +354,7 @@ end
 --- query database for info about this protein
 -- @param rfpg open database handle
 -- @return report string for printing
-function Protein:reportDb(rfpg,s)
+function Protein:reportDb(rfpg)
    local s = 'rFold DB: ' .. self['id'] .. ' '
    local n = rfpg.Q("select distinct pdb_no from pdb_chain where pdbid='" .. self['id'] .. "' order by pdb_no")
    local c = rfpg.Q("select count(*) from pdb_chain where pdbid='" .. self['id'] .. "'")[1]

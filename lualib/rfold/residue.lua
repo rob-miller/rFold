@@ -65,7 +65,11 @@ local Residue = {}  -- class table
 --- DSSP data for this residue as read by parseProteinData(), or subset (ss, ss2, psi, phi, omg, acc) if loaded from database
 -- @field dssp array 
 
+
+-- @table backboneSort order of backone atoms for pdb files
 local backboneSort = { N = 1, CA = 2, C = 3, O = 4 }
+
+-- @table sidechainSort order of sidechain atoms for pdb files
 local sidechainSort = { CB = 1,
                         CG = 2, CG1 = 2, OG = 2, OG1 = 2, SG = 2,
                         CG2 = 3,
