@@ -33,7 +33,8 @@ Using a May, 2016 `cullpdb_pc20_res2.2_R1.0.curr` file from the [Dunbrack Lab PI
 
 ## Collect
 
-Not yet implemented.  Source tree contains modified DSSP program, changed to output internal coordinate records matching PIC data above and more atom coordinates.
+Defines and loads a PostgreSQL database of protein internal coordinate data.  Schema defined in rFold.dbm, a datafile for PgModeler - which is a PostgreSQL schema editor and design tool available at http://pgmodeler.com.br/ .   
+Source tree contains modified DSSP program, changed to output internal coordinate records matching PIC data above and more atom coordinates.
 
 ## Move
 
