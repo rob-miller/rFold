@@ -7,7 +7,7 @@ rFold is intended to be a library of functions to assist in protein structure an
 
 The intended development roadmap is to create functionality in roughly the following order: Build (generate 3D structure coordinates from internal phi, psi, omega and chi dihedral angles); Collect (catalogue internal coordinate and other data from known protein structures); Move (perturb structures to explore local regions of conformational space); and Evaluate (assess three dimensional residue environments based on data from known structures).
 
-Currently (June, 2016) only the Build module is working,  This software can accurately interconvert between PDB files and fully specified internal coordinates (_phi, psi, omega_ and _chi_ dihedral angles, plus all bond lengths and angles).  Planned functionality includes incorporating average bond lengths and angles and default dihedral angles if not specified.
+As of March 2017, both the Build and Collect modules are working.  The Build module can accurately interconvert between PDB files and fully specified internal coordinates (_phi, psi, omega_ and _chi_ dihedral angles, plus all bond lengths and angles).  The Collect module generates a database of protein internal coordinates from input protein structures. 
 
 ## External Dependencies
 
@@ -36,6 +36,10 @@ Using a May, 2016 `cullpdb_pc20_res2.2_R1.0.curr` file from the [Dunbrack Lab PI
 Defines and loads a PostgreSQL database of protein internal coordinate data.  Schema defined in rFold.dbm, a datafile for PgModeler - which is a PostgreSQL schema editor and design tool available at http://pgmodeler.com.br/ .   
 Source tree contains modified DSSP program, changed to output internal coordinate records matching PIC data above and more atom coordinates.
 
+Executable rFoldLoadDB.lua reads PDB or PIC files, generates internal or 3D coordinates, regenerates 3D or internal coordinates and compares against input, processses with modified DSSP and compares again, loads into database and finally extracts from database and confirms that internal coordinates still match throughout.  Only entries passing all tests are committed to database, others are rolled back.
+
+Of 6389 chains in the 30 March, 2017 PISCES 'cullpdb_pc20_res2.0_R0.25_d170330_chains6389', 5941 chains (93%) are successfully loaded; this completes in about 8 hours on the development PC.
+
 ## Move
 
 Not implented.
@@ -50,7 +54,7 @@ In addition to speed and its connection with the [Torch7](http://torch.ch/) Neur
 
 ## License
 
-Copyright 2016 Robert T. Miller
+Copyright 2016, 2017 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.

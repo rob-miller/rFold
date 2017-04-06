@@ -133,7 +133,10 @@ function parsers.parseProteinData (infile, callback, chain, infname)
       fh,err = io.open(infile)
       fname = infile
    end
-   if err then print(infile,err) return end
+   if err then
+      print(infile,err)
+      return nil
+   end
    if fh then
       stringArray = {}
       for line in fh:lines() do
@@ -347,6 +350,11 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
    end
    io.close()
 
+   if 'xxxxx'==pdbid then
+      print('read problem on ' .. fname)
+      return nil
+   end
+   
    if callback then
       callback({['pdbid'] = pdbid, ['filename'] = fname})
       return pdbid

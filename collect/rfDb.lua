@@ -30,6 +30,7 @@ Copyright 2017 Robert T. Miller
 -- -f=<list of PDB codes>                : read PDB codes and optional chain IDs from specified file
 -- 
 
+--- not really finished!!  Just a test fixture for pulling proteins from database
 
 
 

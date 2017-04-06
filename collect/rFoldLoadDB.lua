@@ -393,17 +393,21 @@ for i,arg in ipairs(toProcess) do
          goto continue
       end
       
+      count=count+1
+      count2=count2+1
+      io.write(count .. ' (' .. count2 .. ') ' .. arg .. ' : ')
       
       file,chain = arg:match('^(%S+)%s?(%w?)%s*$')   -- needs space at end if doing on command line, e.g. '7RSAA '
+      
       if chain == '' then chain = nil end
       if chain and chain:match('%d') then goto continue end -- no numeric chain IDs so 1qqp is out
       
       -- load current file
       pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
+      if not pdbid then goto continue end
+      
       prot = protein.get(pdbid)
-      count=count+1
-      count2=count2+1
-      io.write(count .. ' (' .. count2 .. ') ' .. pdbid .. ' ' .. (chain and chain or '') .. ' : ')
+
       --print(pdbid,prot,prot:countDihedra())
       --print(prot:tostring())
       --goto continue
