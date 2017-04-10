@@ -115,8 +115,8 @@ end
 
 --- split 3- (hedron) or 4- (dihedron) element string key into atom token constituents
 --
--- @param k string key to split
--- @return table of sequential fields
+-- @param k string key to split e.g. 2ECA:2EC:3TN:3TCA
+-- @return table of sequential fields e.g. { '2ECA', '2EC', '3TN', '3TCA' }
 function utils.splitKey(k)
    if k:ematch('^(-?%w+):(-?%w+):(-?%w+):(-?%w+)$') then return { _1, _2, _3, _4 }
    elseif k:ematch('^(-?%w+):(-?%w+):(-?%w+)$') then return { _1, _2, _3 }
@@ -168,7 +168,7 @@ end
 function utils.pairsByKeys (t, f)
    local a = {}
    for n in pairs(t) do table.insert(a, n) end
-   table.sort(a, f)
+   if f then table.sort(a, f) end
    local i = 0      -- iterator variable
    local iter = function ()   -- iterator function
       i = i + 1

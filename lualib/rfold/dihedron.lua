@@ -63,7 +63,8 @@ local Dihedron = {}  -- class table
 --- four 4x1 matrices holding atom coordinates comprising this dihedron
 -- @table initialCoords
 
-
+--- flag indicating order of atoms in dihedron is reversed from order of atoms in hedra
+-- @field reverse boolean
 
 --- Dihedron class object initialiser (not a class method).
 -- <br>
@@ -143,6 +144,7 @@ function Dihedron:setHedra()
    self['hedron2'] = hedron2
    self['h2key'] = h2key
 
+   self['reverse'] = reverse
    return reverse
 end
 
@@ -322,6 +324,14 @@ function Dihedron:writeDb(rfpg, res_id, update)
    
 end
 
+function Dihedron:isBackbone()
+   local atoms = utils.splitKey(self['key'])
+   for i,a in ipairs(atoms) do
+      local as = utils.splitAtomKey(a)
+      if not (as[3] == 'N' or as[3] == 'CA' or as[3] == 'C' or as[3] == 'O') then return false end
+   end
+   return true
+end
 
 
 function Dihedron:printInfo()

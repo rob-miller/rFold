@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
 
 --[[
-   rfDb.lua
+   rfGenSCAD.lua
    
 Copyright 2017 Robert T. Miller
 
@@ -18,16 +18,15 @@ Copyright 2017 Robert T. Miller
    limitations under the License.
 ]]
 
---- rfDb.lua [ options ] [<PDBid[chainId]>] ...
+--- rfGenSCAD.lua [ options ] [<PDBid[chainId]>] ...
 -- 
--- Query rFold database
+-- Generate OpenSCAD output from rFold data
 --
 -- options:
 -- 
 -- -l                                    : list pdb ids, chain ids loaded in database
--- -w = pic|gpdb|<filename(.pic|.gpdb)>  : instead of printing, write output to filename with '.pic'.
---                                        or '.gpdb' (generated PDB) extension 
 -- -f=<list of PDB codes>                : read PDB codes and optional chain IDs from specified file
+-- -r=<start>:<finish>                   : only get specified range of residue positions from target protein
 -- 
 
 --- not really finished!!  Just a test fixture for pulling proteins from database
@@ -47,7 +46,8 @@ local args = parsers.parseCmdLine(
    '[ <pdbid[chain id]> ] ...',
    '\n retrieve (optionally convert) coordinates for specified pdbid from rFold database.\n',
    {
-      ['l'] = 'list:  list available PDBids in database'
+      ['l'] = 'list:  list available PDBids in database',
+      ['b'] = 'backbone only: do not generate sidechains'
    },
    {
       ['w'] = 'pic|gpdb|<filename(.pic|.gpdb)> : write specified format to pdbid.<format> or <filename>',
@@ -97,14 +97,16 @@ for i,arg in ipairs(toProcess) do
       if chain == '' then chain = nil end
 
 
-      print('pdb= ' .. pdb .. ' chain= ' .. (chain and chain or ''))
+      --print('pdb= ' .. pdb .. ' chain= ' .. (chain and chain or ''))
       local prot = protein.get(pdb)
       --print(prot:tostring())
       prot:dbLoad(rfpg)
-      print('loaded:')
-      print(prot:tostring())
+      --print('loaded:')
+      --print(prot:tostring())
 
-      print(prot:writeInternalCoords(nil,args['r'] and args['r'][1] or nil))   -- needs to be the i'th file being processed....
+      print(prot:writeSCAD((args['r'] and args['r'][1] or nil), (args['b'] and args['b'] or nil)))
+      
+      -- print(prot:writeInternalCoords(nil,args['r'][1]))   -- 'r' needs to be the i'th file being processed....
       
       --prot:internalToAtomCoords()
       --print(prot:writePDB(true,args['r'][1]))
@@ -128,3 +130,38 @@ for i,arg in ipairs(toProcess) do
    end
 end
 
+
+
+--[[
+
+   OpenSCAD data format:
+   
+   chain:
+   [ res_id = <chain><position>,
+     res_code (G,A,V,..),
+     render_option,
+     [ residue transform matrix in world ],
+     res_ndx
+   ] ...
+
+   residue:
+   [
+     [ dangle,
+       h1_ndx,
+       h2_ndx,
+       reverse,
+       [ dihedral transform matrix in residue ],
+     ] ...
+   ] ...
+   
+   hedra:
+   [ len1,
+     angle2,
+     len3,
+     atom1 (N,C,S,...),
+     atom2,
+     atom3,
+     render_option
+   ] ...
+
+--]]

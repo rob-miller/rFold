@@ -467,5 +467,26 @@ function Protein:printInfo()
    end
 end
 
+
+--- generate OpenSCAD instructions to render protein chain
+-- @param range optional start:finish filter for residues to output
+-- @param backboneOnly optional boolean if true do not generate sidechains in openSCAD output
+-- @return string of OpenSCAD data and command lines
+function Protein:writeSCAD(range, backboneOnly)
+
+   self:linkResidues()              -- set prev, next for each residue in each chain; create tables from residue to dihedron positions according to PDB backbone, sidechain atoms
+   self:renderDihedra()             -- generate hedron and dihedron space coordinates for hedron angle, lengths and dihedron angle
+
+   local s = 'use </Users/rob/proj/rFold/genSCAD/peptide.scad>;\n'
    
+   for k,v in ipairs(self['chainOrder']) do
+      local chain = self['chains'][v]
+      s = s .. chain:writeSCAD(range, backboneOnly)
+   end
+   return s
+end
+
+
+
+
 return protein

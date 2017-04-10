@@ -65,6 +65,9 @@ local Residue = {}  -- class table
 --- DSSP data for this residue as read by parseProteinData(), or subset (ss, ss2, psi, phi, omg, acc) if loaded from database
 -- @field dssp array 
 
+--- map of key(first 3 atom ids) to dihedron for all dihedra in Residue
+-- @field key3index array
+
 
 -- @table backboneSort order of backone atoms for pdb files
 local backboneSort = { N = 1, CA = 2, C = 3, O = 4 }
@@ -111,6 +114,30 @@ function residue.new (o)
 
    return o
 end
+
+--- comparison function for sorting hedron / dihedron / atom keys
+-- @param a 2ECA:2EC:3TN:3TCA or 2ECA 
+-- @param b same
+-- @return boolean result for '<'
+function residue.keysort(a,b)
+   if a==b then return false end  -- if = then not <
+
+   local aksan, aksa = a:match('^(-?%d+)%a(%w+):?')
+   local aksbn, aksb = b:match('^(-?%d+)%a(%w+):?')
+
+   if aksan ~= aksbn then return aksan < aksbn end   -- seqpos takes precedence
+      
+   if aksa == aksb then return residue.keysort(a:match('^-?%d+%a%w+:(.+)$'),b:match('^-?%d+%a%w+:(.+)$')) end  -- if first field = then go to next
+      
+   if backboneSort[aksa] and backboneSort[aksb] then return backboneSort[aksa] < backboneSort[aksb] end
+   if sidechainSort[aksa] and sidechainSort[aksb] then return sidechainSort[aksa] < sidechainSort[aksb] end
+   if backboneSort[aksa] then return true end  -- backbone aksa, sidechain aksb
+   return false -- sidechain aksa, backbone aksb
+end
+
+
+
+
 
 --- callback from file parser, import table data for this Residue according to contents
 -- @param t parsed file record data: DSSP record, PDB ATOM record, or hedron / dihedron specification
@@ -331,7 +358,7 @@ function Residue:linkDihedra()
             elseif s and not self['sidechain'][s] then
                self['sidechain'][s] = { dihedron, i }
             elseif not (b or s) then
-               assert(nil, 'cannot identify atom ' ..r .. n .. ' ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
+               assert(nil, 'cannot identify atom ' .. r .. n .. ' ' .. a .. ' dihedron ' .. dihedron:tostring() .. ' position ' .. i)
             end
          end
       end
@@ -516,32 +543,15 @@ function Residue:writePDB(chain,ndx)
    return s,ndx
 end
 
-local function keysort(a,b)
-   if a==b then return false end  -- if = then not <
-
-   local aksan, aksa = a:match('^(-?%d+)%a(%w+):?')
-   local aksbn, aksb = b:match('^(-?%d+)%a(%w+):?')
-
-   if aksan ~= aksbn then return aksan < aksbn end   -- seqpos takes precedence
-      
-   if aksa == aksb then return keysort(a:match('^-?%d+%a%w+:(.+)$'),b:match('^-?%d+%a%w+:(.+)$')) end  -- if first field = then go to next
-      
-   if backboneSort[aksa] and backboneSort[aksb] then return backboneSort[aksa] < backboneSort[aksb] end
-   if sidechainSort[aksa] and sidechainSort[aksb] then return sidechainSort[aksa] < sidechainSort[aksb] end
-   if backboneSort[aksa] then return true end  -- backbone aksa, sidechain aksb
-   return false -- sidechain aksa, backbone aksb
-end
-
-
 function Residue:writeInternalCoords( pdb, chn )
    local s = ''
    local base = pdb .. ' ' .. chn .. ' '
-   for k,h in utils.pairsByKeys(self['hedra'], keysort) do
+   for k,h in utils.pairsByKeys(self['hedra'], residue.keysort) do
       if h['len1'] and h['angle2'] and h['len3'] then
          s = s .. base .. h['key'] .. ' ' .. string.format('%9.5f %9.5f %9.5f\n', h['len1'], h['angle2'], h['len3'])
       end
    end
-   for k,d in utils.pairsByKeys(self['dihedra'], keysort) do
+   for k,d in utils.pairsByKeys(self['dihedra'], residue.keysort) do
       if d['dihedral1'] then
          s = s .. base .. d['key'] .. ' ' .. string.format('%9.5f\n', d['dihedral1'])
       end
@@ -578,12 +588,15 @@ function Residue:NCaCKeySplit()
 end
 
 --- join dihedrons from N-CA-C and N-CA-CB hedrons, computing protein space coordinates for backbone and sidechain atoms
--- @param atomCoordsIn table of atom_token : 4x1 matrix of protein space coordinates
-function Residue:assemble( atomCoordsIn )
+-- @param atomCoordsIn optional table of atom_token : 4x1 matrix of protein space coordinates
+-- @param genSCAD boolean if true, return table of transformation matrices for each hedron key
+-- @return atomCoords for residue in protein space relative to acomCoordsIn OR table of transformation matrices according to genSCAD parameter
+function Residue:assemble( atomCoordsIn, genSCAD )
    --[[
    for di,d in pairs(self['dihedra']) do
       print('diheron: ' .. d['key'] .. ' angle: ' .. d['dihedral1'])
    end
+   print('genSCAD',genSCAD)
    --]]
 --[[
    form queue, start with n-ca-c, o-c-ca, n-ca-cb  [ o-c-ca not 2nd hedron for any dihedron and thus won't be picked up w/o adding here ]
@@ -601,15 +614,20 @@ function Residue:assemble( atomCoordsIn )
               add 2nd hedron key to back of queue              
          else
               ordering failed, put triple key at back of queue and hope next time we have 1st 3 atom positions (should not happen)
+
+   loop terminates (queue drains) as triple keys which do not start any dihedra are removed without action
    
 --]]
 
    local atomCoords = atomCoordsIn
-   
+   local transformations = {}
+
    local rbase = self['resn'] .. self['res']
    
    local q = deque:new()
    local NCaCKey = utils.genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'C')
+   
+   if genSCAD then transformations[NCaCKey] = geom3d.get44mtx() end
    
    q:push_left(NCaCKey)
    q:push_left(utils.genKey(rbase .. 'O', rbase .. 'C', rbase .. 'CA'))
@@ -650,6 +668,10 @@ function Residue:assemble( atomCoordsIn )
                then
                   local mt, mtr = geom3d.coordSpace( atomCoords[akl[1]], atomCoords[akl[2]], atomCoords[akl[3]], true ) -- get transforms to take 1st hedron to dihedron coordinate space and back
                   atomCoords[akl[4]] = mtr * d['initialCoords'][4]  -- apply back transform to 4th atom's dihedron space coordinates
+                  if genSCAD then
+                     --print(h1k, mtr:transpose():pretty())
+                     transformations[h1k] = mtr
+                  end
                   for i=1,3 do atomCoords[akl[4]][i][1] = utils.setAccuracy83(atomCoords[akl[4]][i][1]) end 
                   --print('finished: ' .. d['key'] .. ' adding hedron ' .. dh2key .. ' a4: ' .. akl[4] .. ' -- ' .. atomCoords[akl[4]]:transpose():pretty())
                   q:push_left(dh2key)
@@ -672,12 +694,46 @@ function Residue:assemble( atomCoordsIn )
    end
    print()
    --]]
+
+   --for x,y in pairs(transformations) do print(x, y:transpose():pretty()) end
    
-   return atomCoords
+   if genSCAD then return transformations
+   else return atomCoords
+   end
+      
 end
 
 function Residue:printInfo()
    for k,v in pairs(self['dihedra']) do v:printInfo() end
+end
+
+
+function Residue:writeSCADstrings()
+   local s = ''
+   for k,h in utils.pairsByKeys(self['hedra'], residue.keysort) do
+      if h['len1'] and h['angle2'] and h['len3'] then
+         s = s .. 'h_' .. h['key']:gsub(':','_') .. ' = [' .. string.format('%9.5f, %9.5f, %9.5f ];\n', h['len1'], h['angle2'], h['len3'])
+      end
+   end
+   for k,d in utils.pairsByKeys(self['dihedra'], residue.keysort) do
+      if d['dihedral1'] then
+         s = s .. 'd_' .. d['key']:gsub(':','_') .. ' = [ ' .. string.format('%9.5f ];\n', d['dihedral1'])
+      end
+   end
+   return s
+end
+
+function Residue:writeSCADhedra()
+   local s = ''
+   for k,h in utils.pairsByKeys(self['hedra'], residue.keysort) do
+      if h['len1'] and h['angle2'] and h['len3'] then
+         s = s .. 'h_' .. h['key']:gsub(':','_') .. ' = [' .. string.format('%9.5f, %9.5f, %9.5f ];\n', h['len1'], h['angle2'], h['len3'])
+      end
+   end
+   return s
+end
+
+function Residue:writeSCADassembly()
 end
 
 
