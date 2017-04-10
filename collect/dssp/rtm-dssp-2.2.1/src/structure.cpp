@@ -1232,8 +1232,10 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
       writeInternal3AtomLine(os, pdbId, mCA, mCB, *og1);
       writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *og1);   // chi1
       if (cg2) {
-        writeInternal3AtomLine(os, pdbId, mCB, *og1, *cg2);
-        writeInternal4AtomLine(os, pdbId, mCA, mCB, *og1, *cg2);
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg2);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg2);
+        //writeInternal3AtomLine(os, pdbId, mCB, *og1, *cg2);       // changed/fixed 10 apr 2017
+        //writeInternal4AtomLine(os, pdbId, mCA, mCB, *og1, *cg2);
       }
     }
     break;
