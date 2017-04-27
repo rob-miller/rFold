@@ -93,6 +93,49 @@ function dihedron.new (o)
    return o
 end
 
+--- get average, std_dev (sample), min, max for dihedral1 from rfold database (not a class method)
+-- calculated over range: total_average of angle for selected subset +/- 1 standard deviation (upper and lower bounds)
+-- @param rfpg open database handle
+-- @param atom_selector list of atom substrings using postgresql LIKE pattern matching, e.g. { '_N','_CA', '_C', '_N' } or { 'GN', 'GCA', 'GC', 'TN' }
+-- @param residue_selector optional rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
+-- @return ( avg, sd, min, max) 
+function dihedron.avgDb(rfpg, atom_selector, residue_selector)
+   local qry = 'with '
+
+   -- residue subset:
+   if residue_selector then
+      qry = qry .. 'residue_subset as ( ' .. residue_selector .. ' ), '
+   end
+
+   -- atom selector subset:
+   qry = qry .. "dihedral_classes as ( select id from dihedral_string where atom_string[1] like '" .. atom_selector[1] .. "' and atom_string[2] like '" .. atom_selector[2] .. "' and atom_string[3] like '" .. atom_selector[3]
+   qry = qry .. "' and atom_string[4] like '" .. atom_selector[4] .. "' ), "
+
+   -- initial working subset of all dangle for residue and atom string selectors :
+   qry = qry .. 'dihedral_subset as ( select dangle from dihedral where dihedral_class in (select id from dihedral_classes) '
+   if residue_selector then
+      qry = qry .. 'and res_id in (select res_id from residue_subset) '
+   end
+   qry = qry .. ' ), '
+
+   -- +/- 1 standard deviation bounds on angle:
+   qry = qry .. 'bounds as ( select (avg(dangle) - stddev_samp(dangle) * 1) as lower_bound, (avg(dangle) + stddev_samp(dangle) * 1) as upper_bound from dihedral_subset ) '
+
+   -- columns to return:
+   qry = qry .. 'select '
+   for j,fn in ipairs( { 'avg', 'stddev_samp', 'min', 'max', 'count' } ) do
+      qry = qry .. fn .. '(dangle) as ' .. fn .. '_dangle, '
+   end
+
+   --- trim last ', '
+   qry = qry:sub(1, -3)
+
+   -- specify upper/lower bounds subset to calculate over:
+   qry = qry .. ' from dihedral_subset where dangle between (select lower_bound from bounds) and (select upper_bound from bounds)'
+
+   return rfpg.Q(qry)
+end
+
 
 --- generate descriptive string for Dihedron: 4- followed by 'key' for this Dihedron = 4 atom tokens separated by :'s
 -- @return descriptive string
@@ -323,6 +366,29 @@ function Dihedron:writeDb(rfpg, res_id, update)
    end
    
 end
+
+--- populate dihedral1 value with average results using rFold db residue selection query and atom keys in string (residue will be '_' for postgresql 'like' query if appropriate)
+-- add tags sd, min, max
+-- @param rfpg open database handle
+-- @param resSelector rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
+function Dihedron:getDbStats(rfpg, resSelector)
+   local akl = utils.splitKey(self['key'])
+   local al = {}
+   for i,ak in ipairs(akl) do
+      local a = utils.splitAtomKey(ak)
+      al[i] = a[2]..a[3]
+   end
+   local stats = dihedron.avgDb(rfpg,al,resSelector)
+   self['dihedral1'] = stats[1]
+
+   for i,fn in ipairs( {'sd', 'min', 'max', 'count'} ) do
+      self[fn] = stats[i+1]
+   end
+end
+
+
+
+
 
 function Dihedron:isBackbone()
    local atoms = utils.splitKey(self['key'])

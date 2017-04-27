@@ -118,8 +118,8 @@ end
 -- @param k string key to split e.g. 2ECA:2EC:3TN:3TCA
 -- @return table of sequential fields e.g. { '2ECA', '2EC', '3TN', '3TCA' }
 function utils.splitKey(k)
-   if k:ematch('^(-?%w+):(-?%w+):(-?%w+):(-?%w+)$') then return { _1, _2, _3, _4 }
-   elseif k:ematch('^(-?%w+):(-?%w+):(-?%w+)$') then return { _1, _2, _3 }
+   if k:ematch('^(-?%d+_?%w+):(-?%d+_?%w+):(-?%d+_?%w+):(-?%d+_?%w+)$') then return { _1, _2, _3, _4 }
+   elseif k:ematch('^(-?%d+_?%w+):(-?%d+_?%w+):(-?%d+_?%w+)$') then return { _1, _2, _3 }
    else assert(nil,'utils.splitKey fail on '..k) end
 end
 
@@ -128,6 +128,7 @@ end
 -- @return table of constituents in order [1] sequence postion [2] residue [3] atom
 function utils.splitAtomKey(k)
    if k:ematch('^(-?%d+)(%a)(%w+)$') then return { tonumber(_1), _2, _3 }
+   elseif k:ematch('^(-?%d+)(_)(%w+)$') then return { tonumber(_1), _2, _3 }
    else assert(nil,'utils.splitAtomKey fail on '..k) end
 end
 

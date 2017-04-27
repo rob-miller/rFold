@@ -123,7 +123,10 @@ function residue.keysort(a,b)
    if a==b then return false end  -- if = then not <
 
    local aksan, aksa = a:match('^(-?%d+)%a(%w+):?')
+   if (not aksan) or (not aksa) then aksan, aksa = a:match('^(-?%d+)_(%w+):?') end
    local aksbn, aksb = b:match('^(-?%d+)%a(%w+):?')
+   if (not aksbn) or (not aksb) then aksbn, aksb = b:match('^(-?%d+)_(%w+):?') end
+   --print(a,b,aksan,aksa,aksbn,aksb)
 
    if aksan ~= aksbn then return aksan < aksbn end   -- seqpos takes precedence
       
@@ -164,6 +167,55 @@ function Residue:load(t)
          for k,v in pairs(t) do print(k,v) end
          assert(nil, self:tostring() .. ' loading ' .. tostring(t) .. ' -- not recognised')
       end
+   end
+end
+
+
+--- populate Residue hedra and dihedra tables with keys only for supplied res and resn
+-- used to generate database average results, not otherwise in normal use
+-- NB: *** neighbouring residues set to wildcard
+function Residue:initEmpty()
+   for x,tbl in ipairs( { chemdata.backbone_angles, chemdata.backbone_dihedrals, chemdata.sidechains[self['res']] } ) do
+      if tbl then
+         for i,hd in ipairs(tbl) do   -- hedra or dihedra
+            local t = {}
+            for k,a in ipairs(hd) do
+               if 5 == k then
+                  t['name'] = a
+               else
+                  local resn = self['resn']
+                  local res = self['res']
+                  if '_' == a:sub(1,1) then         -- handle _CA, _C and _N
+                     resn = (k<4 and resn-1 or resn+1)
+                     res = '_'   -- *** neighbouring residues set to wildcard
+                     a = a:sub(2)  -- trim _ as it is residue
+                  end  
+                  t[k] = resn .. res .. a
+               end
+            end
+            if t[4] then
+               t['dihedral1'] = {}
+            else
+               t['len1'] = {}
+               t['angle2'] = ''
+               t['len3'] = {}
+            end
+            self:load(t)
+         end
+      end
+   end
+end
+
+--- populate Residue hedra and dihedra values with average results using rFold db residue selection query
+-- add hedron and dihedron tags sd, min, max
+-- @param rfpg open database handle
+-- @param resSelector rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
+function Residue:getDbStats(rfpg, resSelector)
+   for k,d in pairs(self['dihedra']) do
+      d:getDbStats(rfpg, resSelector)
+   end
+   for k,h in pairs(self['hedra']) do
+      h:getDbStats(rfpg, resSelector)
    end
 end
 
@@ -543,17 +595,40 @@ function Residue:writePDB(chain,ndx)
    return s,ndx
 end
 
-function Residue:writeInternalCoords( pdb, chn )
+--- generate string in PIC format for this residue's hedra and dihedra
+-- @param pdb pdb id for pic format
+-- @param chn pdb chain for pic format
+-- @param stats optional boolean report stats (sd, min, max) and name if available
+-- @return pic format string of lines for this residue
+function Residue:writeInternalCoords( pdb, chn, stats )
    local s = ''
    local base = pdb .. ' ' .. chn .. ' '
    for k,h in utils.pairsByKeys(self['hedra'], residue.keysort) do
       if h['len1'] and h['angle2'] and h['len3'] then
-         s = s .. base .. h['key'] .. ' ' .. string.format('%9.5f %9.5f %9.5f\n', h['len1'], h['angle2'], h['len3'])
+         s = s .. base .. h['key'] .. ' ' .. string.format('%9.5f %9.5f %9.5f', h['len1'], h['angle2'], h['len3'])
+         if stats then
+            if h['sd'] then
+               for i,val in ipairs( { 'len1', 'angle2', 'len3' } ) do
+                  --print(s,h['sd'][val], h['min'][val], h['max'][val])
+                  --print()
+                  s = s .. string.format(' ( ' .. val .. ' sd: %9.5f min: %9.5f max: %9.5f )', h['sd'][val], h['min'][val], h['max'][val])
+               end
+               s = s .. string.format(' count: %9.0f ', h['count'])
+            end
+         end
+         s = s .. '\n'
       end
    end
    for k,d in utils.pairsByKeys(self['dihedra'], residue.keysort) do
       if d['dihedral1'] then
-         s = s .. base .. d['key'] .. ' ' .. string.format('%9.5f\n', d['dihedral1'])
+         s = s .. base .. d['key'] .. ' ' .. string.format('%9.5f', d['dihedral1'])
+         if stats then
+            if d['sd'] then
+               s = s .. string.format(' ( sd: %9.5f min: %9.5f max: %9.5f count: %9.0f )', d['sd'], d['min'], d['max'], d['count'])
+            end
+            if d['name'] then s = s .. ' ' .. d['name'] end
+         end
+         s = s .. '\n'
       end
    end
    return s
