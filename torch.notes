@@ -27,4 +27,51 @@ trying instructions from https://developer.nvidia.com/cuda-downloads for 15.04
   dpkg -i cuda-repo-ubuntu1504_7.5-18_amd64.deb
   apt-get update
   sudo apt-get install cuda
-  
+
+17 apr 17 -- seems hopeless...
+apt-get-install nvidia-cuda-toolkit (provides nvcc) is a good thing - gets lots of dependencies and install.sh looks for it
+but still buggered ... seems have to do stuff manually like '/home/rob/torch/install/bin/luarocks install torch' but really no joy
+
+solution was to add ';./?.lua' to LUA_PATH in .profile
+
+also local luarocks gtting wiped out - numlua build command is :
+luarocks make numlua-0.3-1.rockspec HDF5_INCDIR=/usr/include/hdf5/serial HDF5_LIBDIR=/usr/lib/x86_64-linux-gnu/hdf5/serial
+
+also
+
+   luarocks install luadbi-postgresql POSTGRES_INCDIR=/usr/include/postgresql
+   luarocks install luasql-postgres PGSQL_INCDIR=/usr/include/postgresql/
+
+ok back to running rFold lua code but cutorch / cunn tests above failing
+
+follow instructions above, dump all current nvidia install from ubuntu, use deb network from  https://developer.nvidia.com/cuda-downloads
+
+after reboot, also got cudnn runtime and dev library from https://developer.nvidia.com/rdp/cudnn-download
+
+clean.sh and install.sh stuck on CUDA_CUDART_LIBRARY not found
+
+better clean of nvidia drivers, remove ubuntu bumblebee which forced install of nvidia-304 on removing nvidia-375.  now on install cuda nvidia-smi works
+
+complete wipe of torch with fresh download did not fix, fail at:
+
+optim 1.0.5-0 is now built and installed in /home/rob/torch/install/ (license: BSD)
+...
+cmake -E make_directory build && cd build && cmake .. -DLUALIB= -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/home/rob/torch/install/bin/.." -DCMAKE_INSTALL_PREFIX="/home/rob/torch/install/lib/luarocks/rocks/cutorch/scm-1" && make -j$jopts install
+...
+CMake Error at /usr/share/cmake-3.5/Modules/FindPackageHandleStandardArgs.cmake:148 (message):
+  Could NOT find CUDA (missing: CUDA_CUDART_LIBRARY) (found suitable version
+  "8.0", minimum required is "6.5")
+Call Stack (most recent call first):
+  /usr/share/cmake-3.5/Modules/FindPackageHandleStandardArgs.cmake:388 (_FPHSA_FAILURE_MESSAGE)
+  /home/rob/torch/install/share/cmake/torch/FindCUDA.cmake:1009 (find_package_handle_standard_args)
+  CMakeLists.txt:7 (FIND_PACKAGE)
+
+(utterly fucking useless error message)
+
+solution:
+look in torch/install/share/cmake/torch/FindCUDA.cmake:1009 (find_package_handle_standard_args), determine is looking for CUDA_TOOLKIT_ROOT_DIR, define for that specific cmake command:
+
+cmake .. -DLUALIB= -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="/home/rob/torch/install/bin/.." -DCMAKE_INSTALL_PREFIX="/home/rob/torch/install/lib/luarocks/rocks/cutorch/scm-1" -DCUDA_TOOLKIT_ROOT_DIR="/usr/local/cuda"
+
+
+
