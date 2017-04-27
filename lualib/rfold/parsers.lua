@@ -79,9 +79,12 @@ function parsers.parseCmdLine (argFormat, info, valid_flags, valid_params)
          if string.match(arg[i],'=') then
             local key, val
             key, val = string.match(arg[i],'^-(%S+)=(%S+)$')
+            if not val then
+               key, val = string.match(arg[i],'^-(%S+)="(.+)"$')
+            end
             if not (valid_params and valid_params[ key ]) then
                usage(argFormat, info, valid_flags, valid_params)
-               print('parameter -' .. key .. ' value ' .. val .. ' not recognised')
+               print('parameter -' .. (key and key or 'nil') .. ' value ' .. (val and val or 'nil') .. ' not recognised in fragment: ' .. arg[i])
                os.exit()
             end
             if not args[key] then args[key]={} end
