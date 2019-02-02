@@ -289,31 +289,32 @@ void MAtom::WritePDB(ostream& os) const
 void MAtom::WriteId(ostream& os) const {
   MResidueType res = MapResidue(mResName);  // expensive because MAtom does not know its MResidue
   char code = kResidueInfo[res].code;
-  os << code << mResSeq << mName;
+  //os << code << mResSeq << mName;
+  os << mResSeq << code << mName;
 }
 
 const MResidueInfo kResidueInfo[] = {
 	{ kUnknownResidue,	'X', "UNK" },
-	{ kAlanine,			'A', "ALA" },
+	{ kAlanine,		'A', "ALA" },
 	{ kArginine,		'R', "ARG" },
 	{ kAsparagine,		'N', "ASN" },
 	{ kAsparticAcid,	'D', "ASP" },
 	{ kCysteine,		'C', "CYS" },
 	{ kGlutamicAcid,	'E', "GLU" },
 	{ kGlutamine,		'Q', "GLN" },
-	{ kGlycine,			'G', "GLY" },
+	{ kGlycine,		'G', "GLY" },
 	{ kHistidine,		'H', "HIS" },
 	{ kIsoleucine,		'I', "ILE" },
-	{ kLeucine,			'L', "LEU" },
-	{ kLysine,			'K', "LYS" },
+	{ kLeucine,		'L', "LEU" },
+	{ kLysine,		'K', "LYS" },
 	{ kMethionine,		'M', "MET" },
 	{ kPhenylalanine,	'F', "PHE" },
-	{ kProline,			'P', "PRO" },
-	{ kSerine,			'S', "SER" },
+	{ kProline,		'P', "PRO" },
+	{ kSerine,		'S', "SER" },
 	{ kThreonine,		'T', "THR" },
 	{ kTryptophan,		'W', "TRP" },
 	{ kTyrosine,		'Y', "TYR" },
-	{ kValine,			'V', "VAL" }
+	{ kValine,		'V', "VAL" }
 };
 
 struct MBridge
@@ -369,8 +370,9 @@ MResidue::MResidue(uint32 inNumber,
 	mHBondDonor[0].residue = mHBondDonor[1].residue = mHBondAcceptor[0].residue = mHBondAcceptor[1].residue = nullptr;
 
 	static const MAtom kNullAtom = {};
-	mN = mCA = mC = mO = kNullAtom;
-	
+	mN = mCA = mC = mO = mH = kNullAtom;
+	bool NHpdb = false;
+        
 	foreach (const MAtom& atom, inAtoms)
 	{
 		if (mChainID.empty())
@@ -383,7 +385,7 @@ MResidue::MResidue(uint32 inNumber,
 		
 		if (atom.mResSeq != mSeqNumber)
 			throw mas_exception(boost::format("inconsistent residue sequence numbers (%1% != %2%)") % atom.mResSeq % mSeqNumber);
-		
+		// cout << "atom name " << atom.GetName() << "\n";
 		if (atom.GetName() == "N")
 			mN = atom;
 		else if (atom.GetName() == "CA")
@@ -392,28 +394,39 @@ MResidue::MResidue(uint32 inNumber,
 			mC = atom;
 		else if (atom.GetName() == "O")
 			mO = atom;
-		else if (atom.GetName() != "OXT" && atom.mResName != "GLY")  // rtm added because OXT going in as CB of GLY
+		else if (atom.GetName() == "H") {
+                        mH = atom;                 // rtm added for pdb files with amide proton specified
+                        NHpdb = true;
+                        // cout << "found H!\n";
+                }
+		//else if (atom.GetName() == "OXT")
+		//	mOXT = atom;
+		else //if (atom.GetName() != "OXT" && atom.mResName != "GLY")  // rtm added because OXT going in as CB of GLY
 			mSideChain.push_back(atom);
 	}
 	
 	// assign the Hydrogen
-	mH = GetN();
+        if (! NHpdb ) {   // rtm added for pdb files with amide proton specified ... this will change DSSP results for these PDB files :-(
+          // cout << "overwrite H!\n";
+          mH = GetN();
 	
-	if (mType != kProline and mPrev != nullptr)
-	{
-		const MAtom& pc = mPrev->GetC();
-		const MAtom& po = mPrev->GetO();
-		
-		double CODistance = Distance(pc, po);
-		
-		mH.mLoc.mX += (pc.mLoc.mX - po.mLoc.mX) / CODistance; 
-		mH.mLoc.mY += (pc.mLoc.mY - po.mLoc.mY) / CODistance; 
-		mH.mLoc.mZ += (pc.mLoc.mZ - po.mLoc.mZ) / CODistance; 
-	}
+          if (mType != kProline and mPrev != nullptr)
+            {
+              const MAtom& pc = mPrev->GetC();
+              const MAtom& po = mPrev->GetO();
+              
+              double CODistance = Distance(pc, po);
+              
+              mH.mLoc.mX += (pc.mLoc.mX - po.mLoc.mX) / CODistance; 
+              mH.mLoc.mY += (pc.mLoc.mY - po.mLoc.mY) / CODistance; 
+              mH.mLoc.mZ += (pc.mLoc.mZ - po.mLoc.mZ) / CODistance; 
+            }
+
+        }
 
 	// rtm: assign or generate the CBeta
 
-	if (0 < mSideChain.size() && (1.7 > Distance(mCA, mSideChain.front())) ) {  // rtm: filter - make it up instead of values beyond 1.7 - 2.53
+	if (0 < mSideChain.size() && (1.7 > Distance(mCA, mSideChain.front())) && mSideChain.front().TestAtomName("CB")) {  // rtm: filter - make it up instead of values beyond 1.7 - 2.53
 	  mCB = mSideChain.front();
 	} else {
 
@@ -423,7 +436,7 @@ MResidue::MResidue(uint32 inNumber,
 	  mCB.mName = "CB";
           
           //cout << boost::format("N  %d %s %c %s %s %d  %f %f %f \n") % mN.mSerial % mN.mName % mN.mAltLoc % mN.mResName % mN.mChainID % mN.mResSeq % mN.mLoc.mX % mN.mLoc.mY % mN.mLoc.mZ  << endl;
-                 
+
 	  MPoint nca = mCA - mN ; // GetCAlpha() - GetN();   // vector CA to N
 	  MPoint cca = mCA - mC ; // GetCAlpha() - GetC();   // vector CA to C
 	  MPoint xx = nca + cca;
@@ -431,7 +444,7 @@ MResidue::MResidue(uint32 inNumber,
 
 	  double sx = kCACBDIST * cos(kTETH_ANG) / sqrt(DotProduct(xx,xx));
 	  double sy = kCACBDIST * sin(kTETH_ANG) / sqrt(DotProduct(yy,yy));
-	  
+                    
 	  mCB.mLoc += xx * sx + yy * sy;
 
           char str[32];
@@ -691,7 +704,8 @@ double MResidue::Chi5() const
 
 
 
-tr1::tuple<double,char> MResidue::Alpha() const
+//tr1::tuple<double,char> MResidue::Alpha() const
+boost::tuple<double,char> MResidue::Alpha() const
 {
 	double alhpa = 360;
 	char chirality = ' ';
@@ -705,7 +719,8 @@ tr1::tuple<double,char> MResidue::Alpha() const
 		else
 			chirality = '+';
 	}
-	return tr1::make_tuple(alhpa, chirality);
+	//return tr1::make_tuple(alhpa, chirality);
+        return boost::make_tuple(alhpa, chirality);
 }
 
 double MResidue::Kappa() const
@@ -1032,7 +1047,7 @@ void writeDistAngleDist(ostream& os, const MAtom& a1, const MAtom& a2, const MAt
   double d2 = Distance(a1,a3);
   double angle = acos( ((d0*d0) + (d1*d1) - (d2*d2)) / (2*d0*d1) ) * 180 / kPI;
   
-  boost::format internalDDA("%8.4lf %8.4lf %8.4lf");
+  boost::format internalDDA("%9.5lf %9.5lf %9.5lf");
   os << ( internalDDA % d0 % angle % d1 );
 }
 
@@ -1051,7 +1066,9 @@ void writeInternal3AtomLine(ostream& os, std::string pdbId, const MAtom& a1, con
 void writeInternal4AtomLine(ostream& os, std::string pdbId, const MAtom& a1, const MAtom& a2, const MAtom& a3, const MAtom& a4) {
   double val = DihedralAngle(a1,a2,a3,a4);
   os << pdbId << ' ' << a1.mChainID << ' ';
-  a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ':'; a4.WriteId(os); os << ' ' << val << endl;
+  a1.WriteId(os); os << ':'; a2.WriteId(os); os << ':'; a3.WriteId(os); os << ':'; a4.WriteId(os);
+  boost::format internalDihed("%9.5lf");
+  os << ' ' << ( internalDihed % val ) << endl;
 }
 
 void MResidue::WriteInternal(ostream& os, std::string pdbId)
@@ -1081,8 +1098,22 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
   writeInternal3AtomLine(os, pdbId, mCB, mCA, mC);
   writeInternal4AtomLine(os, pdbId, mO, mC, mCA, mCB);
 
-  writeInternal3AtomLine(os, pdbId, mN, mCA, mCB);   // redundant because could reference sidechains from O, but chi1 defined from N and may want N-CA-CB available as reference triple for residue coordinate space
+  if (kGlycine != mType && kAlanine != mType &&
+      (GetSC("CG1") || GetSC("CG") || GetSC("OG") || GetSC("OG1") || GetSC("SG")) )  // only do for residues with CG
+    writeInternal3AtomLine(os, pdbId, mN, mCA, mCB);   // redundant because could reference sidechains from O, but chi1 defined from N and may want N-CA-CB available as reference triple for residue coordinate space
 
+  const MAtom *oxt = GetSC("OXT");  // not sidechain but stashed there
+  if (oxt) {
+    writeInternal3AtomLine(os, pdbId, mCA, mC, *oxt);
+    writeInternal4AtomLine(os, pdbId, mN, mCA, mC, *oxt);
+  }
+
+  if (mH.mType != kNitrogen) {     // get amide proton if specified in input PDB file  -- DSSP creates mH by copying from N
+    writeInternal3AtomLine(os, pdbId, mH, mN, mCA);
+    writeInternal4AtomLine(os, pdbId, mC, mCA, mN, mH);
+  }
+
+  
   switch(mType) {
   case kGlycine:
   case kAlanine:
@@ -1122,14 +1153,14 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
   case kIsoleucine: {
     const MAtom *cg1 =  GetSC("CG1");
     const MAtom *cg2 =  GetSC("CG2");
-    const MAtom *cd =  GetSC("CD");
+    const MAtom *cd1 =  GetSC("CD1");
 
     if (cg1) {
       writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg1);
       writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg1);   // chi1
-      if (cd) {
-        writeInternal3AtomLine(os, pdbId, mCB, *cg1, *cd);
-        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg1, *cd);   // chi2
+      if (cd1) {
+        writeInternal3AtomLine(os, pdbId, mCB, *cg1, *cd1);
+        writeInternal4AtomLine(os, pdbId, mCA, mCB, *cg1, *cd1);   // chi2
       }
     }
     if (cg2) {
@@ -1219,8 +1250,10 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
       writeInternal3AtomLine(os, pdbId, mCA, mCB, *og1);
       writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *og1);   // chi1
       if (cg2) {
-        writeInternal3AtomLine(os, pdbId, mCB, *og1, *cg2);
-        writeInternal4AtomLine(os, pdbId, mCA, mCB, *og1, *cg2);
+      writeInternal3AtomLine(os, pdbId, mCA, mCB, *cg2);
+      writeInternal4AtomLine(os, pdbId, mN, mCA, mCB, *cg2);
+        //writeInternal3AtomLine(os, pdbId, mCB, *og1, *cg2);       // changed/fixed 10 apr 2017
+        //writeInternal4AtomLine(os, pdbId, mCA, mCB, *og1, *cg2);
       }
     }
     break;
@@ -1323,6 +1356,7 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
     const MAtom *ce2 =  GetSC("CE2");
     const MAtom *ce3 =  GetSC("CE3");
     const MAtom *cz2 =  GetSC("CZ2");
+    const MAtom *cz3 =  GetSC("CZ3");
     const MAtom *ch2 =  GetSC("CH2");
 
     if (cg) {
@@ -1354,6 +1388,10 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
         if (ce3) {
           writeInternal3AtomLine(os, pdbId, *cg, *cd2,*ce3);
           writeInternal4AtomLine(os, pdbId, mCB, *cg, *cd2,*ce3);
+          if (cz3) {
+            writeInternal3AtomLine(os, pdbId, *cd2,*ce3,*cz3);
+            writeInternal4AtomLine(os, pdbId, *cg,*cd2,*ce3,*cz3);
+          }
         }
       }
     }
@@ -1493,7 +1531,7 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
     assert(0);
     break;
   }
-  
+
   os << "--" << endl;  
   
 }
@@ -1758,7 +1796,7 @@ void MProtein::ReadPDB(istream& is, bool cAlphaOnly)
 		{
 			if (cAlphaOnly and line.substr(12, 4) != " CA ")
 				continue;
-
+                        // cout << line;
 			atomSeen = ba::starts_with(line, "ATOM  ");
 
 			MAtom atom = {};
@@ -1767,6 +1805,7 @@ void MProtein::ReadPDB(istream& is, bool cAlphaOnly)
 			atom.mSerial = boost::lexical_cast<uint32>(ba::trim_copy(line.substr(6, 5)));
 			//	13 - 16	Atom name Atom name.
 			atom.mName = ba::trim_copy(line.substr(12, 4));
+                        // cout << "read atom " << atom.GetName() << "\n";
 			//	17		Character altLoc Alternate location indicator.
 			atom.mAltLoc = line[16];
 			//	18 - 20	Residue name resName Residue name.
@@ -1818,8 +1857,9 @@ void MProtein::ReadPDB(istream& is, bool cAlphaOnly)
 				atom.mType = kUnknownAtom;
 			}
 
-			if (atom.mType == kHydrogen)
-				continue;
+                        // rtm keep mH hydrogens if present
+			//if (atom.mType == kHydrogen)
+			//	continue;
 			
 			if (atom.mAltLoc != ' ')
 			{

@@ -189,7 +189,8 @@ class MResidue
 	double				Chi5() const;
 
 
-        std::tr1::tuple<double,char>
+        //std::tr1::tuple<double,char>
+        boost::tuple<double,char>
 						Alpha() const;
 	double				Kappa() const;
 	double				TCO() const;

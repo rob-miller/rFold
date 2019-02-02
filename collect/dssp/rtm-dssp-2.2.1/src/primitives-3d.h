@@ -9,7 +9,8 @@
 
 #include <vector>
 
-#include <boost/tr1/tuple.hpp>
+//#include <boost/tr1/tuple.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <boost/math/quaternion.hpp>
 
 typedef boost::math::quaternion<double> MQuaternion;
@@ -64,7 +65,8 @@ double CosinusAngle(const MPoint& p1, const MPoint& p2, const MPoint& p3, const 
 
 MQuaternion Normalize(MQuaternion q);
 
-std::tr1::tuple<double,MPoint> QuaternionToAngleAxis(MQuaternion q);
+//std::tr1::tuple<double,MPoint> QuaternionToAngleAxis(MQuaternion q);
+boost::tuple<double,MPoint> QuaternionToAngleAxis(MQuaternion q);
 MPoint Centroid(std::vector<MPoint>& points);
 MPoint CenterPoints(std::vector<MPoint>& points);
 MQuaternion AlignPoints(const std::vector<MPoint>& a, const std::vector<MPoint>& b);
