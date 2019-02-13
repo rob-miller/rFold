@@ -388,4 +388,12 @@ export LUA_CPATH='/usr/local/lib/lua/5.1/?.so;/usr/local/lib/luarocks/rocks/?.so
    --- was important that I used python3 then both command line and pycharm happy with it
    - got reading pdb files the way I think I want
    - pic files not getting atoms right....
+
+05 feb 2019
+   - working on python objects but now think that correct approach is to add methods and variables outside of
+     existing Chain, Residue classes and later put them in the Bipython source tree
+     
+
+13 feb 2019
+   - load .pic files ok, start on internalToAtomCoords()
    
