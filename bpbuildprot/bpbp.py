@@ -12,7 +12,7 @@ import sys
 
 import gzip
 
-#from Bio.PDB import *
+from Bio import PDB
 
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.PDBIO import *
@@ -25,6 +25,8 @@ from Bio.PDB.Entity import Entity
 from Bio.Data import IUPACData
 
 from Bio.PDB.StructureBuilder import StructureBuilder
+
+import math
 
 try:
     import numpy
@@ -94,35 +96,89 @@ class PIC_residue:
 
 '''
 
+
+# ------------ utility functions
+
 akre = re.compile(r'(?P<pos>\d+)(?P<res>[A-Za-z])(?P<atm>[A-Za-z]+)')
 dhkre = re.compile(r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w_]+):(?P<a3>-?[\w_]+)(:(?P<a4>-?[\w_]+))?')
+
 
 def split_atom_key(atom_key):
     rslt = akre.match(atom_key)
     return rslt.groups()
 
+
 def split_dh_key(dh_key):
     rslt = dhkre.match(dh_key)
     return rslt.groups()
 
+
 def gen_key(di_hedron):
     kl = []
-    for k in ['a1','a2','a3']:
+    for k in [0,1,2]:
         kl.append(di_hedron[k])
-    a4 = di_hedron['a4']
+    a4 = di_hedron[3]
     if a4:
         kl.append(a4)
     return ':'.join(kl)
 
 
+def check_res(res):
+    rid = res.id
+    if ' ' != rid[0]:
+        return False
+    if ' ' != rid[2]:
+        return False
+    return True
+
+
+def gen_Mrot(angle_rads,axis):
+    cosang = math.cos(angle_rads)
+    sinang = math.sin(angle_rads)
+
+    if 'z' == axis:
+        return numpy.arr([[cosang,-sinang,0,0],
+                          [sinang,cosang,0,0],
+                          [0,0,1,0],
+                          [0,0,0,1]],dtype=float64)
+    elif 'y' == axis:
+        return numpy.arr([[cosang,0,sinang,0],
+                          [0, 1, 0, 0],
+                          [-sinang,0,cosang,0],
+                          [0,0,0,1]],dtype=float64)
+    else:
+        return numpy.arr([[1,0,0,0],
+                          [0,cosang,-sinang,0],
+                          [0,sinang,cosang,0],
+                          [0,0,0,1]],dtype=float64)
+
+
+
+# ------------ could add to protein/model classes
+
+
+def internal_to_atom_coordinates(struct):
+    for chn in struct.get_chains():
+        chn.set_first_last()
+    for chn in struct.get_chains():
+        chn.link_residues()
+    for chn in struct.get_chains():
+        chn.render_dihedra()
+    for chn in struct.get_chains():
+        chn.assemble_residues()
+
+
+# ------------ add to residue class
+
+
 def residue_pic_init(self):
     self.hedra = {}      # array of hedron objects indexed by hedron keys ([resPos res atom] x3)
     self.dihedra = {}    # array of dihedron objects indexed by dihedron keys ([resPos res atom] x4)
-    self.h2dhIndex = {}  # map of key(first 3 atom ids) to dihedron for all dihedra in Residue
+    self.id3_dh_index = {}  # map of dihedron key (first 3 atom ids) to dihedron for all dihedra in Residue
 
 
 def residue_pic_load(self,di_hedron):
-    dhk = gen_key(di_hedron)
+    dhk = gen_key([di_hedron['a1'],di_hedron['a2'],di_hedron['a3'],di_hedron['a4']])
     try:
         if di_hedron['a4'] is not None:   # parse regex defaults this to None instead of KeyError
             self.dihedra[dhk] = Dihedron(di_hedron)
@@ -133,8 +189,57 @@ def residue_pic_load(self,di_hedron):
         self.pic_load(di_hedron)
 
 
+def residue_link_dehedra(self):
+    '''
+    k3i = {}
+    for k, dihedron in pairs(self['dihedra']) do
+        dihedron['res'] = self # each dihedron can find its residue
+        k3 = dihedron['key3']
+        if not k3i[k3] then
+             k3i[k3] = {}
+        k3i[k3][  # k3i[k3] +1 ] = dihedron       # map to find each dihedron from atom tokens 1,2,3
+    self['key3index'] = k3i
+     '''
+
+    id3i = {}
+    for dh in self.dihedra.values():
+        dh.res = self               # each dihedron can find its residue
+        id3 = dh.id3
+        if id3 not in id3i:
+            id3i[id3] = []
+        id3i[id3].append(dh)        # map to find each dihedron from atom tokens 1,2,3
+    self.id3_dh_index = id3i
+
+
+
+def residue_render_hedra(self):
+    for h in self.hedra.values():
+        if h.updated:
+            h.init_pos()
+
+
+def residue_render_dihedra(self):
+    for d in self.hedra.values():
+        if d.updated:
+            d.init_pos()
+
+
+def residue_assemble(self,startpos):
+    '''
+
+
+    '''
+    pass
+
+
 Residue.pic_init = residue_pic_init
 Residue.pic_load = residue_pic_load
+Residue.link_dihedra = residue_link_dehedra
+Residue.render_hedra = residue_render_hedra
+Residue.render_dihedra = residue_render_dihedra
+Residue.assemble = residue_assemble
+
+# ------------ add to chain class
 
 
 def chain_init_pic(self):
@@ -157,27 +262,100 @@ def chain_pic_load(self,di_hedra):
     res.pic_load(di_hedra)
 
 
+def chain_set_first_last(self):
+    # SEQFAIL
+    self.firstpos = 999999
+    self.lastpos  = -999999
+
+    for res in self.get_residues():
+        if check_res(res):
+            respos = res.id[1]
+            if respos < self.firstpos:
+                self.firstpos = respos
+            if respos > self.lastpos:
+                self.lastpos = respos
+
+
+
+def chain_set_prev_post(self, res):
+    #print(res.id, res.disordered)
+    #if respos > self[firstPos] then res[prev] = self[residues][respos-1]
+    #if respos < len(self[residues]) then res[next] = self[residues][respos+1]
+
+    # SEQFAIL
+    respos = res.id[1]
+    if respos > self.firstpos:
+        res.prev = self[respos-1]
+    if respos < self.lastpos:
+        res.post = self[respos+1]
+
+
+
+def chain_link_residues(self):
+    # SEQFAIL
+    for res in self.get_residues():
+        self.set_prev_next(res)
+        res.link_dihedra()
+
+
+def chain_render_dihedra(self):
+    # SEQFAIL
+    for res in self.get_residues():
+        res.render_hedra()
+    for res in self.get_residues():
+        res.render_dihedra()
+
+
+def chain_assemble_residues(self, start=False, fin=False):
+    '''
+    for res in orderec_residues
+        if (not start or start<= respos) and (not fin or fin >= respos):
+            if res[prev] and res[prev] is ordered:    # if no chain break
+                startPos={}
+                rp = res[prev]
+                akl = res:NCaCKeySplit()  # ordered list - tuple?
+                for ak in akl:
+                    startPos[ak] = rp[atomCoords][ak]
+            else:  # have chain break so use stopred start pos
+                startPos = self[initNCaC][respos]
+            res[atomCoords] = res:assemble(startPos)
+    '''
+    pass
+
 Chain.pic_init = chain_init_pic
 Chain.pic_load = chain_pic_load
+Chain.set_first_last = chain_set_first_last
+Chain.set_prev_next = chain_set_prev_post
+Chain.link_residues = chain_link_residues
+Chain.render_dihedra = chain_render_dihedra
+Chain.assemble_residues = chain_assemble_residues
 
 
+class HedronMatchError(Exception):
+    pass
 
+
+class HedronIncompleteError(Exception):
+    pass
 
 
 class Dihedron:
     def __init__(self, dh_dict):  # kwargs because parsed into group.dict
-        self.id = dh_dict['a1'] + ':' + dh_dict['a2'] + ':' + dh_dict['a3'] + ':' + dh_dict['a4']
-        self.dihedral1 = dh_dict['dihedral1']  # angle formed between 3 atoms
 
-        # no residue or position, just atoms
+        self.a14 = [dh_dict['a1'],dh_dict['a2'],dh_dict['a3'],dh_dict['a4']]
+
+        self.id = gen_key(self.a14)
+        self.dihedral1 = float(dh_dict['dihedral1'])  # angle formed between two planes
+
+        # no residue or position, just atoms # maybe also grab residue?
         self.dclass = ''
         atomre = re.compile(r'^\d+[a-zA-Z](\w+)$')
-        for k in ('a1','a2','a3','a4'):
-            m = atomre.match(dh_dict[k])
+        for ak in self.a14:
+            m = atomre.match(ak)
             self.dclass += m.group(1)
 
-        self.id3  = dh_dict['a1'] + ':' + dh_dict['a2'] + ':' + dh_dict['a3']
-        self.id32 = dh_dict['a2'] + ':' + dh_dict['a3'] + ':' + dh_dict['a4']
+        self.id3 = self.a14[0] + ':' + self.a14[1] + ':' + self.a14[2]
+        self.id32 = self.a14[1] + ':' + self.a14[2] + ':' + self.a14[3]
 
         # 4 matrices specifying hedron space coordinates of constituent atoms, initially atom3 on +Z axis
         self.InitialCoords = []
@@ -186,24 +364,124 @@ class Dihedron:
         self.hedron1 = None
         self.hedron2 = None
 
+        self.h1key = None
+        self.h2key = None
+
+        self.initial_coords = None
+        self.a4_pre_rotation = None
+
         self.res = None        # Residue object which includes this dihedron; set by Residue:linkDihedra()
         self.reverse = False   # order of atoms in dihedron is reversed from order of atoms in hedra
 
         # flag indicting that atom coordinates are up to date (do not need to be recalculated from dihedral1)
         self.updated = True
 
-        #print(self)
+        #print(self, self.dclass)
 
     def __str__(self):
         return '4-' + self.id + ' ' + self.dclass + ' ' + str(self.dihedral1)
+
+    # find specified hedron on this residue or its adjacent neighbors
+    @staticmethod
+    def get_hedron(res,id3):
+        hedron = res.hedra.get(id3,None)
+        if not hedron and res.hasAttr(prev) and not res.prev.disordered and (' ' == res.prev.id[0]):  # not hetero
+            hedron = res.prev.hedra.get(id3,None)
+        if not hedron and res.hasAttr(post) and not res.post.disordered and (' ' == res.post.id[0]):
+            hedron = res.post.hedra.get(id3,None)
+        return hedron
+
+    def set_hedra(self):
+        rev = False
+        res = self.res
+        h1key = gen_key(self.a14[0:2])
+        hedron1 = Dihedron.get_hedron(res,h1key)
+        if not hedron1:
+            rev = True
+            h1key = gen_key(self.a14[2:0:-1])
+            hedron1 = Dihedron.get_hedron(res,h1key)
+            h2key = gen_key(self.a14[3:1:-1])
+        else:
+            h1key = gen_key(self.a14[1:3])
+
+        if not hedron1:
+            raise HedronMatchError(res, "can't find 1st hedron", h1key, self)
+
+        hedron2 = Dihedron.get_hedron(res,h2key)
+
+        if not hedron2:
+            raise HedronMatchError(res, "can't find 2nd hedron", h2key, self)
+
+        self.hedron1 = hedron1
+        self.h1key = h1key
+        self.hedron2 = hedron2
+        self.h2key = h2key
+
+        self.reverse = rev
+
+        return rev
+
+    def init_pos(self):
+
+        rev = self.setHedra()
+        hedron1 = self.hedron1
+        hedron2 = self.hedron2
+
+        '''
+# not sure this happens...
+
+   local complete = true
+   for i=1,3 do
+      if not hedron1['atoms'][i] then complete=false end
+   end
+   for i=1,3 do
+      if not hedron2['atoms'][i] then complete=false end
+   end
+   if not complete then
+      if utils.warn then
+         io.stderr:write('dihedron: hedra missing atoms ' .. self:tostring() .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() .. ' ' .. hedron2:tostring() .. '\n')
+      end
+      --io.write('dihedron: hedra missing atoms ' .. self:tostring() .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() .. ' ' .. hedron2:tostring() .. '\n')
+      return
+   end
+        '''
+
+        initial = []
+
+        if not rev:
+            initial.append(hedron1.atoms[0].copy())
+            initial.append(hedron1.atoms[1].copy())
+            initial.append(hedron1.atoms[2].copy())
+
+            a4_pre_rotation = hedron2.atomsR[2].copy()
+            a4shift = hedron2.len1
+        else:
+            initial.append(hedron1.atomsR[2].copy())
+            initial.append(hedron1.atomsR[1].copy())
+            initial.append(hedron1.atomsR[0].copy())
+
+            a4_pre_rotation = hedron2.atoms[0].copy()
+            a4shift = hedron2.len3
+
+        a4_pre_rotation[2][0] *= -1                     # a4 to +Z
+        a4_pre_rotation[2][0] += a4shift                # hedron2 shift up so a2 at 0,0,0
+        mrz = gen_Mrot(math.radians(self.dihedral1),'z')
+        initial[3] = mrz * a4_pre_rotation
+
+        self.initial_coords = initial
+        self.a4_pre_rotation = a4_pre_rotation
+
+        self.updated = False
+
+
 
 
 class Hedron:
     def __init__(self, h_dict):  # kwargs because parsed into group.dict
         self.id = h_dict['a1'] + ':' + h_dict['a2'] + ':' + h_dict['a3']
-        self.len1 = h_dict['len1']     # distance between 1st and 2nd atom
-        self.angle2 = h_dict['angle2']  # angle formed between 3 atoms
-        self.len3 = h_dict['len3']     # distance between 2nd and 3rd atoms
+        self.len1 = float(h_dict['len1'])     # distance between 1st and 2nd atom
+        self.angle2 = float(h_dict['angle2'])  # angle formed between 3 atoms
+        self.len3 = float(h_dict['len3'])     # distance between 2nd and 3rd atoms
 
         # no position or residue, just atom chars at end of key
         self.hclass = ''
@@ -224,8 +502,36 @@ class Hedron:
     def __str__(self):
         return '3-' + self.id + ' ' + self.hclass
 
+    def init_pos(self):
 
+        # build hedron with a2 on +Z axis, a1 at origin, a0 in -Z at angle n XZ plane
+        for i in range(0,3):
+            # note this initializes a1 to 0,0,0 origin
+            self.atoms.append(numpy.array([[0],[0],[0],[1]], dtype=numpy.float64))  # 4x1 array
 
+        # supplement: angles which add to 180 are supplementary
+        sar = math.radians(180.0 - self.angle2)
+
+        # a2 is len3 up from a2 on Z axis, X=Y=0
+        self.atoms[2][2][0] = self.len3
+        # a0 X is sin( sar ) * len1
+        self.atoms[0][0][0] = math.sin(sar) * self.len1
+        # a0 Z is -(cos( sar ) * len1) (assume angle2 always obtuse, so a0 is in -Z
+        self.atoms[0][2][0] = - (math.cos(sar) * self.len3)
+
+        # same again but 'reversed' : a0 on Z axis, a1 at origin, a2 in -Z
+        for i in range(0,3):
+            # atom[1] to 0,0,0 origin
+            self.atomsR.append(numpy.array([[0],[0],[0],[1]], dtype=numpy.float64))
+
+        # a0r is len1 up from a1 on Z axis, X=Y=0
+        self.atomsR[0][2][0] = self.len1
+        # a2r X is sin( sar ) * len3
+        self.atomsR[2][0][0] = math.sin(sar)* self.len3
+        # a2r Z is -(cos( sar ) * len3)
+        self.atomsR[2][2][0] = - (math.cos(sar) * self.len3)
+
+        self.updated = False
 
 
 
@@ -344,9 +650,9 @@ for target in toProcess:
 
     if pdb_input:
         print('parsed pdb input ', filename)
-        foo = {}
-        foo['a1'] = '1KN'
-        pdb_chain.pic_load(foo)
+        # foo = {}
+        # foo['a1'] = '1KN'
+        # pdb_chain.pic_load(foo)
     else:
         print('parsed pic input ', filename)
         #print(pdb_chain)
@@ -366,6 +672,9 @@ for target in toProcess:
             if m:
                 # print(m.groupdict())
                 pdb_chain.pic_load(m.groupdict())
+
+
+        internal_to_atom_coordinates(pdb_structure)
 
     print(pdb_structure.header['idcode'], pdb_chain.id, ':', pdb_structure.header['head'])
 
