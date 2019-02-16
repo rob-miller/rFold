@@ -34,77 +34,6 @@ except ImportError:
     from Bio import MissingPythonDependencyError
     raise MissingPythonDependencyError(
         "Install NumPy to build proteins from internal coordinates.")
-'''
-class PIC_protein:
-    def __init__(self,id):
-        self.id = id
-        self.chains = [{}]
-        self.model = 0
-        self.chains_maxpos = [{}]
-
-    def load(self,filename):
-        di_hedron_re = re.compile(r'^(?P<pdbid>\w+)\s+(?P<chn>\w?)\s*'    
-            # pdbid and chain id
-        '(?P<a1>-?[\w_]+):(?P<a2>-?[\w_]+):(?P<a3>-?[\w_]+)'              
-            # 3 atom specifiers for hedron
-        '(:(?P<a4>-?[\w_]+))?'                                            
-            # 4th atom speicfier for dihedron
-        '\s+'
-        '|((?P<len1>\S+)\s+(?P<angle2>\S+)\s+(?P<len3>\S+)\s*$)'          
-            # len-angle-len for hedron
-        '((?P<dihedral1>\S+)\s*$)')                                       
-            # dihedral angle for dihedron
-
-        fil = open(filename, 'r')
-        for aline in fil:
-            m = di_hedron_re.match(aline)
-            if m:
-                mdl = self.model
-                chn = m.group('chn')
-                pos = int(re.search(r'\d+',m.group('a1')).group(0))
-                #print(mdl,chn,pos)
-                try:
-                    if self.chains_maxpos[mdl][chn] > pos:
-                        # no KeyError means already have this model, chain 
-                        # defined longer than current position
-                        # so start new model
-                        # print(pos + ' less than maxpos ' 
-                        # + self.chains_maxpos[mdl][chn] +
-                        # ' on chain so new model and new chain')
-                        mdl += 1
-                        self.model = mdl
-                        self.chains[mdl][chn] = PicChain(self, self.model, chn)
-                except KeyError:  # KeyError means no chain in current model 
-                    # for this chain id
-                    self.chains[mdl][chn] = PicChain(self, self.model, chn)
-
-                self.chains[mdl][chn].load(m.groupdict())
-                self.chains_maxpos[mdl][chn] = pos
-
-            #else:
-                #print('no match on ' + aline)
-
-
-class PicChain:
-    def __init__(self,parent,parent_model,id): 
-        self.id = id
-        self.parent = parent
-        self.parent_model = parent_model
-        # dict of N,Ca,C atom coordinates for first residue of each ordered c
-        # hain segment indexed by 1st atom id
-        self.initNCaC = {}
-        # possibly sparse array (dict) of residues comprising sequence
-        self.PIC_residues = {}
-
-    def load(self,kwargs):
-        print('bar')
-
-class PIC_residue:
-    def __init__(self,**kwargs):
-        pass
-
-'''
-
 
 # ------------ utility functions
 
@@ -185,7 +114,7 @@ def residue_pic_init(self):
     self.hedra = {}
     # array of dihedron objects indexed by dihedron keys ([resPos res atom] x4)
     self.dihedra = {}
-    # map of dihedron key (first 3 atom ids) to dihedron 
+    # map of dihedron key (first 3 atom ids) to dihedron
     # for all dihedra in Residue
     self.id3_dh_index = {}
     # reference to adjacent residues in chain
@@ -194,15 +123,15 @@ def residue_pic_init(self):
 
 
 def residue_pic_load(self, di_hedron):
-    dhk = gen_key([di_hedron['a1'], di_hedron['a2'], di_hedron['a3'], 
+    dhk = gen_key([di_hedron['a1'], di_hedron['a2'], di_hedron['a3'],
                    di_hedron['a4']])
     try:
         # parse regex defaults this to None instead of KeyError
-        if di_hedron['a4'] is not None:   
+        if di_hedron['a4'] is not None:
             self.dihedra[dhk] = Dihedron(di_hedron)
         else:
             self.hedra[dhk] = Hedron(di_hedron)
-    except AttributeError:    
+    except AttributeError:
         # start residue created from pic file by PDB_parser not pic initialised
         self.pic_init()
         self.pic_load(di_hedron)
@@ -262,7 +191,7 @@ def chain_pic_load(self, di_hedra):
     except KeyError:
         # print(res_id,IUPACData.protein_letters_1to3[sak[1]].upper())
         # do outside Chain - so Chain() does not know about Residue()
-        res = Residue(res_id, 
+        res = Residue(res_id,
                       IUPACData.protein_letters_1to3[sak[1]].upper(), ' ')
         self.add(res)
         res.pic_init()
@@ -352,7 +281,7 @@ class Dihedron:
         self.a14 = [dh_dict['a1'], dh_dict['a2'], dh_dict['a3'], dh_dict['a4']]
 
         self.id = gen_key(self.a14)
-        self.dihedral1 = float(dh_dict['dihedral1'])  
+        self.dihedral1 = float(dh_dict['dihedral1'])
 
         # no residue or position, just atoms # maybe also grab residue?
         self.dclass = ''
@@ -364,7 +293,7 @@ class Dihedron:
         self.id3 = self.a14[0] + ':' + self.a14[1] + ':' + self.a14[2]
         self.id32 = self.a14[1] + ':' + self.a14[2] + ':' + self.a14[3]
 
-        # 4 matrices specifying hedron space coordinates of constituent atoms, 
+        # 4 matrices specifying hedron space coordinates of constituent atoms,
         # initially atom3 on +Z axis
         self.InitialCoords = []
 
@@ -378,13 +307,13 @@ class Dihedron:
         self.initial_coords = None
         self.a4_pre_rotation = None
 
-        # Residue object which includes this dihedron; 
+        # Residue object which includes this dihedron;
         # set by Residue:linkDihedra()
         self.res = None
-        # order of atoms in dihedron is reversed from order of atoms in hedra   
-        self.reverse = False   
+        # order of atoms in dihedron is reversed from order of atoms in hedra
+        self.reverse = False
 
-        # flag indicting that atom coordinates are up to date 
+        # flag indicting that atom coordinates are up to date
         # (do not need to be recalculated from dihedral1)
         self.updated = True
 
@@ -398,10 +327,10 @@ class Dihedron:
     def get_hedron(res, id3):
         hedron = res.hedra.get(id3, None)
         if (not hedron and res.prev and not res.prev.disordered
-           and (' ' == res.prev.id[0])):  # not hetero
+                and (' ' == res.prev.id[0])):  # not hetero
             hedron = res.prev.hedra.get(id3, None)
         if (not hedron and res.post and not res.post.disordered
-           and (' ' == res.post.id[0])):
+                and (' ' == res.post.id[0])):
             hedron = res.post.hedra.get(id3, None)
         return hedron
 
@@ -453,12 +382,12 @@ class Dihedron:
    end
    if not complete then
       if utils.warn then
-         io.stderr:write('dihedron: hedra missing atoms ' .. self:tostring() 
-         .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() 
+         io.stderr:write('dihedron: hedra missing atoms ' .. self:tostring()
+         .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring()
          .. ' ' .. hedron2:tostring() .. '\n')
       end
-      --io.write('dihedron: hedra missing atoms ' .. self:tostring() 
-      .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() 
+      --io.write('dihedron: hedra missing atoms ' .. self:tostring()
+      .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring()
       .. ' ' .. hedron2:tostring() .. '\n')
       return
    end
@@ -508,10 +437,10 @@ class Hedron:
             m = atomre.match(h_dict[k])
             self.hclass += m.group(1)
 
-        # 3 matrices specifying hedron space coordinates of constituent atoms, 
+        # 3 matrices specifying hedron space coordinates of constituent atoms,
         # initially atom3 on +Z axis
         self.atoms = []
-        # 3 matrices, hedron space coordinates, reversed order 
+        # 3 matrices, hedron space coordinates, reversed order
         # initially atom1 on +Z axis
         self.atomsR = []
 
@@ -524,12 +453,12 @@ class Hedron:
 
     def init_pos(self):
 
-        # build hedron with a2 on +Z axis, a1 at origin, 
+        # build hedron with a2 on +Z axis, a1 at origin,
         # a0 in -Z at angle n XZ plane
         for i in range(0, 3):
             # note this initializes a1 to 0,0,0 origin
-            self.atoms.append(numpy.array([[0], [0], [0], [1]], 
-                              dtype=numpy.float64))  # 4x1 array
+            self.atoms.append(numpy.array([[0], [0], [0], [1]],
+                                          dtype=numpy.float64))  # 4x1 array
 
         # supplement: angles which add to 180 are supplementary
         sar = math.radians(180.0 - self.angle2)
@@ -538,15 +467,15 @@ class Hedron:
         self.atoms[2][2][0] = self.len3
         # a0 X is sin( sar ) * len1
         self.atoms[0][0][0] = math.sin(sar) * self.len1
-        # a0 Z is -(cos( sar ) * len1) 
+        # a0 Z is -(cos( sar ) * len1)
         # (assume angle2 always obtuse, so a0 is in -Z)
         self.atoms[0][2][0] = - (math.cos(sar) * self.len3)
 
         # same again but 'reversed' : a0 on Z axis, a1 at origin, a2 in -Z
         for i in range(0, 3):
             # atom[1] to 0,0,0 origin
-            self.atomsR.append(numpy.array([[0], [0], [0], [1]], 
-                               dtype=numpy.float64))
+            self.atomsR.append(numpy.array([[0], [0], [0], [1]],
+                                           dtype=numpy.float64))
 
         # a0r is len1 up from a1 on Z axis, X=Y=0
         self.atomsR[0][2][0] = self.len1
@@ -564,7 +493,7 @@ if os.path.isdir('/media/data'):
     PDB_repository_base = '/media/data/pdb/'
 elif os.path.isdir('/Volumes/data'):
     PDB_repository_base = '/Volumes/data/pdb/'
-                  
+
 
 arg_parser = argparse.ArgumentParser(
     description='Interconvert .pic (pprotein internal coordinates) and '
@@ -574,18 +503,18 @@ arg_parser.add_argument(
     help='a .pdb or .pic path/filename to read (first model, first chain), '
          'or a PDB idCode with optional chain ID to read from {0} as .ent.gz'
          .format((PDB_repository_base or '[PDB resource not defined - '
-                 'please configure before use]')))
+                  'please configure before use]')))
 
 arg_parser.add_argument(
     '-f', dest='filelist',
     help='a Dunbrack cullPDB pdb ID list to read from {0} as .ent.gz'
          .format((PDB_repository_base or '[PDB resource not defined - '
-                 'please configure before use]')))
-arg_parser.add_argument('-wp', help='write pdb file with .pypdb extension', 
+                  'please configure before use]')))
+arg_parser.add_argument('-wp', help='write pdb file with .pypdb extension',
                         action="store_true")
-arg_parser.add_argument('-wi', help='write pic file with .pypdb extension', 
+arg_parser.add_argument('-wi', help='write pic file with .pypdb extension',
                         action="store_true")
-arg_parser.add_argument('-ct', help='test conversion supplied pdb/pic to ', 
+arg_parser.add_argument('-ct', help='test conversion supplied pdb/pic to ',
                         action="store_true")
 
 args = arg_parser.parse_args()
@@ -603,7 +532,7 @@ if args.filelist:
         pdbidMatch = pdbidre.match(fields[0])
         if pdbidMatch:
             # print(m.group(1) + ' ' + m.group(2))
-            # toProcess.append(PDB_repository_base + m.group(2) 
+            # toProcess.append(PDB_repository_base + m.group(2)
             # + '/pdb' + m.group(1) + '.ent.gz' )
             toProcess.append(pdbidMatch.group(0))
 
@@ -633,8 +562,8 @@ for target in toProcess:
         filename = target
 
     pdb_structure = PDB_parser.get_structure(
-        'prot', 
-        gzip.open(filename, mode='rt') 
+        'prot',
+        gzip.open(filename, mode='rt')
         if filename.endswith('.gz') else filename)
 
     # get specified chain if given, else just pick first for now
@@ -646,7 +575,7 @@ for target in toProcess:
     if pdbidMatch is not None and pdbidMatch.group(3) is not None:
         if pdb_structure[0][pdbidMatch.group(3)] is not None:
             pdb_chain = pdb_structure[0][pdbidMatch.group(3)]
-            rCount = len(pdb_chain)  
+            rCount = len(pdb_chain)
         else:
             print('chain ' + pdbidMatch.group(3) + ' not found in ' + filename)
             continue
@@ -668,7 +597,7 @@ for target in toProcess:
             print(mc, ' models ', cc, ' chains ', rct, ' residues total')
             for mi in range(mc):
                 for ci in range(cc):
-                    print('model ', mi, ' chain ', ci, ' residues ', 
+                    print('model ', mi, ' chain ', ci, ' residues ',
                           pdat[mi, ci])
             print('selecting first chain only')
 
@@ -698,16 +627,16 @@ for target in toProcess:
         pdb_chain.pic_init()
         di_hedron_re = re.compile(
             # pdbid and chain id
-            r'^(?P<pdbid>\w+)\s+(?P<chn>\w?)\s*'                       
+            r'^(?P<pdbid>\w+)\s+(?P<chn>\w?)\s*'
             # 3 atom specifiers for hedron
-            r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w_]+):(?P<a3>-?[\w_]+)'      
+            r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w_]+):(?P<a3>-?[\w_]+)'
             # 4th atom speicfier for dihedron
-            r'(:(?P<a4>-?[\w_]+))?'                                    
+            r'(:(?P<a4>-?[\w_]+))?'
             r'\s+'
             # len-angle-len for hedron
-            r'(((?P<len1>\S+)\s+(?P<angle2>\S+)\s+(?P<len3>\S+)\s*$)|'  
+            r'(((?P<len1>\S+)\s+(?P<angle2>\S+)\s+(?P<len3>\S+)\s*$)|'
             # dihedral angle for dihedron
-            r'((?P<dihedral1>\S+)\s*$))')                               
+            r'((?P<dihedral1>\S+)\s*$))')
         picfile = open(filename, 'r')
         for aline in picfile:
             m = di_hedron_re.match(aline)
@@ -717,7 +646,7 @@ for target in toProcess:
 
         internal_to_atom_coordinates(pdb_structure)
 
-    print(pdb_structure.header['idcode'], pdb_chain.id, ':', 
+    print(pdb_structure.header['idcode'], pdb_chain.id, ':',
           pdb_structure.header['head'])
 
     if args.wp:
