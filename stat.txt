@@ -397,3 +397,6 @@ export LUA_CPATH='/usr/local/lib/lua/5.1/?.so;/usr/local/lib/luarocks/rocks/?.so
 13 feb 2019
    - load .pic files ok, start on internalToAtomCoords()
    
+15 feb 2019
+   - got through chain.render_dihedra(), next on to chain.assemble_residues()
+   
