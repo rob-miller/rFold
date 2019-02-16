@@ -29,34 +29,46 @@ Copyright 2017 Robert T. Miller
 -- -r=<start>:<finish>                   : only get specified range of residue positions from target protein
 -- 
 
---- not really finished!!  Just a test fixture for pulling proteins from database
-
+--- work in progress
 
 
 local parsers = require 'rfold.parsers'
 local protein = require "rfold.protein"
 local utils = require 'rfold.utils'
 local chain = require 'rfold.chain'
+local chemdata = require 'rfold.chemdata'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
 rfpg.dbReconnect(1)
 
+local scaleDefault=10.0
+--datafileDefault='rFold.scad'
 
 local args = parsers.parseCmdLine(
-   '[ <pdbid[chain id]> ] ...',
-   '\n retrieve (optionally convert) coordinates for specified pdbid from rFold database.\n',
+   '[ <pdbid[chain id]>  | <pdb file> | <pic file> ] ...',
+   '\n retrieve (optionally convert) coordinates for specified pdbid from rFold database, output as scad file for 3D printing\n',
    {
       ['l'] = 'list:  list available PDBids in database',
-      ['b'] = 'backbone only: do not generate sidechains'
+      ['b'] = 'backbone only: do not generate sidechains',
+      ['wpa'] = 'write peptideOffsets.scad file'
    },
    {
-      ['w'] = 'pic|gpdb|<filename(.pic|.gpdb)> : write specified format to pdbid.<format> or <filename>',
-      ['f'] = '<input file> : process IDs listed in <input file> (1 per line) followed by any on command line',
-      ['r'] = '<firstResidue:lastResidue> : only output residues within the range specified '
+      ['s'] = '<scale> : slicer units per angstrom (usually millimetres). default=' .. scaleDefault,
+      --['d'] = '<datafile.scad> : coordinate data filename (only written if input structure data).  default=' .. datafileDefault,
+
+      --['w'] = '<filename.scad> : write commands to <filename.scad>  default=stdout.',
+      ['r'] = '<firstResidue:lastResidue> : only output residues within the range specified ',
+      ['f'] = '<input file> : process IDs listed in <input file> (1 per line) followed by any on command line'
    }
 )
 
+local scale = args['s'] and args['s'][1] or scaleDefault
+local datafile = args['w'] and args['w'][1] or datafileDefault
 
+if args['wpa'] then
+   utils.writeFile('peptideOffsets.scad', protein.scadOffsets())
+end
+      
 if args['l'] then
    local cur = rfpg.Qcur('select pdb_no, pdbid, chain, filename from pdb_chain order by pdbid, chain, filename')
    local pdb = cur:fetch({},'a')
@@ -90,21 +102,58 @@ end
 
 for i,arg in ipairs(toProcess) do
    if '' ~= arg then
-
+      local file, chain, pdbid
+      
       if 'quit' == arg then os.exit() end    -- so can insert 'quit' in input file of PDB IDs for testing and debugging
 
-      local pdb,chain = arg:match('^(%d%w%w%w)(%w?)%s*$')
+      pdbid,chain = arg:match('^(%d%w%w%w)(%w?)%s*$')   -- try pdb id for db query first
+
+      if not pdbid then
+         file,chain = arg:match('^(%S+)%s?(%w?)%s*$')   -- needs space at end if doing on command line, e.g. '7RSAA '
+      end
+      
       if chain == '' then chain = nil end
+      
+      if not pdbid then
+         -- load current file
+         pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
+      end
+      
+      if not pdbid then goto continue end   -- give up
 
+      local prot = protein.get(pdbid)
 
-      --print('pdb= ' .. pdb .. ' chain= ' .. (chain and chain or ''))
-      local prot = protein.get(pdb)
-      --print(prot:tostring())
-      prot:dbLoad(rfpg)
+      if not file then 
+         prot:dbLoad(rfpg)
+      end
+
+      if prot:countDihedra() > 0 then     -- need atom coords to scale
+         prot:internalToAtomCoords()
+         prot:clearInternalCoords()
+      end
+
+      prot:scaleAtomCoords(scale)
+
+      prot:atomsToInternalCoords()
+      prot:clearInitNCaC()
+      prot:clearAtomCoords()
+      prot:internalToAtomCoords()
+      
       --print('loaded:')
-      --print(prot:tostring())
+      -- print(prot:tostring())
 
-      print(prot:writeSCAD((args['r'] and args['r'][1] or nil), (args['b'] and args['b'] or nil)))
+      local scadData =  prot:writeSCAD(scale,(args['r'] and args['r'][1] or nil), (args['b'] and args['b'] or nil))
+
+      utils.writeFile(pdbid .. 'coords.scad', 'protein = ' .. scadData .. ';\n')
+
+      
+      --print('chain(chains,residues,hedra);')
+
+      --print('translate([10,10,' .. (chemdata.covalent_radii['Nres']/2) * scale .. '])')
+      --print('  rotate([0,90,0])')
+      --print('    rotate([0,0,residues[0][2][0]])')
+      --print('      amideChain(amides,chains,residues,hedra);')
+
       
       -- print(prot:writeInternalCoords(nil,args['r'][1]))   -- 'r' needs to be the i'th file being processed....
       
@@ -127,6 +176,9 @@ for i,arg in ipairs(toProcess) do
       local coords3D
          -- ]]
       --end
+
+      ::continue::
+
    end
 end
 
