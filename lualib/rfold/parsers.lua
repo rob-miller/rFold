@@ -148,9 +148,14 @@ function parsers.parseProteinData (infile, callback, chain, infname)
    end
    for key,line in ipairs(stringArray) do
       --print(line)
-      if line:match('^HEADER ') then  -- dssp or pdb
+      if line:match('^HEADER ') then  -- dssp or pdb or pic
          pdbid = line:match('(%S+)%s*%.?$')
-         local header = line:match('^(.+' .. pdbid .. ').+$') .. '              '  -- wipe the '.' dssp puts at end
+         --print(pdbid)
+         local header = line:gsub('%.$','')       -- wipe the '.' dssp puts at end
+         header = header:gsub('%s*$','')           -- wipe all trailing space
+         header = string.format('%-80s\n', header)   -- reformat to space-filled 80 chars long
+         
+         --local header = line:match('^(.+' .. pdbid .. ').+$') .. '              ' 
          --print(pdbid,header)
          if callback then
             callback({['pdbid'] = pdbid, ['header'] = header })
@@ -162,6 +167,8 @@ function parsers.parseProteinData (infile, callback, chain, infname)
       elseif line:match('^TITLE') then  -- pdb only -- dssp does not pass
          local title = line
          title = title:gsub("'",'-PRIME')
+         title = title:gsub('%*$','')           -- wipe all trailing space
+         title = string.format('%-80s\n', title)   -- reformat to space-filled 80 chars long
          if callback then
             callback({['pdbid'] = pdbid, ['title'] = title })
          else
@@ -176,7 +183,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
             rdt['compnd'] = compnd
          end
          --print(pdbid)
-      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec
+      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?[%w_]+):(-?[%w_]+):(-?[%w_]+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$')  then  -- hedron spec   (.pic)
          local trip = {}
          trip['pdbid'],trip['chn'],trip[1],trip[2],trip[3],trip['len1'],trip['angle2'],trip['len3'] = pdbid, _1, _2, _3, _4, tonumber(_5), tonumber(_6), tonumber(_7)
          if not chain or chain == trip['chn'] then
@@ -187,7 +194,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
             end
          end
          --print(pdbid,chn,a1,a2,a3,v1,v2,v3)
-      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?%w+):(-?%w+):(-?%w+):(-?%w+)%s+(%S+)%s*$')  then   -- dihedron spec
+      elseif line:ematch('^'..pdbid..'%s+(%a?)%s*(-?[%w_]+):(-?[%w_]+):(-?[%w_]+):(-?[%w_]+)%s+(%S+)%s*$')  then   -- dihedron spec     (.pic)
          local quad={}
          quad['pdbid'],quad['chn'],quad[1],quad[2],quad[3],quad[4],quad['dihedral1'] = pdbid, _1, _2, _3, _4, _5, tonumber(_6)
          if not chain or chain == quad['chn'] then
@@ -199,6 +206,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
          end
          --print(pdbid,chn,a1,a2,a3,a4,v1)
       elseif line:ematch('^%s+(%d+)%s+(-?%d+)%s(%a?)%s(%a)%s') then    -- modified dssp output
+         --print(_1,_2,_3,_4)
          local dsp = {}
          local ndx
          dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'] = tonumber(_1),tonumber(_2),_3,_4
@@ -210,6 +218,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
          dsp['ss2'] = line:sub(19,26)
          dsp['acc'] = tonumber(line:sub(36,38))
          local nums = line:sub(106)
+         --print('nums', nums)
          assert(nums:ematch('^%s*(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s*$'), 'failed to parse dssp: '..line)
 
          dsp['n'] = {}
@@ -230,7 +239,7 @@ function parsers.parseProteinData (infile, callback, chain, infname)
                rdt['dssp'][#rdt['dssp']+1] = dsp
             end
          end
-         --print(ndx, resn, chn, res, '.'..ss..'.','>'..ss2..'<',phi,psi,omg,zn,zc,bca)
+         --print('dssp:', dsp['ndx'], dsp['resn'], dsp['chn'], dsp['res'], '.'.. (dsp['ss'] and dsp['ss'] or 'no_ss') ..'.','>'.. (dsp['ss2'] and dsp['ss2'] or 'no_ss2') ..'<',dsp['phi'],dsp['psi'],dsp['omg'],dsp['n']['z'],dsp['c']['z'],dsp['bca'])
 --[[
          1         2         3         4         5         6         7         8
 12345678901234567890123456789012345678901234567890123456789012345678901234567890
@@ -239,6 +248,7 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
 --]]
          --                ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:ematch('^ATOM%s+(%d+)%s*%w+') then
+         --print(line)
          local pdb = {}
          pdb['ndx'] = tonumber(_1)
          pdb['atom'] = line:sub(13,16):gsub('%s','')
@@ -335,7 +345,23 @@ ATOM   2606  CD  GLN A 324    -147.432-100.309  -1.110  1.00  0.00           C
       elseif line:match('^MTRIX') then
       elseif line:match('^SCALE') then
       elseif line:match('^ANISOU') then
-      elseif line:match('^TER') then
+      elseif line:ematch('^TER%s+(%d+)') then
+         --print(line)
+         local ter = { ['TER'] = true }
+         ter['ndx'] = tonumber(_1)
+         ter['res3'] = line:sub(18,20)
+         ter['chn'] = line:sub(22,22)
+         ter['resn'] = tonumber(line:sub(23,26))
+         ter['pdbid'] = pdbid
+         
+         if (not chain) or (chain == ter['chn']) then
+            if callback then
+               callback(ter)
+            else
+               rdt['pdb'][#rdt['pdb']+1] = ter
+            end
+         end
+         
       elseif line:match('^HETATM') then    -- todo: add support
       elseif line:match('^MODRES') then
       elseif line:match('^MODEL') then

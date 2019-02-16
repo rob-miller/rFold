@@ -83,6 +83,10 @@ function dihedron.new (o)
    o['key3'] = utils.genKey(o[1],o[2],o[3])
    o['key32'] = utils.genKey(o[2],o[3],o[4])
    
+   local classArr={}
+   for i=1,4 do classArr[i] = utils.splitAtomKey(o[i])[3] end
+   o['class'] = table.concat(classArr)
+
    o['updated'] = true
 
    if not o['initialCoords'] then
@@ -145,6 +149,8 @@ function Dihedron:tostring()
    return s
 end
 
+
+
 local function getHedron(res,key)
    local hedron = res['hedra'][key]
    if not hedron and res['prev'] and res['prev']['ordered'] then hedron = res['prev']['hedra'][key] end
@@ -174,13 +180,21 @@ function Dihedron:setHedra()
    if not hedron1 then
       --assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedron ' .. h1key .. ' a4= ' .. self[4])
       io.stderr:write('residue ' .. res['res'] .. res['resn'] .. ' failed to locate 1st hedron ' .. h1key .. ' a4= ' .. self[4] .. '\n')
+
+      res:reportDH3()
+      os.exit()
+         
    end
 
    hedron2 = getHedron(res,h2key)
    if not hedron2 then 
       --assert(nil,'residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron ' .. h2key .. ' a1= ' .. self[1])
       io.stderr:write('residue ' .. res['res'] .. res['resn'] .. ' failed to locate 2nd hedron ' .. h2key .. ' a1= ' .. self[1] .. '\n')
-   end
+
+      res:reportDH3()
+      os.exit()
+         
+end
 
    self['hedron1'] = hedron1
    self['h1key'] = h1key
@@ -200,7 +214,10 @@ function Dihedron:initPos()
    local hedron1 = self['hedron1']
    local hedron2 = self['hedron2']
 
-   if not (hedron1 and hedron2) then return end -- error bad PDB data!
+   if not (hedron1 and hedron2) then
+      print('Dihedron:initPos - ' .. self:tostring() .. ' missing data h1= ' .. (hedron1 and 'ok' or 'nil') .. ' h2= ' ..  (hedron2 and 'ok' or 'nil'))
+      return
+   end -- error bad PDB data!
    
    local complete = true
    for i=1,3 do
@@ -213,6 +230,7 @@ function Dihedron:initPos()
       if utils.warn then
          io.stderr:write('dihedron: hedra missing atoms ' .. self:tostring() .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() .. ' ' .. hedron2:tostring() .. '\n')
       end
+      --io.write('dihedron: hedra missing atoms ' .. self:tostring() .. (reverse and ' reverse ' or ' forward ') .. hedron1:tostring() .. ' ' .. hedron2:tostring() .. '\n')
       return
    end
       
@@ -394,7 +412,7 @@ function Dihedron:isBackbone()
    local atoms = utils.splitKey(self['key'])
    for i,a in ipairs(atoms) do
       local as = utils.splitAtomKey(a)
-      if not (as[3] == 'N' or as[3] == 'CA' or as[3] == 'C' or as[3] == 'O') then return false end
+      if not (as[3] == 'N' or as[3] == 'CA' or as[3] == 'C' or as[3] == 'O' or as[3] == 'H') then return false end
    end
    return true
 end

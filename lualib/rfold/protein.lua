@@ -75,7 +75,7 @@ function protein.new (o)
    end
 
    if not o['header'] then
-      o['header'] = string.format('HEADER    %-40s%9s   %s','DE NOVO PROTEIN',os.date("%d-%b-%Y"),o['id'])
+      o['header'] = string.format('%-80s\n', string.format('HEADER    %-40s%9s   %s ','DE NOVO PROTEIN',os.date("%d-%b-%Y"),o['id']) )
       --print(o['header'])
    end
    protein.proteins[o['id']] = o
@@ -134,6 +134,7 @@ end
 
                       
 --- add the passed table data to the protein specified (pdbid) in the table (not a class method - may create new Protein)
+-- NB: this is a callback called line-by-line for input file normally through parseProteinData
 -- @param t table with field 'pdbid' and preferably chain identifier field 'chn', passed here as callback from file parser
 function protein.load(t)
    if not t['pdbid'] then
@@ -220,6 +221,21 @@ function Protein:countDSSPs()
    return dc
 end
 
+--- clear initial coordinates for each chain
+function Protein:clearInitNCaC()
+   for k,v in pairs(self['chains']) do
+      v:clearInitNCaC()
+   end
+end
+
+--- scale atom coordinates by parameter
+-- @param scale float scale multiplier
+function Protein:scaleAtomCoords(scale)
+   for k,v in pairs(self['chains']) do
+      v:scaleAtomCoords(scale)
+   end
+end
+
 --- generate sequence strings for chains in this protein
 -- @return chain sequence strings, 1n separated
 function Protein:tosequence()
@@ -256,12 +272,18 @@ end
 function Protein:writePDB(noRemark,range)
    --print('protein topdb ')
    local s= ''
-   if self['header'] then s = s .. self['header'] ..'\n' end
-   if self['title'] then s = s .. self['title'] ..'\n' end
+   if self['header'] then s = s .. self['header'] end
+   if self['title'] then s = s .. self['title'] end
    if not noRemark then
-      s = s .. string.format('%-80s\n','REMARK   5')
-      s = s .. string.format('%-80s\n','REMARK   5 WARNING')
-      s = s .. string.format('%-80s\n','REMARK   5 ' .. self['id'] .. ':   ' .. 'RFOLD OUTPUT ' .. os.date("%d-%b-%Y %H:%M:%S") )
+      s = s .. utils.remarkString(' ')
+      s = s .. utils.remarkString('WARNING')
+      s = s .. utils.remarkString(self['id'] .. ':   ' .. 'RFOLD OUTPUT ' .. os.date("%d-%b-%Y %H:%M:%S") )
+   end
+
+   if self['remarks'] then
+      for i,r in ipairs(self['remarks']) do
+         s = s .. r
+      end
    end
    
    local ndx=0
@@ -271,7 +293,7 @@ function Protein:writePDB(noRemark,range)
       ls, ndx = chain:writePDB(ndx,range)
       s = s .. ls
    end
-   s = s .. string.format('%-80s','END')
+   s = s .. string.format('%-80s\n','END')
    return s
 end
 
@@ -281,8 +303,15 @@ end
 -- @return string containing structure specification in internal coordinates (complete)
 function Protein:writeInternalCoords(noTitle,range)
    local s = ''
-   if self['header'] then s = s .. self['header'] ..'\n' end
-   if (not noTitle) and self['title'] then s = s .. self['title'] ..'\n' end
+   if self['header'] then s = s .. self['header'] end
+   if (not noTitle) and self['title'] then s = s .. self['title'] end
+
+   if self['remarks'] then
+      for i,r in ipairs(self['remarks']) do
+         s = s .. r
+      end
+   end
+   
    for k,v in ipairs(self['chainOrder']) do
       local chain = self['chains'][v]
       s = s .. chain:writeInternalCoords(range)
@@ -449,6 +478,24 @@ function Protein:setStartCoords()
    end
 end
 
+--- generate keys for di/hedra in all residues in all chains
+function Protein:initEmpty()
+   for k,v in pairs(self['chains']) do
+      v:initEmpty()
+   end
+end
+
+--- populate Residue hedra and dihedra values with average results using rFold db residue selection query
+-- add hedron and dihedron tags sd, min, max
+-- @param rfpg open database handle
+-- @param resSelector rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
+function Protein:getDbStats(rfpg, resSelector)
+   for k,v in pairs(self['chains']) do
+      v:getDbStats(rfpg, resSelector)
+   end
+end
+
+
 --- generate string indicating chain IDs and residues in each
 -- @return string
 function Protein:report()
@@ -467,22 +514,56 @@ function Protein:printInfo()
    end
 end
 
+--- generate variables in openSCAD format for indexing datafiles (not a class method)
+-- should not need to be run often
+function protein.scadOffsets()
+
+   local proteinOffsets =    { '// protein base level', 'p_pdbid', 'p_proteinScale', 'p_chainData'  }    -- output scale from rFold affects transformation matrices so integral to data file
+   --local chainDataOffsets =  { '// chain level data', 'c_chainID', 'c_hedra', 'c_dihedra', 'c_amideSet', 'c_residues' }
+   local chainDataOffsets =  { '// chain level data', 'c_chainID', 'c_hedra', 'c_dihedra', 'c_residues' }
+   local hedraOffsets =      { '// hedra definitions', 'h_len1', 'h_angle2', 'h_len3', 'h_atom1', 'h_atom2', 'h_atom3' }
+   local resDihedraOffsets = { '// dihedra specifications for each residue in sequence, dihedral array', 'd_dangle1', 'd_h1ndx', 'd_h2ndx', 'd_reversed', 'd_dihedralTransform' }
+   --local resAmideOffsets =   { '// amideSet: backbone only di/hedra indices and amide proton data in sequence array', 'a_resNdx', 'a_NCaCndx', 'a_CaCNCaNdx', 'a_NCaCOndx', 'a_CCaNHndx', 'a_CCaNHtransform' }
+   local residueOffsets =    { '// residueSet: world transform for each residue in sequence array', 'r_resNdx', 'r_resID', 'r_resTransform' }
+   
+   local s='//\n// OpenSCAD array indices to reference protein data\n//\n\n';
+
+   --for x,t in ipairs( { proteinOffsets, chainDataOffsets, hedraOffsets, resDihedraOffsets, resAmideOffsets, residueOffsets } ) do
+   for x,t in ipairs( { proteinOffsets, chainDataOffsets, hedraOffsets, resDihedraOffsets, residueOffsets } ) do
+      local ndx=0
+      for i,v in ipairs(t) do
+         s = s .. v
+         if '/' ~= v:sub(1,1) then
+            s = s .. ' = ' .. ndx .. ';'
+            ndx = ndx+1
+         end
+         s = s .. '\n'
+      end
+      s = s .. '\n'
+   end
+
+   return s
+end
 
 --- generate OpenSCAD instructions to render protein chain
 -- @param range optional start:finish filter for residues to output
 -- @param backboneOnly optional boolean if true do not generate sidechains in openSCAD output
 -- @return string of OpenSCAD data and command lines
-function Protein:writeSCAD(range, backboneOnly)
+function Protein:writeSCAD(scale, range, backboneOnly)
 
    self:linkResidues()              -- set prev, next for each residue in each chain; create tables from residue to dihedron positions according to PDB backbone, sidechain atoms
    self:renderDihedra()             -- generate hedron and dihedron space coordinates for hedron angle, lengths and dihedron angle
 
-   local s = 'use </Users/rob/proj/rFold/genSCAD/peptide.scad>;\n'
-   
+   local s = '[ "' .. self['id'] .. '", ' .. scale .. ',\n'
+
    for k,v in ipairs(self['chainOrder']) do
-      local chain = self['chains'][v]
-      s = s .. chain:writeSCAD(range, backboneOnly)
+      s = s .. ' [\n'
+      s = s .. self['chains'][v]:writeSCAD(scale, range, backboneOnly)
+      s = s .. ' ]\n'
    end
+
+   s = s .. ']'
+   
    return s
 end
 

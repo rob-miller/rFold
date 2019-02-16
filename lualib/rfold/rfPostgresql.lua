@@ -102,6 +102,17 @@ end
 
 
 ---------------------------------
+function getHostName()
+    local f = io.popen ("/bin/hostname")
+    local hostname = f:read("*a") or ""
+    f:close()
+    hostname =string.gsub(hostname, "\n$", "")
+    return hostname
+end
+
+if ('xubuntu' == getHostName()) then 
+   rfpg.host='nova'
+end
 
 function rfpg.dbReconnect(autocommit)
    rfpg.pg = luasql.postgres()

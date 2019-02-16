@@ -35,7 +35,7 @@ end
 -- @table chemdata.res3
 chemdata.res3 = { G = 'GLY', A = 'ALA', V = 'VAL', L = 'LEU', I = 'ILE', M = 'MET', F = 'PHE', P = 'PRO', S = 'SER', T = 'THR',
                C = 'CYS', N = 'ASN', Q = 'GLN', Y = 'TYR', W = 'TRP', D = 'ASP', E = 'GLU', H = 'HIS', K = 'LYS', R = 'ARG',
-               X = 'UNK' }
+               X = 'UNK', _ = 'UNK' }
 
 --- residue 3-letter name to single letter conversion
 -- @table chemdata.res1
@@ -43,16 +43,25 @@ chemdata.res1 = { ['GLY'] = 'G', ['ALA'] = 'A', ['VAL'] = 'V', ['LEU'] = 'L', ['
                ['CYS'] = 'C', ['ASN'] = 'N', ['GLN'] = 'Q', ['TYR'] = 'Y', ['TRP'] = 'W', ['ASP'] = 'D', ['GLU'] = 'E', ['HIS'] = 'H', ['LYS'] = 'K', ['ARG'] = 'R',
                ['UNK'] = 'X' }
 
+
+-- generating hedra / dihedra / atom coordinates
+-- see Residue:assemble(), Residue:dihedraFromAtoms()
+-- need first 3 positions in dihedron located (known coordinates in hedron1) to generate coordinates for position 4
+-- if the first 3 dihedron positions exist as reversed key in hedra (C-CA-N-H, on N-CA-C is present) then 2nd hedron needs reverse key (H-N-CA)
+
+-- also for rFoldLoadDB database load must update dssp to match
+
 --- backbone hedra definitions
 -- @table chemdata.backbone_angles
 chemdata.backbone_angles = {
    { 'N', 'CA', 'C' },
    { 'CA', 'C', 'O' },
    { 'CB', 'CA', 'C' },
-   { 'N', 'CA', 'CB' },
+   { 'N', 'CA', 'CB' },  -- needed for residues with sidechains but not gly or ala
    { 'CA', 'C', 'OXT' },
    { 'CA', 'C', '_N' },
-   { '_C', 'N', 'CA' }
+   { '_C', 'N', 'CA' },
+   { 'H', 'N', 'CA' }
 }
 
 --- backbone dihedra definitions
@@ -63,7 +72,8 @@ chemdata.backbone_dihedrals = {
    { '_C', 'N', 'CA', 'C', 'phi' },  -- phi i
    { 'N', 'CA', 'C', 'O' },
    { 'O', 'C', 'CA', 'CB' },
-   { 'N', 'CA', 'C', 'OXT' } --,
+   { 'N', 'CA', 'C', 'OXT' },
+   { 'C', 'CA', 'N', 'H' }
    -- ['psi'] = 1, ['omega'] = 2, ['phi'] = 3
 }
    
@@ -285,7 +295,7 @@ chemdata.electronegativity = { ['C'] = 2.55, ['O'] = 3.44, ['N'] = 3.04, ['H'] =
 --- atom classes based on Heyrovska, Raji covalent radii paper
 -- @table chemdata.residue_atom_class
 chemdata.residue_atom_bond_state = {
-   ['X'] = { ['N'] = 'Nsb', ['CA'] = 'Csb', ['C'] = 'Cdb', ['O'] = 'Odb', ['OXT'] = 'Osb', ['CB'] = 'Csb' },
+   ['X'] = { ['N'] = 'Nsb', ['CA'] = 'Csb', ['C'] = 'Cdb', ['O'] = 'Odb', ['OXT'] = 'Osb', ['CB'] = 'Csb', ['H'] = 'Hsb' },
    ['V'] = { ['CG1'] = 'Csb', ['CG2'] = 'Csb' },
    ['L'] = { ['CG'] = 'Csb', ['CD1'] = 'Csb', ['CD2'] = 'Csb' },
    ['I'] = { ['CG1'] = 'Csb', ['CG2'] = 'Csb', ['CD1'] = 'Csb' },

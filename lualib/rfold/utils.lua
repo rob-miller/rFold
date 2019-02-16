@@ -197,6 +197,12 @@ function utils.atomString(ndx,name,res,chain,resn,ax,ay,az,occ,tempFact)
                         'ATOM  ', ndx, name,' ', chemdata.res3[res], chain, resn,' ', ax, ay, az, occ, tempFact, '    ', string.sub(name,1,1),'  ')
 end
 
+--- generate a PDB REMARK 5 string
+-- @param s string text of the remark
+function utils.remarkString(s)
+   return string.format('%-80s\n','REMARK   5 ' .. s)
+end
+
 --- open a named file, write the passed string, close the file
 -- @param fname name of file to open
 -- @param s string to write

@@ -50,10 +50,10 @@ local Hedron = {}  -- class table
 --- distance between second and third atoms
 -- @field len3 float
 
---- three 4x1 matrices specifying coordinates of constituent atoms, initially atom3 on +Z axis
+--- three 4x1 matrices specifying hedron space coordinates of constituent atoms, initially atom3 on +Z axis
 -- @table atoms 
 
---- three 4x1 matrices specifying coordinates of constituent atoms, reversed order - initially atom1 on +Z axis
+--- three 4x1 matrices specifying hedron space coordinates of constituent atoms, reversed order - initially atom1 on +Z axis
 -- @table atomsR
 
 --- flag indicating that atom coordinates are up to date (do not need to be recalculated from len1-angle2-len3)
@@ -73,6 +73,12 @@ function hedron.new (o)
    setmetatable(o, { __index = Hedron })
 
    o['key'] = utils.genKey(o[1],o[2],o[3])
+
+   local classArr={}
+   for i=1,3 do classArr[i] = utils.splitAtomKey(o[i])[3] end
+   o['class'] = table.concat(classArr)
+
+
    o['updated'] = true
 
    if not o['atoms'] then
@@ -128,8 +134,18 @@ function hedron.avgDb(rfpg, atom_selector, residue_selector)
    -- specify upper/lower bounds subset to calculate over:
    qry = qry .. ' from angle_subset where angle between (select lower_bound from bounds) and (select upper_bound from bounds)'
 
+   --print(qry)
    local rslt = rfpg.Q(qry)
 
+   --[[
+   for x,y in ipairs(rslt) do
+      print(x,y, y .. ' ')
+      if not y then print(x,qry)
+         os.exit()
+      end
+   end
+   --]]
+   
    return {
       ['len1'] = { rslt[1], rslt[2], rslt[3], rslt[4] },
       ['angle2'] = { rslt[5], rslt[6], rslt[7], rslt[8] },
@@ -283,11 +299,18 @@ function Hedron:writeDb(rfpg, res_id, update)
    return aid 
 end
 
+--- return val if check is true, else return 0 
+local function or0(check,val)
+   return val
+   --return (check and val or 0)
+end
+
 --- populate len1, angle2, len3 values with average results using rFold db residue selection query and atom keys in string (residue will be '_' for postgresql 'like' query if appropriate)
 -- add tags sd[len1, angle2, len3], min[...], max[...]
 -- @param rfpg open database handle
 -- @param resSelector rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
 function Hedron:getDbStats(rfpg, resSelector)
+   --print('enter')
    local akl = utils.splitKey(self['key'])
    local al = {}
    for i,ak in ipairs(akl) do
@@ -295,19 +318,54 @@ function Hedron:getDbStats(rfpg, resSelector)
       al[i] = a[2]..a[3]
    end
    local stats = hedron.avgDb(rfpg,al,resSelector)
+   --local c = 
+
+   self['count'] = stats['count']
+
+   -- if no data (c=0) for this angle in database for some reason, return 0's instead of nil's so don't crash elsewhere
+   
    self['len1'] = stats['len1'][1]
    self['angle2'] = stats['angle2'][1]
    self['len3'] = stats['len3'][1]
 
+   --[[
    for i,fn in ipairs( {'sd', 'min', 'max'} ) do
       self[fn] = {}
       for j,val in ipairs( {'len1', 'angle2', 'len3'} ) do
          self[fn][val] = stats[val][i+1]
          --print(fn,val,stats[val][i+1])
+         --print(fn .. ' ' .. val .. ' ' .. self[fn][val] .. ' ' ..  stats[val][i+1])
+      -- heisenbug here : works if the print() below is uncommented, fails repeatably otherwise
          --print()
       end
    end
-   self['count'] = stats['count']
+   --]]
+
+   for i,fn in ipairs( {'sd', 'min', 'max'} ) do
+      self[fn] = {}
+   end
+   for j,val in ipairs( {'len1', 'angle2', 'len3'} ) do
+      local stats2 = stats[val]
+      for i,fn in ipairs( {'sd', 'min', 'max'} ) do
+         self[fn][val] = stats2[i+1]
+         --print(fn,val,stats[val][i+1])
+         --print(fn .. ' ' .. val .. ' ' .. self[fn][val] .. ' ' ..  stats[val][i+1])
+         --print()
+      end
+   end
+   
+   
+   --[[
+   print(collectgarbage("count"))
+   print(self['len1'],self['angle2'],self['len3'])
+
+   for i,fn in ipairs( {'sd', 'min', 'max'} ) do
+      for i,val in ipairs( { 'len1', 'angle2', 'len3' } ) do
+         print(val,self['sd'][val],self['min'][val],self['max'][val])
+         print(val .. ' ' .. self['sd'][val] .. ' ' .. self['min'][val] .. ' ' .. self['max'][val])
+      end
+   end
+   --]]
 end
 
 

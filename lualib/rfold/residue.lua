@@ -84,9 +84,11 @@ local sidechainSort = { CB = 1,
                         CZ = 9, CZ2 = 9, NZ = 9,
                         NH1 = 10, OH = 10, CZ3 = 10, 
                         CH2 = 11, NH2 = 11,
-                        OXT = 12
+                        OXT = 12,
+                        H = 13
 }
 
+local maxSideChain = 13
 
 --- Residue class object initialiser (not a class method)
 -- @param o table with fields 'res' = 1-letter amino acid code, 'resn' = sequence position of Residue in Chain
@@ -122,15 +124,15 @@ end
 function residue.keysort(a,b)
    if a==b then return false end  -- if = then not <
 
-   local aksan, aksa = a:match('^(-?%d+)%a(%w+):?')
-   if (not aksan) or (not aksa) then aksan, aksa = a:match('^(-?%d+)_(%w+):?') end
-   local aksbn, aksb = b:match('^(-?%d+)%a(%w+):?')
-   if (not aksbn) or (not aksb) then aksbn, aksb = b:match('^(-?%d+)_(%w+):?') end
+   local aksan, aksa = a:match('^(-?%d+)[%a_](%w+):?')
+   --if (not aksan) or (not aksa) then aksan, aksa = a:match('^(-?%d+)_(%w+):?') end
+   local aksbn, aksb = b:match('^(-?%d+)[%a_](%w+):?')
+   --if (not aksbn) or (not aksb) then aksbn, aksb = b:match('^(-?%d+)_(%w+):?') end
    --print(a,b,aksan,aksa,aksbn,aksb)
 
-   if aksan ~= aksbn then return aksan < aksbn end   -- seqpos takes precedence
+   if aksan ~= aksbn then return tonumber(aksan) < tonumber(aksbn) end   -- seqpos takes precedence
       
-   if aksa == aksb then return residue.keysort(a:match('^-?%d+%a%w+:(.+)$'),b:match('^-?%d+%a%w+:(.+)$')) end  -- if first field = then go to next
+   if aksa == aksb then return residue.keysort(a:match('^-?%d+[%a_]%w+:(.+)$'),b:match('^-?%d+[%a_]%w+:(.+)$')) end  -- if first field = then go to next
       
    if backboneSort[aksa] and backboneSort[aksb] then return backboneSort[aksa] < backboneSort[aksb] end
    if sidechainSort[aksa] and sidechainSort[aksb] then return sidechainSort[aksa] < sidechainSort[aksb] end
@@ -140,6 +142,32 @@ end
 
 
 
+--- test self for ordered boolean, update as necessary
+-- currently only checks backbone N, CA, C are present, and only clears ordered flag (default for object creation is ordered set true)
+function Residue:checkResidue()
+   local n = self['resn']
+   local r = self['res']
+   local k = utils.genKey(n..r..'N',n..r..'CA',n..r..'C')
+   if self['hedra'][k] then return end  -- have N-CA-C hedron, conclude ordered
+
+   local akl = self:NCaCKeySplit()
+   for ai,ak in ipairs(akl) do
+      if self['dssp'] then
+         local atomName = utils.splitAtomKey(ak)[3]:lower()
+         local datom = self['dssp'][atomName]
+         if (not datom) or (not (datom['x'] and datom['y'] and datom['z']))  then
+            --print(self['resn'] .. ' ' .. self['res'] .. ' is disordered (dssp)')
+            self['ordered'] = false
+            return
+         end
+      elseif not self['atomCoords'][ak] then
+         print(self['resn'] .. ' ' .. self['res'] .. ' is disordered (pdb)')
+         self['ordered'] = false
+         return
+      end
+   end
+   --print(self['resn'] .. ' ' .. self['res'] .. ' is ordered')
+end
 
 
 --- callback from file parser, import table data for this Residue according to contents
@@ -147,22 +175,26 @@ end
 function Residue:load(t)
    if t['psi'] then -- dssp record
       self['dssp'] = t
+      --print('dssp',  t['ndx'], t['resn'], t['chn'], t['res'])
    elseif t['tempfact'] then   -- pdb ATOM record
       local ak = t['resn'] .. t['res'] .. t['atom']
+      --print(ak)
       local atom = geom3d.get41mtx()
       atom[1][1] = t['x']
       atom[2][1] = t['y']
       atom[3][1] = t['z']
       self['atomCoords'][ak] = atom
-   else
+   else    -- pic record
       t['pdbid'] = nil  -- not desired in di,hedron objects
       t['chn'] = nil  
       if t['dihedral1'] then
          --print('dihedron: ' .. self:tostring() .. ' ' .. utils.genKey(t[1],t[2],t[3],t[4]))
          self['dihedra'][ utils.genKey(t[1],t[2],t[3],t[4]) ] = dihedron.new(t)
+         --self:reportDihedra()
       elseif t['angle2'] then
          --print('hedron: ' .. self:tostring() .. ' ' ..  utils.genKey(t[1],t[2],t[3]))
          self['hedra'][ utils.genKey(t[1],t[2],t[3]) ] = hedron.new(t)
+         --self:reportHedra()
       else
          for k,v in pairs(t) do print(k,v) end
          assert(nil, self:tostring() .. ' loading ' .. tostring(t) .. ' -- not recognised')
@@ -174,22 +206,36 @@ end
 --- populate Residue hedra and dihedra tables with keys only for supplied res and resn
 -- used to generate database average results, not otherwise in normal use
 -- NB: *** neighbouring residues set to wildcard
-function Residue:initEmpty()
-   for x,tbl in ipairs( { chemdata.backbone_angles, chemdata.backbone_dihedrals, chemdata.sidechains[self['res']] } ) do
+-- @param terminal bool indicates residue is end of chain so wipe di/hedra and reload with appropriate (oxt ok, no forward neighbours)
+function Residue:initEmpty( terminal )
+   if terminal then
+      self['hedra'] = {}
+      self['dihedra'] = {}
+   end
+   for x,tbl in ipairs( { chemdata.backbone_angles, chemdata.backbone_dihedrals, chemdata.sidechains[self['res']] } ) do   -- add the first bespoke one (redundant) so we have hedra for all dihedra  { { '_CA', '_C', 'N' } }, 
       if tbl then
-         for i,hd in ipairs(tbl) do   -- hedra or dihedra
+         for i,hd in ipairs(tbl) do   -- hd = hedra or dihedra
             local t = {}
-            for k,a in ipairs(hd) do
+            local forward = false
+            for k,a in ipairs(hd) do  -- a = atom name
                if 5 == k then
-                  t['name'] = a
+                  t['name'] = a  -- optional 5th entry in backbone_dihedrals to mark psi, phi, omega
                else
                   local resn = self['resn']
                   local res = self['res']
-                  if '_' == a:sub(1,1) then         -- handle _CA, _C and _N
-                     resn = (k<4 and resn-1 or resn+1)
-                     res = '_'   -- *** neighbouring residues set to wildcard
-                     a = a:sub(2)  -- trim _ as it is residue
-                  end  
+                  if '_' == a:sub(1,1) then         -- handle _CA, _C and _N where the _ refers to adjacent residues; change this to investigate angles between specific residue pairs !!
+                     forward=true
+                     if k<3 then    -- 1st in triple or quad is always self['resn']. so for _ in positions 1,2 we -1 here and then +1 all positions because forward=true; for _ in posn 4 we +1 it below as forward=true but already past posns 1,2,3
+                        resn = resn-1
+                     else
+                        res = '_'   -- *** _ in position 4, goes to forward neighbouring residue so set to wildcard
+                     end
+                     a = a:sub(2)  -- trim _ from chemdata table entry as it elsewhere means residue wildcard
+                  elseif forward then
+                     -- we are processing string with _ already found in position 1 or 2, so current position refers to forward neighbour and so set to wildcard here
+                     res = '_'   -- *** _ in position 1,2 therefore positions 3,4 go to forward neighbouring residue so set to wildcard
+                  end
+                  if forward then resn=resn+1 end
                   t[k] = resn .. res .. a
                end
             end
@@ -200,7 +246,18 @@ function Residue:initEmpty()
                t['angle2'] = ''
                t['len3'] = {}
             end
-            self:load(t)
+            local skipCheck=false
+            for x,y in ipairs(t) do  -- eliminate some depending on terminal flag
+               if terminal and forward then skipCheck=true end
+               if (not terminal) and y:find('OXT') then skipCheck=true end
+               if not hd[4] and hd[1] == 'N' and hd[2] == 'CA' and hd[3] == 'CB'  then skipCheck=true end
+            end
+
+            if not skipCheck then
+               --for x,y in ipairs(t) do io.write(y .. ' ') end
+               --print()
+               self:load(t)
+            end
          end
       end
    end
@@ -254,7 +311,7 @@ end
 function Residue:dbLoad(rfpg)
    local resid = self['res_id']  -- if res_id not pre-set need to know pdb_no to find it
    --print(resid)
-   local cur = rfpg.Qcur('select atom, x, y, z from atom_coordinates where res_id=' .. resid .. ' and not init')
+   local cur = rfpg.Qcur('select atom, x, y, z from atom_coordinates where res_id=' .. resid .. ' and not init')  -- only want extra stored coordinates, not initNCaC positions
    local atomData = cur:fetch({},'a')
    while atomData do
       local atom = geom3d.get41mtx()
@@ -279,7 +336,7 @@ function Residue:dbLoad(rfpg)
       dsspData = cur:fetch({},'a')      
    end
 
-   cur = rfpg.Qcur('select key, angle1, angle2, dangle from dihedral where res_id=' .. resid)
+   cur = rfpg.Qcur('select d.key, d.angle1, d.angle2, d.dangle, dc.name from dihedral d, dihedral_class dc where d.dihedral_class = dc.id and d.res_id=' .. resid)
    local dihedralData = cur:fetch({},'a')
    while dihedralData do
       local k = dihedralData['key']
@@ -316,7 +373,7 @@ end
 --- generate descriptive string for Residue: 1-letter amino acid code, sequence position
 -- @return descriptive string
 function Residue:tostring()
-   return self['res'] .. self['resn']
+   return self['resn'] .. self['res'] .. ( self['ordered'] and ' | ordered |' or ' | disordered | ') .. self:countHedra() .. ' hedra | ' .. self:countDihedra() .. ' dihedra |'  
 end
 
 --- count entries in self['hedra'] table
@@ -324,9 +381,17 @@ end
 function Residue:countHedra()
    local c = 0
    for k,v in pairs(self['hedra']) do
+      --print(k)
       c = c+1
    end
    return c
+end
+
+--- report entries in self['hedra'] table
+function Residue:reportHedra()
+   for k,v in pairs(self['hedra']) do
+      print(v:tostring())
+   end
 end
 
 --- count entries in self['dihedra'] table
@@ -340,11 +405,44 @@ function Residue:countDihedra()
    return c
 end
 
+--- report entries in self['dihedra'] table
+function Residue:reportDihedra()
+   for k,v in pairs(self['dihedra']) do
+      print(v:tostring())
+   end
+end
+
+--- report di/hedra data for self and neighbours
+function Residue:reportDH3()
+   if self['prev'] then
+      print('prev: ' .. self['prev']['resn'] .. ' ' .. self['prev']['res'])
+      self['prev']:reportHedra()
+      self['prev']:reportDihedra()
+   end
+   print('curr: ' .. self['resn'] .. ' ' .. self['res'])
+   self:reportHedra()
+   self:reportDihedra()
+   if self['next'] then
+      print('next: ' .. self['next']['resn'] .. ' ' .. self['next']['res'])
+      self['next']:reportHedra()
+      self['next']:reportDihedra()
+   end
+end
+
 --- delete protein space atom coordinate data from this residue
 function Residue:clearAtomCoords()
    self['atomCoords'] = {}
 end
-   
+
+--- scale atom coordinates by parameter
+-- @param scale float scale multiplier
+function Residue:scaleAtomCoords(scale)
+   local ms = geom3d.genMscale(scale)
+   for k,a in pairs(self['atomCoords']) do
+      self['atomCoords'][k] = ms * a
+   end
+end
+
 --- delete internal coordinate data from this chain
 function Residue:clearInternalCoords()
    for k,h in pairs(self['hedra']) do -- 23 mar 17 : was ipairs 
@@ -359,6 +457,7 @@ end
 --- set hedron space coordinates for each point from supplied length, angle, length
 function Residue:renderHedra()
    for k,h in pairs(self['hedra']) do
+      --print('renderHedra: ' .. k)
       if h['updated'] then h:initPos() end
    end
 end
@@ -508,6 +607,15 @@ function Residue:dihedraFromAtoms()
       self['dihedra'][utils.genKey(sN,sCA,sC,sOXT)] = dihedron.new({ sN,sCA,sC,sOXT })
    end
    
+   -- amide proton N H if present
+   local sH = skbase .. 'H'
+   if self['atomCoords'][sH] then
+      self['hedra'][utils.genKey(sH,sN,sCA)] = hedron.new({ sH,sN,sCA })
+--      self['dihedra'][utils.genKey(sH,sN,sCA,sC)] = dihedron.new({ sH,sN,sCA,sC })
+--      self['hedra'][utils.genKey(sCA,sN,sH)] = hedron.new({ sCA,sN,sH })
+      self['dihedra'][utils.genKey(sC,sCA,sN,sH)] = dihedron.new({ sC,sCA,sN,sH })
+   end
+   
    -- sidechain hedra and dihedra
    local sct = chemdata.sidechains[self['res']]
    if sct then 
@@ -544,6 +652,7 @@ end
 
 --- generate ATOM records for this Residue
 --<br>
+-- ['backbone'] and ['sidechain'] are already in numeric order (specified in backboneSort / sidechainSort) set up by linkDihedra
 -- Note: OXT defined in Dihedra like other atoms, if present
 -- @todo make use of temperature factor field
 -- @param chain chain ID
@@ -563,10 +672,10 @@ function Residue:writePDB(chain,ndx)
          ndx = ndx + 1
          dihedron = a[1]
          position = a[2]
-         --print('res:writePDB chain ' .. chain .. ' ndx ' .. ndx .. ' ' .. dihedron:tostring() .. ' pos ' .. position)
          atomName = utils.splitAtomKey(dihedron[position])[3]   -- dihedron['atomNames'][position]  -- dihedron['atomCoords'][coordsInitial]['names'][position]
          local akl = { dihedron[1], dihedron[2], dihedron[3], dihedron[4] } -- utils.splitKey(dihedron['key'])
          atom = self['atomCoords'][akl[position]] --  dihedron['initialCoords'][position]
+         --print('res:writePDB chain ' .. chain .. ' ndx ' .. ndx .. ' ' .. dihedron:tostring() .. ' pos ' .. position .. ' atom ' .. atomName .. ' = ' .. (atom and 'ok' or 'nil') .. ' ordered= ' .. (self['ordered'] and 'true' or 'false'))
          if atom then 
             ls =  utils.atomString(ndx,atomName,self['res'], chain, self['resn'], atom[1][1], atom[2][1],atom[3][1], 1.0, 0.0)
             --print(ls)
@@ -575,7 +684,7 @@ function Residue:writePDB(chain,ndx)
       end
    end
 
-      for i = 1,12 do
+      for i = 1,maxSideChain do
          local a = self['sidechain'][i]
          if a then
             dihedron = a[1]
@@ -605,12 +714,12 @@ function Residue:writeInternalCoords( pdb, chn, stats )
    local base = pdb .. ' ' .. chn .. ' '
    for k,h in utils.pairsByKeys(self['hedra'], residue.keysort) do
       if h['len1'] and h['angle2'] and h['len3'] then
+         local c = tonumber(h['count'])
          s = s .. base .. h['key'] .. ' ' .. string.format('%9.5f %9.5f %9.5f', h['len1'], h['angle2'], h['len3'])
          if stats then
             if h['sd'] then
                for i,val in ipairs( { 'len1', 'angle2', 'len3' } ) do
-                  --print(s,h['sd'][val], h['min'][val], h['max'][val])
-                  --print()
+                  --print(s,val,h['sd'][val], h['min'][val], h['max'][val],h['count'])  -- should not crash here with nil values because test h['len1'] and h['angle2'] and h['len3'] above
                   s = s .. string.format(' ( ' .. val .. ' sd: %9.5f min: %9.5f max: %9.5f )', h['sd'][val], h['min'][val], h['max'][val])
                end
                s = s .. string.format(' count: %9.0f ', h['count'])
@@ -664,7 +773,7 @@ end
 
 --- join dihedrons from N-CA-C and N-CA-CB hedrons, computing protein space coordinates for backbone and sidechain atoms
 -- @param atomCoordsIn optional table of atom_token : 4x1 matrix of protein space coordinates
--- @param genSCAD boolean if true, return table of transformation matrices for each hedron key
+-- @param genSCAD boolean if true, return table of transformation matrices for each hedron key (called from Chain:writeSCAD())
 -- @return atomCoords for residue in protein space relative to acomCoordsIn OR table of transformation matrices according to genSCAD parameter
 function Residue:assemble( atomCoordsIn, genSCAD )
    --[[
@@ -707,6 +816,9 @@ function Residue:assemble( atomCoordsIn, genSCAD )
    q:push_left(NCaCKey)
    q:push_left(utils.genKey(rbase .. 'O', rbase .. 'C', rbase .. 'CA'))
    q:push_left(utils.genKey(rbase .. 'N', rbase .. 'CA', rbase .. 'CB'))
+--   q:push_left(utils.genKey(rbase .. 'H', rbase .. 'N', rbase .. 'CA'))
+--   q:push_left(utils.genKey(rbase .. 'CA', rbase .. 'N', rbase .. 'H'))
+   q:push_left(utils.genKey(rbase .. 'C', rbase .. 'CA', rbase .. 'N'))
 
    if not atomCoords then -- if list of initial coords not passed as parameter, use N-CA-C initial coords from creating dihedral
       atomCoords = {}
@@ -718,11 +830,19 @@ function Residue:assemble( atomCoordsIn, genSCAD )
          end
       end
    end
-   
+
+   --utils.warn=true  
    while not q:is_empty() do
       local h1k = q:pop_right()
       local dihedra = self['key3index'][h1k]
-      --print('start h1k ' .. h1k, dihedra)
+      --[[
+      print('start h1k ' .. h1k, dihedra)
+      if dihedra then
+         for x,y in ipairs(dihedra) do
+            print(' ' .. y['key'])
+         end
+      end
+      --]]
       if dihedra then
          for di, d in ipairs(dihedra) do
             if d['initialCoords'][4] then  -- (skip incomplete dihedron if don't have 4th atom due to missing input data)
@@ -752,11 +872,17 @@ function Residue:assemble( atomCoordsIn, genSCAD )
                   q:push_left(dh2key)
                else
                   if utils.warn then 
-                     io.stderr:write('no coords to start ' .. d['key'] .. '\n')
+                     io.stderr:write('no coords to start ' .. d['key'] .. ' ')
+                     for i=1,3 do
+                        io.stderr:write(akl[i] .. '=' .. (atomCoords[akl[1]] and 'ok ' or 'nil '))
+                     end
+                     io.stderr:write('\n')
                   end
                   --assert(nil,'foo')
                   --q:push_left(h1k)
                end
+            else
+               print('skipping due to no initial coords for position 4 of ' .. d['key'])
             end
          end
       end

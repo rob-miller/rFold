@@ -186,7 +186,7 @@ function verifyDb()
 
    for r1,r3 in pairs(chemdata.res3) do  -- first round through all residues: sidechain atoms into res_atoms, backbone+Cbeta into res_atoms
       -- load backbone and c-beta (Ala atoms) into res_atoms
-      local ala_atoms = { 'N', 'CA', 'C', 'O', 'CB', 'OXT' }
+      local ala_atoms = { 'N', 'CA', 'C', 'O', 'CB', 'OXT', 'H' }
       local backbone = chemdata.residue_atom_bond_state['X']
       for i,pa in ipairs(ala_atoms) do
          --if (not (r1 == 'G' and pa == 'CB')) then
@@ -194,7 +194,7 @@ function verifyDb()
          --end
       end
       -- load sidechain atoms int res_atoms
-      local sidechain = (r1 == 'G' or r1 == 'A' or r1 == 'X') and {} or chemdata.residue_atom_bond_state[r1]
+      local sidechain = (r1 == 'G' or r1 == 'A' or r1 == 'X' or r1 == '_') and {} or chemdata.residue_atom_bond_state[r1]
       for an,ac in pairs(sidechain) do
          --print('an[1]', string.sub(an,1,1))
          rfpg.Qcur("insert into res_atoms (name, bond_state, atom) values ('" .. r1 .. an .. "','" .. ac .. "','" .. string.sub(an,1,1) .. "') on conflict (name) do nothing;")
@@ -299,7 +299,9 @@ local args = parsers.parseCmdLine(
    'convert PDB file to internal coordinates and load into database.  repository base: ' .. PDB_repository_base .. ' db: ' .. rfpg.db .. ' on ' .. rfpg.host .. ' ('  ..utils.getHostname() .. ')',
    {
       ['nd'] = 'do not run dssp on PDB input file',
-      ['u'] = 'update database (default is skip if entry already exists)'
+      ['u'] = 'update database (default is skip if entry already exists)',
+      ['wa'] = 'write all intermediate files in validation testing',
+      ['t'] = 'test only - do not write to database, just validate input file'
    },
    {
       ['f'] = '<input file> : process files listed in <input file> (1 per line) followed by any on command line',
@@ -405,9 +407,10 @@ for i,arg in ipairs(toProcess) do
       -- load current file
       pdbid = parsers.parseProteinData(file, function (t) protein.load(t) end, chain)
       if not pdbid then goto continue end
-      
+
       prot = protein.get(pdbid)
 
+      --print()
       --print(pdbid,prot,prot:countDihedra())
       --print(prot:tostring())
       --goto continue
@@ -423,33 +426,44 @@ for i,arg in ipairs(toProcess) do
       if prot:countDihedra() > 0  then  -- did read internal coordinates, either from .pic file or rtm DSSP output
          loadedPIC = true
          --- test if we can generate PDB coordinates and match back:
-         coordsInternal = prot:writeInternalCoords(true)  -- get output for internal coordinate data as loaded 
+         coordsInternal = prot:writeInternalCoords(true)  -- get output for internal coordinate data as loaded
+         if args['wa'] then utils.writeFile('in1.pic',coordsInternal) end
          prot:internalToAtomCoords()            -- generate PDB atom coordinates from internal coordinates (needs dihedron data structures to complete chain)
          prot:clearInternalCoords()             -- wipe internal coordinates as loaded
+
+         coords3D = prot:writePDB(true)
+         if args['wa'] then utils.writeFile('gen2.pdb',coords3d) end
+         
          prot:atomsToInternalCoords()           -- generate internal coordinates from PDB atom coordinates
          s1 = prot:writeInternalCoords(true)  -- get output for internal coordinate data as generated
+         if args['wa'] then utils.writeFile('gen3.pic',s1) end
          
          if not utils.lineByLineCompare(coordsInternal,s1) then
             print('Reject: ' .. (0 == dsspCount and 'PIC' or 'DSSP') .. ' file ' .. arg .. ' failed to regenerate matching internal coordinates from calculated 3D coordinates.')
             goto continue
          end
          
-         coords3D = prot:writePDB(true)
       else                             -- did read PDB file
          loadedPDB=true
          --- test if we can get internal coordinates and regenerate input pdb file
          prot:atomsToInternalCoords()     -- calculate bond lengths, bond angles and dihedral angles from input coordinates
+
          coords3D = prot:writePDB(true)   -- loaded PDB format text without REMARK RFOLD record (timestamp may not match)
+         if args['wa'] then utils.writeFile('in1.pdb',coords3D) end
+
          prot:clearAtomCoords()
+         coordsInternal = prot:writeInternalCoords(true)  
+         if args['wa'] then utils.writeFile('gen2.pic',coordsInternal) end
+
          prot:internalToAtomCoords()
          s1 = prot:writePDB(true)
+         if args['wa'] then utils.writeFile('gen3.pdb',s1) end
 
          if not utils.lineByLineCompare(coords3D,s1) then
             print('Reject: PDB file ' .. arg .. ' failed to regenerate matching 3D coordinates from calculated internal coordinates')
             goto continue
          end
-         
-         coordsInternal = prot:writeInternalCoords(true)  
+
       end
 
       --- if here then can interconvert 3D coordinates <-> internal coordinates and have both in prot: object and formatted output strings coordsInternal / coords3D
@@ -459,16 +473,22 @@ for i,arg in ipairs(toProcess) do
       
       if 0 == dsspCount and not args['nd'] then -- did read pic or pdb file, need dssp results
          local dsspstatus,dsspresult,dssperr = ps.pipe_simple(coords3D,mkdssp,unpack({'-i','-'}))
+         if args['wa'] then utils.writeFile('gen4.dssp',dsspresult) end
+         
          pdbid = parsers.parseProteinData(dsspresult, function (t) protein.load(t) end, chain, prot['filename'])  -- now we get new structure loaded from dssp data
-
+         
          dsspstatus=nil
          dsspresult=nil
          dssperr=nil
          
          prot2 = protein.get(pdbid)  -- dssp data in prot2: object
+         print(prot2:report())
+         
          prot2:setStartCoords()
          prot2:linkResidues()
          s1 = prot2:writeInternalCoords(true)  -- get output for internal coordinate data as read from dssp
+         if args['wa'] then utils.writeFile('gen5dssp.pic',s1) end
+
 
          if not utils.lineByLineCompare(coordsInternal,s1)  then
             print('Reject: ' .. arg .. ' failed to generate matching DSSP internal coordinates from 3D coordinates.')
@@ -485,10 +505,18 @@ for i,arg in ipairs(toProcess) do
       --print('input:    ' .. prot:tostring())
       --os.exit()
 
+      if args['t'] then
+         print (pdbid  .. ' validates and can be loaded to database\n')
+         print('input:    ' .. prot:tostring())
+      end
+
       prot:clearAtomCoords()
       rfpg.Qcur('begin')
       prot:writeDb(rfpg,args['u'],src)
-      --print(prot:reportDb(rfpg))
+
+      if args['t'] then
+         print(prot:reportDb(rfpg))
+      end
 
       prot2 = protein.get(pdbid)  -- initialise a new prot object with pdbid just loaded to database
       if chain then prot2['chain'] = chain end
@@ -497,31 +525,42 @@ for i,arg in ipairs(toProcess) do
       prot2:dbLoad(rfpg)
       --print('database: ' .. prot2:tostring())
 
+      if args['t'] then
+         print('db read:  ' .. prot:tostring())
+      end
       
-      if loadedPIC then
+      if loadedPIC or args['wa'] then
          s1 = prot2:writeInternalCoords(true)
-      elseif loadedPDB then 
+         if args['wa'] then utils.writeFile('gen6.pic',s1) end
+      end
+      
+      if loadedPDB then 
          prot2:internalToAtomCoords()
          s2 = prot2:writePDB(true)
+         if args['wa'] then utils.writeFile('gen7.pdb',s2) end
       end
       
       if loadedPIC and not utils.lineByLineCompare(coordsInternal,s1)  then
          print('Reject: ' .. arg .. ' failed to load back matching internal coordinates from database.')
+         --rfpg.Qcur('commit')
          rfpg.Qcur('rollback')
-         --utils.writeFile('loaded.pic',coordsInternal)
-         --utils.writeFile('db.pic',s1)
          --os.exit()
       elseif loadedPDB and not utils.lineByLineCompare(coords3D,s2)  then
          print('Reject: ' .. arg .. ' failed to calculate matching 3D coordinates from database internal coordinates.')
+         -- rfpg.Qcur('commit')
          rfpg.Qcur('rollback')
-         --utils.writeFile('loaded.pdb',coords3D)
-         --utils.writeFile('db.pdb',s2)
          --os.exit()
       else
-         rfpg.Qcur('commit')
-         print('Success: loaded ' .. arg .. (src and ' [src= ' .. src ..']' or '') )
+         if args['t'] then
+            rfpg.Qcur('rollback')
+            print('Success: could have loaded ' .. arg .. (src and ' [src= ' .. src ..']' or '') .. ' but rolled back due to -t flag' )
+         else
+            rfpg.Qcur('commit')
+            print('Success: loaded ' .. arg .. (src and ' [src= ' .. src ..']' or '') )
+         end
       end
-      
+
+   
       ::continue::
       --protein.drop(pdbid2)
       protein.clean()

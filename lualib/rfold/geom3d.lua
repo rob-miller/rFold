@@ -103,6 +103,17 @@ function geom3d.genMry(angr)
    return mry
 end
 
+--- generate 3D scaling matrix
+-- @param scale scale factor
+-- @return a 4x4 3D scaling matrix
+function geom3d.genMscale(scale)
+   local ms = geom3d.get44mtx()
+   ms[1][1] = scale
+   ms[2][2] = scale
+   ms[3][3] = scale
+   return ms
+end
+
 --- generate 3D Z axis rotation matrix
 -- @param angr rotation angle in radians
 -- @return a 4x4 3D rotation matrix

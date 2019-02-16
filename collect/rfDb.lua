@@ -69,6 +69,10 @@ end
 local resCount=0
 local resDb
 local resSelectQry = 'select res_id from temp_selected_residues'
+local remarkString
+
+--resSelectQry = args['rs'][1]
+
 if (args['rs']) then
    rfpg.Qcur('begin')  -- keep the temp table for this session
    rfpg.Qcur('create temp table temp_selected_residues (res_id bigint) on commit drop')
@@ -89,12 +93,14 @@ if (args['rs']) then
       os.exit()
    end
    resCount = rfpg.Q('select count(*) from temp_selected_residues')[1]
-   print('REMARK   1 RFOLD AVERAGE OVER ' .. resCount .. ' RESIDUES')
+   remarkString = utils.remarkString('RFOLD AVERAGE OVER ' .. resCount .. ' RESIDUES')
 end
 
+
 if args['s'] then
+   print(remarkString)
    --print(args['rs'][1])
-   
+   --print('resDb',resDb)
    local res = residue.new({['res'] = resDb, ['resn'] = 2})
    res:initEmpty()
    res:getDbStats(rfpg,resSelectQry)
@@ -103,10 +109,21 @@ if args['s'] then
 end
 
 if args['a'] then
-   local res = residue.new({['res'] = resDb, ['resn'] = 2})
-   res:initEmpty()
-   res:getDbStats(rfpg,resSelectQry)
-   print(res:writeInternalCoords('AVG','A'))
+   local pdbid='AVG'
+   local p = protein.get( pdbid )
+   local chn = 'A'
+
+   -- generate a 2 residue empty chain, residue 1 wildcard, residue 2 resDb 
+   p['chains'][chn] = chain.new({ ['id'] = chn, ['pdbid'] = pdbid })
+   p['chainOrder'][#p['chainOrder']+1] = chn
+   p['remarks'] = { remarkString }
+   --p['chains'][chn]:getResidue(resDb, 1, false, true) 
+   for i=1,8 do p['chains'][chn]:getResidue(( i==1 and '_' or resDb), i, false, true) end
+
+   p:initEmpty()
+   p:getDbStats(rfpg,resSelectQry)
+   io.write(p:writeInternalCoords())
+   
 end
 
 

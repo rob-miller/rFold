@@ -57,7 +57,8 @@ local args = parsers.parseCmdLine(
    {
 --      ['a'] = 'average: generate hedron_default.lua and dihedron_default.lua files of average values from input files',
       ['t'] = 'test: convert (PDB|internal_coordinates) input to (internal_coordinates|PDB) and back again, verify match',
-      ['w'] = 'write: converted result to <pdbid>.pdb or <pdbid>.pic in current directory'
+      ['w'] = 'write: converted result to <pdbid>.pdb or <pdbid>.pic in current directory',
+      ['wa'] = 'writeAll: all intermediate files for -t written in current directory'
    },
    {
       ['f'] = '<input file> : process files listed in <input file> (1 per line) followed by any on command line'
@@ -79,13 +80,14 @@ for i,a in ipairs(args) do table.insert(toProcess, a) end
 for i,a in ipairs(toProcess) do
    if a:match('^IDs%s') then toProcess[i]='' end     -- header line for Dunbrack list : 'IDs         length Exptl.  resolution  R-factor FreeRvalue'
    if a:match('^#') then toProcess[i]='' end         -- comment line starts with '#'
-   if a:ematch('^(%d%w%w%w)(%w?)%s+') then           -- looks like pdbcode with optional chain, read as compressed file from PDB_repository_base
+   if a:ematch('^(%d%w%w%w)(%w?)%s*') then           -- looks like pdbcode with optional chain, read as compressed file from PDB_repository_base
       local pdbid, chn = _1:lower(), _2
       local subdir = pdbid:match('^%w(%w%w)%w$')
       toProcess[i] = PDB_repository_base .. '/' .. subdir .. '/pdb' .. pdbid:lower() .. '.ent.gz'
       if (chn) then
          toProcess[i] = toProcess[i] .. ' ' .. chn
       end
+      print(a,toProcess[i])
    end
 end
 
@@ -111,11 +113,14 @@ for i,arg in ipairs(toProcess) do
          elseif args['t'] then
             io.write('testing ' .. arg .. ' ... ')
             io.flush()
-            local s0 = prot:writeInternalCoords()  -- get output for internal coordinate data as loaded 
+            local s0 = prot:writeInternalCoords()  -- get output for internal coordinate data as loaded
+            if args['wa'] then utils.writeFile('in.pic',s0) end
             prot:internalToAtomCoords()    -- generate PDB atom coordinates from internal coordinates
             prot:clearInternalCoords()          -- wipe internal coordinates as loaded
+            if args['wa'] then utils.writeFile('gen_intermediate.pdb',prot:writePDB()) end
             prot:atomsToInternalCoords()    -- generate internal coordinates from PDB atom coordinates
             local s1 = prot:writeInternalCoords()  -- get output for internal coordinate data as generated
+            if args['wa'] then utils.writeFile('gen_out.pic',s1) end
             local c = utils.lineByLineCompare(s0,s1) 
             if c then
                print('passed. ' .. c .. ' pic lines compared, ' .. prot:report())
@@ -143,9 +148,12 @@ for i,arg in ipairs(toProcess) do
             io.write('testing ' .. arg .. ' ... ')
             io.flush()
             local s0 = prot:writePDB(true)     -- PDB format text without REMARK RFOLD record (timestamp may not match)
+            if args['wa'] then utils.writeFile('in.pdb',s0) end
             prot:clearAtomCoords()
             prot:internalToAtomCoords()
+            if args['wa'] then utils.writeFile('gen_intermediate.pic',prot:writeInternalCoords()) end
             local s1 = prot:writePDB(true)
+            if args['wa'] then utils.writeFile('gen_out.pdb',s1) end
             local c = utils.lineByLineCompare(s0,s1) 
             if c then
                print('passed: ' .. c .. ' pdb lines compared, ' .. prot:report())
