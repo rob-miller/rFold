@@ -47,6 +47,26 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="src">
 		<type name="varchar" length="1"/>
 	</column>
+	<column name="sequence">
+		<type name="varchar"/>
+		<comment><![CDATA[as read from atom records, '-' gapped, indexed by res_pos]]></comment>
+	</column>
+	<column name="seqres">
+		<type name="varchar"/>
+		<comment><![CDATA[PDB file chain SEQRES data]]></comment>
+	</column>
+	<column name="chain_order" not-null="true">
+		<type name="smallint"/>
+	</column>
+	<column name="header">
+		<type name="varchar"/>
+	</column>
+	<column name="title">
+		<type name="varchar"/>
+	</column>
+	<column name="src">
+		<type name="varchar"/>
+	</column>
 	<constraint name="pdb_chain_pk" type="pk-constr" table="public.pdb_chain">
 		<columns names="pdb_no" ref-type="src-columns"/>
 	</constraint>
@@ -90,6 +110,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="ordered">
 		<type name="boolean" length="1"/>
+	</column>
+	<column name="prev_res">
+		<type name="varchar"/>
+	</column>
+	<column name="next_res">
+		<type name="varchar"/>
+	</column>
+	<column name="ordered">
+		<type name="boolean"/>
 	</column>
 	<constraint name="residue_pk" type="pk-constr" table="public.residue">
 		<columns names="res_id" ref-type="src-columns"/>
@@ -193,6 +222,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="dihedral_class">
 		<type name="smallint" length="1"/>
+	</column>
+	<column name="key">
+		<type name="varchar"/>
+	</column>
+	<column name="dihedral_class">
+		<type name="smallint"/>
 	</column>
 	<column name="angle1">
 		<type name="bigint" length="1"/>
@@ -318,6 +353,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="electronegativity">
 		<type name="double precision" length="1"/>
 	</column>
+	<column name="electronegativity">
+		<type name="double precision"/>
+	</column>
 	<constraint name="periodic_table_pk_atom" type="pk-constr" table="public.periodic_table">
 		<columns names="atom" ref-type="src-columns"/>
 	</constraint>
@@ -347,6 +385,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="acc">
 		<type name="smallint" length="1"/>
+	</column>
+	<column name="acc">
+		<type name="smallint"/>
 	</column>
 	<constraint name="dssp_pk_res_id" type="pk-constr" table="public.dssp">
 		<columns names="res_id" ref-type="src-columns"/>

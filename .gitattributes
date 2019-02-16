@@ -1,0 +1,2 @@
+*.lua linguist-language=Lua
+collect/dssp/rtm-dssp-2.2.1/src/* linguist-vendored

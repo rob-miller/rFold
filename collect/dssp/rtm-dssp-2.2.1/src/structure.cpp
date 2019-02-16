@@ -1113,7 +1113,6 @@ void MResidue::WriteInternal(ostream& os, std::string pdbId)
     writeInternal4AtomLine(os, pdbId, mC, mCA, mN, mH);
   }
 
-  
   switch(mType) {
   case kGlycine:
   case kAlanine:
