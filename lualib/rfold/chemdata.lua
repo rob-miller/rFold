@@ -134,8 +134,10 @@ chemdata.sidechains = {
    ['T'] = {
       { 'CA', 'CB', 'OG1' },
       { 'N', 'CA', 'CB', 'OG1', 'chi1' },   -- chi1
-      { 'CB', 'OG1', 'CG2' },
-      { 'CA', 'CB', 'OG1', 'CG2' } --,
+      { 'CA', 'CB', 'CG2' },
+      { 'N', 'CA', 'CB', 'CG2' } --,
+      -- { 'CB', 'OG1', 'CG2' },     -- changed / fixed 10 apr 2017
+      -- { 'CA', 'CB', 'OG1', 'CG2' } --,
       --['chi1'] = 2
    },
    ['C'] = {

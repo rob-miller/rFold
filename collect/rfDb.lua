@@ -38,23 +38,76 @@ local parsers = require 'rfold.parsers'
 local protein = require "rfold.protein"
 local utils = require 'rfold.utils'
 local chain = require 'rfold.chain'
+local residue = require 'rfold.residue'
+local chemdata = require 'rfold.chemdata'
 
 local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
-rfpg.dbReconnect(1)
+--rfpg.dbReconnect(0) -- no autocommit
 
 
 local args = parsers.parseCmdLine(
    '[ <pdbid[chain id]> ] ...',
-   '\n retrieve (optionally convert) coordinates for specified pdbid from rFold database.\n',
+   '\n retrieve internal coordinates for specified pdbid from rFold database with optional processing.\n',
    {
-      ['l'] = 'list:  list available PDBids in database'
+      ['l'] = 'list:  list available PDBids in database',
+      ['s'] = 'statistics: report position statistics over +/- 1 std dev for rs subset below',
+      ['a'] = 'average: generate internal coordinates for average ALA residue over rs subset below'
    },
    {
-      ['w'] = 'pic|gpdb|<filename(.pic|.gpdb)> : write specified format to pdbid.<format> or <filename>',
+--      ['w'] = 'pic|gpdb|<filename(.pic|.gpdb)> : write specified format to pdbid.<format> or <filename>',
       ['f'] = '<input file> : process IDs listed in <input file> (1 per line) followed by any on command line',
-      ['r'] = '<firstResidue:lastResidue> : only output residues within the range specified '
+      ['r'] = '<firstResidue:lastResidue> : only output residues within the range (positions) specified ',
+      ['rs'] = '"\\\"<residue selector string>\\\"" : rFold db query returning res_id e.g. [-rs="\\\"select res_id from dssp where struc=' .. "'H'" .. " and struc2=' X S+   '" .. '\\\""] - see rFold schema (and watch quotes!)'
    }
 )
+
+if (args['a'] or args['s']) and not args['rs'] then
+   print("options 'a' and 's' require option 'rs'")
+   os.exit()
+end
+
+local resCount=0
+local resDb
+local resSelectQry = 'select res_id from temp_selected_residues'
+if (args['rs']) then
+   rfpg.Qcur('begin')  -- keep the temp table for this session
+   rfpg.Qcur('create temp table temp_selected_residues (res_id bigint) on commit drop')
+   rfpg.Qcur('insert into temp_selected_residues ' .. args['rs'][1])
+   --rfpg.Qcur('with t as ( ' .. args['rs'][1] .. ' ) select * into temp_selected_residues from t') 
+   local resCur = rfpg.Qcur('select distinct res from residue where res_id in ( ' .. resSelectQry .. ' )')
+   local resRow = resCur:fetch({})
+   while resRow do
+      resCount = resCount+1
+      resDb = resRow[1]
+      resRow = resCur:fetch(resRow)
+   end
+   --rfpg.Qcur('rollback')
+   if 1 ~= resCount then resDb = '_' end
+  -- print('resCount = ', resCount, 'res= ', resDb)
+   if 0 == resCount then
+      print('residue selector "' .. args['rs'][1] .. "' gets no results")
+      os.exit()
+   end
+   resCount = rfpg.Q('select count(*) from temp_selected_residues')[1]
+   print('REMARK   1 RFOLD AVERAGE OVER ' .. resCount .. ' RESIDUES')
+end
+
+if args['s'] then
+   --print(args['rs'][1])
+   
+   local res = residue.new({['res'] = resDb, ['resn'] = 2})
+   res:initEmpty()
+   res:getDbStats(rfpg,resSelectQry)
+   print(res:writeInternalCoords('AVG','A', true))
+   
+end
+
+if args['a'] then
+   local res = residue.new({['res'] = resDb, ['resn'] = 2})
+   res:initEmpty()
+   res:getDbStats(rfpg,resSelectQry)
+   print(res:writeInternalCoords('AVG','A'))
+end
 
 
 if args['l'] then
@@ -65,6 +118,8 @@ if args['l'] then
       pdb = cur:fetch({},'a')
    end
 end
+
+
 
 local toProcess={}
 if args['f'] then
@@ -88,6 +143,36 @@ for i,a in ipairs(toProcess) do
 end
 
 
+--[[
+
+   DSSP strcuture info:
+   
+   STRUCTURE	This is a complex column containing multiple sub columns. The first column contains a letter indicating the secondary structure assigned to this residue. Valid values are:
+   Code	Description
+   H	Alpha helix
+   B	Beta bridge
+   E	Strand
+   G	Helix-3
+   I	Helix-5
+   T	Turn
+   S	Bend
+   What follows are three column indicating for each of the three helix types (3, 4 and 5) whether this residue is a candidate in forming this helix. A > character indicates it starts a helix, a number indicates it is inside such a helix and a < character means it ends the helix.
+
+   The next column contains a S character if this residue is a possible bend.
+
+   Then there's a column indicating the chirality and this can either be positive or negative (i.e. the alpha torsion is either positive or negative).
+
+   The last two column contain beta bridge labels. Lower case here means parallel bridge and thus upper case means anti parallel.
+
+   ----------------------
+   
+   And then there is 1 extra column that I picked up!
+
+   canonical helix interior is ' X S+   '
+   
+--]]
+
+
 for i,arg in ipairs(toProcess) do
    if '' ~= arg then
 
@@ -104,7 +189,7 @@ for i,arg in ipairs(toProcess) do
       print('loaded:')
       print(prot:tostring())
 
-      print(prot:writeInternalCoords(nil,args['r'][1]))   -- needs to be the i'th file being processed....
+      print(prot:writeInternalCoords(nil,args['r'] and args['r'][1] or nil))   -- needs to be the i'th file being processed....
       
       --prot:internalToAtomCoords()
       --print(prot:writePDB(true,args['r'][1]))

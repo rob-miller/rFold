@@ -345,31 +345,35 @@ end
 --<br>
 -- first Residue startPos is set from DSSP or other source to match PDB file, subsequent startPos's read from previous residue backbone atom coordinates in protein coordinate space
 -- @todo incorporate parallel threads here: divide into n segments for n threads, then assemble segments together at end
--- @see setStartCoords
-function Chain:assembleResidues()
+-- @see Chain:setStartCoords()
+-- @see Chain:writeSCAD()
+-- @param start optional int sequence position start of range
+-- @param fin optional int sequence position end of range
+function Chain:assembleResidues(start,fin)
    local c=1
    local ndx=0
    for i,r in self:orderedResidues() do
-      local startPos
-      if r['prev'] and r['prev']['ordered'] then  -- if sequential, i.e. no chain breaks
-         startPos={}
-         local rp = r['prev']
-         local akl = r:NCaCKeySplit()
-         for ai,ak in ipairs(akl) do
-            startPos[ak] = rp['atomCoords'][ak]
-            --print('start from previous: ' .. ak .. ' ' .. startPos[ak]:transpose():pretty())
+      if (not start or start <= i) and (not fin or fin >= i) then      
+         local startPos
+         if r['prev'] and r['prev']['ordered'] then  -- if sequential, i.e. no chain breaks
+            startPos={}
+            local rp = r['prev']
+            local akl = r:NCaCKeySplit()
+            for ai,ak in ipairs(akl) do
+               startPos[ak] = rp['atomCoords'][ak]
+               --print('start from previous: ' .. ak .. ' ' .. startPos[ak]:transpose():pretty())
+            end
+         else
+            startPos = self['initNCaC'][r['resn']]
          end
-      else
-         startPos = self['initNCaC'][r['resn']]
+         r['atomCoords'] = r:assemble(startPos)
+         
+         --s,ndx = r:writePDB('A',ndx,r['atomCoords'])
+         --io.write(s)
+         --print()
+         --c = c+1
+         --if c>4 then os.exit() end
       end
-      r['atomCoords'] = r:assemble(startPos)
-
-      --s,ndx = r:writePDB('A',ndx,r['atomCoords'])
-      --io.write(s)
-      --print()
-      --c = c+1
-      --if c>4 then os.exit() end
-      
    end
 end
 
@@ -636,6 +640,140 @@ function Chain:printInfo()
    for k,v in self:orderedResidues() do
       v:printInfo()
    end
+end
+
+local function writeSCADdihed(d,transformations,hedraNdx)
+   local s = ''
+   s = s .. '    //   ' .. d['key'] .. '[ ' .. d['h1key'] .. '  --  ' .. d['h2key'] .. '\n'
+   s = s .. '  [ ' .. d['dihedral1'] .. ', ' .. hedraNdx[d['h1key']]-1 .. ', ' .. hedraNdx[d['h2key']]-1 .. ', ' .. (d['reverse'] and '1' or '0') .. ', '   -- openSCAD arrays start from 0
+   s = s .. geom3d.writeSCAD(transformations[d['key3']]) .. ' ]'
+   return s
+   --[[
+   print('backbone dk:',dk)
+   --for x,y in pairs(d) do print(x,y) end
+   print('key3:',d['key3'],'key32:',d['key32'])
+   print('key3 transformations:')
+   print(transformations[ d['key3'] ]:transpose():pretty())
+   print('dihed1:',d['dihedral1'])
+   print('hndx:',hedraNdx[ d['key3'] ] .. ', ' .. hedraNdx[ d['key32'] ])
+   --]]
+end   
+
+--- generate string of OpenSCAD commands to render chain
+-- @param range start:finish filter for residues to output
+-- @param backboneOnly optional boolean default false, only output for backbone atoms
+-- @return string of OpenSCAD data and command lines
+function Chain:writeSCAD(range,backboneOnly)
+   local start
+   local fin
+   local s=''
+   if range then
+      start,fin = range:match('(%d+):(%d+)')
+      start = tonumber(start)
+      fin = tonumber(fin)
+      --print('start',start,'fin',fin)
+   end
+
+   -- collect all hedra in hash to eliminate redundant references
+   local hedra = {}
+   for i,r in self:orderedResidues() do
+      if (not start or start <= i) and (not fin or fin >= i) then
+         local resHedra = r['hedra']
+         for k,h in pairs(resHedra) do
+            hedra[k] = h
+         end
+      end
+   end
+-- [[
+   -- generate openSCAD array of hedra plus index table so can refer to each by array index
+   local hedraNdx = {}
+   local hedraSCAD = ''
+   local ndx=0
+   for k,h in utils.pairsByKeys(hedra, residue.keysort) do
+      ndx = ndx + 1
+      hedraNdx[k] = ndx
+      local atoms = {}
+      for i,k in pairs(utils.splitKey(k))  do
+         local a = utils.splitAtomKey(k)
+         atoms[i] = a[3]:sub(1,1)  -- get just the element e.g. N, C, O
+      end
+      hedraSCAD = hedraSCAD .. '    // ' .. h['key'] .. '\n'
+      hedraSCAD = hedraSCAD .. string.format(' [ %9.5f, %9.5f, %9.5f, "%s", "%s", "%s" ],\n', h['len1'], h['angle2'], h['len3'], atoms[1], atoms[2], atoms[3])
+   end
+--]]
+
+   -- for x,y in pairs(hedraNdx) do print(x,y) end
+   
+   -- generate openSCAD array of dihedra grouped by residue, each dihedron with residue-space transformation matrix
+
+   local resNdx = {}
+   local resSCAD = ''
+   ndx = 0
+   for i,r in self:orderedResidues() do
+      if (not start or start <= i) and (not fin or fin >= i) then
+         ndx = ndx + 1
+         resNdx[r['resn']] = ndx
+         resSCAD = resSCAD .. ' [  // ' .. r['res'] .. r['resn'] .. ' backbone \n'
+         local transformations = r:assemble(nil,true)  -- assemble with no start position, return transformation matrices
+         --for x,y in pairs(transformations) do print(x, y:transpose():pretty()) end
+         --for x,y in pairs(transformations) do print(x) end
+         local first=true
+         for dk,d in pairs(r['dihedra']) do
+            --print('dk:',dk)
+            if d:isBackbone() and hedraNdx[d['h2key']] then
+               if first then first=false else resSCAD = resSCAD .. ',\n' end
+               resSCAD = resSCAD .. writeSCADdihed(d,transformations,hedraNdx)
+            end
+         end
+         if not backboneOnly then
+            resSCAD = resSCAD .. ',\n    // ' .. r['res'] .. r['resn'] .. ' sidechain \n'
+            first = true
+            for dk,d in pairs(r['dihedra']) do
+               --print('dk:',dk)
+               if (not d:isBackbone()) and hedraNdx[d['h2key']] then
+                  if first then first=false else resSCAD = resSCAD .. ',\n' end
+                  resSCAD = resSCAD .. writeSCADdihed(d,transformations,hedraNdx)
+               end
+            end
+         end
+
+         resSCAD = resSCAD .. '\n ],\n'
+
+      end
+   end
+
+   resSCAD = resSCAD:sub(1,-3) -- lose last ','
+
+   self:clearAtomCoords()   -- all chain fragments start at default dihedron coordinates
+   self['initNCaC'] = {}    -- ignore world offset for PDB file
+   self:assembleResidues(start,fin)   -- generate atom coordinates starting from origin (default init pos for first dihedron) - any chain breaks handled manually
+
+   local chainSCAD = ''
+   local first = true
+   for i,r in self:orderedResidues() do
+      if (not start or start <= i) and (not fin or fin >= i) then
+         local mt, mtr
+         local akl = r:NCaCKeySplit()
+         if r['prev'] and r['prev']['ordered'] then
+            local atomCoords = r['prev']['atomCoords']
+            mt, mtr = geom3d.coordSpace( atomCoords[akl[1]], atomCoords[akl[2]], atomCoords[akl[3]], true ) -- get transforms to, from coord space of NCaC for this residue in world coords
+         else
+            mtr = geom3d.get44mtx()
+         end
+
+         if first then first=false else chainSCAD = chainSCAD .. ',\n' end
+         chainSCAD = chainSCAD .. ' [ ' .. resNdx[r['resn']]-1 .. ',   // ' .. r['res'] .. r['resn'] .. '\n'
+         chainSCAD = chainSCAD .. '   ' .. geom3d.writeSCAD(mtr) .. ' ]'
+      end
+   end
+
+   chainSCAD = chainSCAD .. '\n'
+      
+   s = s .. 'hedra = [\n' .. hedraSCAD:sub(1,-3) .. '\n];\n\n'
+   s = s .. 'residues = [\n' .. resSCAD .. '\n];\n'
+   s = s .. 'chains = [\n' .. chainSCAD .. '\n];\n'
+   
+   return s
 end
 
 return chain

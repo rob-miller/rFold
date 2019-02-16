@@ -56,7 +56,7 @@ local Hedron = {}  -- class table
 --- three 4x1 matrices specifying coordinates of constituent atoms, reversed order - initially atom1 on +Z axis
 -- @table atomsR
 
---- flag indicting that atom coordinates are up to date (do not need to be recalculated from len1-angle2-len3)
+--- flag indicating that atom coordinates are up to date (do not need to be recalculated from len1-angle2-len3)
 -- @field updated
 
 
@@ -85,6 +85,57 @@ function hedron.new (o)
    --print('instantiate hedron ' .. o['key'])
    
    return o
+end
+
+--- get average, std_dev (sample), min, max for len1, angle2, len3 from rfold database (not a class method)
+-- calculated over range: total_average of angle for selected subset +/- 1 standard deviation (upper and lower bounds)
+-- @param rfpg open database handle
+-- @param atom_selector list of atom substrings using postgresql LIKE pattern matching, e.g. { '_N','_CA', '_C' } or { 'GN', 'GCA', 'GC' }
+-- @param residue_selector optional rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
+-- @return ( len1 = ( avg, sd, min, max), angle2 =  ( avg, sd, min, max), len3 = ( avg, sd, min, max) )
+function hedron.avgDb(rfpg, atom_selector, residue_selector)
+   local qry = 'with '
+
+   -- residue subset:
+   if residue_selector then
+      qry = qry .. 'residue_subset as ( ' .. residue_selector .. ' ), '
+   end
+
+   -- atom selector subset:
+   qry = qry .. "angle_classes as ( select id from angle_string where atom_string[1] like '" .. atom_selector[1] .. "' and atom_string[2] like '" .. atom_selector[2] .. "' and atom_string[3] like '" .. atom_selector[3] .. "' ), "
+
+   -- initial working subset of all angle, bond1_len, bond2_len for residue and atom string selectors :
+   qry = qry .. 'angle_subset as ( select a.angle as angle, b1.length as b1L, b2.length as b2L from angle a, bond b1, bond b2 where a.angle_class in (select id from angle_classes) '
+   if residue_selector then
+      qry = qry .. 'and a.res_id in (select res_id from residue_subset) '
+   end
+   qry = qry .. 'and a.bond1=b1.bond_id and a.bond2=b2.bond_id ), '
+
+   -- +/- 1 standard deviation bounds on angle:
+   qry = qry .. 'bounds as ( select (avg(angle) - stddev_samp(angle) * 1) as lower_bound, (avg(angle) + stddev_samp(angle) * 1) as upper_bound from angle_subset ) '
+
+   -- columns to return:
+   qry = qry .. 'select '
+   for i,col in ipairs( { 'b1L', 'angle', 'b2L' } ) do
+      for j,fn in ipairs( { 'avg', 'stddev_samp', 'min', 'max' } ) do
+         qry = qry .. fn .. '(' .. col .. ') as ' .. fn .. '_' .. col .. ', '
+      end
+   end
+   --- trim last ', '
+   --qry = qry:sub(1, -3)
+   qry = qry .. 'count(angle) as count_angle '
+
+   -- specify upper/lower bounds subset to calculate over:
+   qry = qry .. ' from angle_subset where angle between (select lower_bound from bounds) and (select upper_bound from bounds)'
+
+   local rslt = rfpg.Q(qry)
+
+   return {
+      ['len1'] = { rslt[1], rslt[2], rslt[3], rslt[4] },
+      ['angle2'] = { rslt[5], rslt[6], rslt[7], rslt[8] },
+      ['len3'] = { rslt[9], rslt[10], rslt[11], rslt[12] },
+      ['count'] = rslt[13]
+   }
 end
 
 
@@ -231,5 +282,34 @@ function Hedron:writeDb(rfpg, res_id, update)
 
    return aid 
 end
+
+--- populate len1, angle2, len3 values with average results using rFold db residue selection query and atom keys in string (residue will be '_' for postgresql 'like' query if appropriate)
+-- add tags sd[len1, angle2, len3], min[...], max[...]
+-- @param rfpg open database handle
+-- @param resSelector rFold database query returning res_id, e.g. "select res_id from dssp where struc='H' and struc2=' X S+   '" limits to residues inside alpha helices
+function Hedron:getDbStats(rfpg, resSelector)
+   local akl = utils.splitKey(self['key'])
+   local al = {}
+   for i,ak in ipairs(akl) do
+      local a = utils.splitAtomKey(ak)
+      al[i] = a[2]..a[3]
+   end
+   local stats = hedron.avgDb(rfpg,al,resSelector)
+   self['len1'] = stats['len1'][1]
+   self['angle2'] = stats['angle2'][1]
+   self['len3'] = stats['len3'][1]
+
+   for i,fn in ipairs( {'sd', 'min', 'max'} ) do
+      self[fn] = {}
+      for j,val in ipairs( {'len1', 'angle2', 'len3'} ) do
+         self[fn][val] = stats[val][i+1]
+         --print(fn,val,stats[val][i+1])
+         --print()
+      end
+   end
+   self['count'] = stats['count']
+end
+
+
 
 return hedron

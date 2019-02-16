@@ -49,7 +49,10 @@ end
 -- @return a 4x4 matrix with diagonal elements = 1.0
 function geom3d.get44mtx()
    local m = matrix.zeros(4,4)
-   m[4][4]=1.0
+   m[1][1] = 1.0
+   m[2][2] = 1.0
+   m[3][3] = 1.0
+   m[4][4] = 1.0
    return m
 end
 
@@ -60,9 +63,9 @@ end
 -- @return a 4x4 3D transformation matrix
 function geom3d.genMt(x,y,z)
    local mt = geom3d.get44mtx()
-   mt[1][1] = 1.0
-   mt[2][2] = 1.0
-   mt[3][3] = 1.0
+   --mt[1][1] = 1.0
+   --mt[2][2] = 1.0
+   --mt[3][3] = 1.0
 
    mt[1][4] = x
    mt[2][4] = y
@@ -77,7 +80,7 @@ function geom3d.genMrx(angr)
    local mrx = geom3d.get44mtx()
    local cosang = math.cos(angr)
    local sinang = math.sin(angr)
-   mrx[1][1] = 1.0
+   --mrx[1][1] = 1.0
    mrx[2][2] = cosang
    mrx[3][3] = cosang
    mrx[2][3] = -sinang
@@ -93,7 +96,7 @@ function geom3d.genMry(angr)
    local cosang = math.cos(angr)
    local sinang = math.sin(angr)
    mry[1][1] = cosang
-   mry[2][2] = 1.0
+   --mry[2][2] = 1.0
    mry[3][3] = cosang
    mry[3][1] = -sinang
    mry[1][3] = sinang
@@ -109,7 +112,7 @@ function geom3d.genMrz(angr)
    local sinang = math.sin(angr)
    mrz[1][1] = cosang
    mrz[2][2] = cosang
-   mrz[3][3] = 1.0
+   --mrz[3][3] = 1.0
    mrz[1][2] = -sinang
    mrz[2][1] = sinang
    return mrz
@@ -152,6 +155,25 @@ function geom3d.getDistance3d(m1,m2)
       dsum = dsum + (v * v)
    end
    return math.sqrt(dsum)
+end
+
+--- generate string with matrix in openSCAD format
+-- @param mtx nxm matrix
+-- @return string openSCAD representation of m
+function geom3d.writeSCAD(mtx)
+   local m = mtx:size(1)
+   local n = mtx:size(2)
+
+   local s = '[ '
+   for i = 1, m do
+      s = s .. '[ '
+      for j = 1, n do
+         s = s .. mtx[i][j] .. (j<n and ', ' or ' ')
+      end
+      s = s .. ']' .. (i<m and ', ' or ' ')
+   end
+   s = s .. ']'
+   return s
 end
 
 local function nzt(val)
