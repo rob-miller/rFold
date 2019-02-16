@@ -1,0 +1,16 @@
+
+14 feb 2019
+
+environment assessment
+
+instead of doing spherical shells divided into voxels
+define a cubic lattice on AA coordinate space
+inscribe a sphere for some radius of interest to discard vertices outside sphere
+use fuzzy set function to assign membership of environmental atom to nearest vertices
+   can sort atoms in x,y,z for assignment
+
+sort vertices by distance to AA center for input to neural net
+   also should make nice presentation in bar graphs - e.g. like convolutional NNs in different atom types
+
+perhaps set up NNs for each dihedral -- at least on side chains, could yield fast evaluation of side chain rotamers for backbone motions
+
