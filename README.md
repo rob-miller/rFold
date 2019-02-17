@@ -1,4 +1,5 @@
 #rFold
+Update 02/2019: As [Torch](https://github.com/torch/distro) entered 'maintenance mode' while I was busy with other things, I am now actively porting this work to Python (and [Biopython](https://biopython.org/))
 [rFold](http://rob-miller.github.io/rFold/doc/topics/README.md.html) is a set of Lua (LuaJIT) classes and submodules to build, manipulate and analyse three-dimensional protein structures.
 
 ## Overview
@@ -52,9 +53,15 @@ Not implemented.  See [Miller, Douthart and Dunker 1994](https://books.google.co
 
 In addition to speed and its connection with the [Torch7](http://torch.ch/) Neural Nets / Scientific Computing Framework, I find Lua code remarkably easy to understand and modify long after initial development work.
 
+## Tools
+
+This section is mainly to acknowledge the use of [PyVmMonitor](http://www.pyvmmonitor.com/index.html) for python profiling, in accordance wtih its [Open Source License](http://www.pyvmmonitor.com/license.html).
+
+For Python development I am using [Visual Studio Code](https://code.visualstudio.com/).  This is remarkable in that it is the first Microsoft product I am actually using by choice; my compliments to them.
+
 ## License
 
-Copyright 2016, 2017 Robert T. Miller
+Copyright 2016-2019 Robert T. Miller
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use these files except in compliance with the License.
