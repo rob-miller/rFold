@@ -1,7 +1,0 @@
-1IGY.pic   - chain B, has inserted residue: 52-ASN 52A-PRO 53-SER (lua .pic file misses this)
-1MUD.pic   - has all 20 AAs
-1bfg.pic   - starts at 19
-4A07.pic   - starts at 76, skips 241 and 260 (both hetatms)
-4LGY.pic   - starts at -1, chain break 449-465 and missing 1135 (1135 hetatm), ends at 1295  
-4OO9.pic   - mGlu5, lysozyme insertion: 568..hetatm(634)..678,1002..1162,680..missing(681-688)..hetatm(691)..missing(721-728)..832
-7RSA.pic
