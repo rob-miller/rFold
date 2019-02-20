@@ -28,6 +28,7 @@ from Bio.Data import IUPACData
 # from Bio.PDB.StructureBuilder import StructureBuilder
 
 import math
+from Bio.PDB.vectors import *
 
 try:
     import numpy
@@ -36,7 +37,10 @@ except ImportError:
     raise MissingPythonDependencyError(
         "Install NumPy to build proteins from internal coordinates.")
 
-__updated__ = '2019-02-19 21:22:58'
+from PIC_Data import pic_data_sidechains
+
+
+__updated__ = '2019-02-20 17:57:45'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -135,6 +139,53 @@ class PIC_Utils:
                     # pdb_chain.pic_load(m.groupdict())
                     pass
 
+    @staticmethod
+    def zdh(lst):
+        return dict(zip(['a1', 'a2', 'a3', 'a4'], lst))
+        
+        
+def genCBhamryck(res):
+    # https://biopython.org/wiki/The_Biopython_Structural_Bioinformatics_FAQ
+    # How do I put a virtual Cβ on a Gly residue?
+    n = res['N'].get_vector()
+    c = res['C'].get_vector()
+    ca = res['CA'].get_vector()
+    # center at origin
+    n = n - ca
+    c = c - ca
+    # find rotation matrix that rotates n -120 degrees along the ca-c vector
+    rot = rotaxis2m(-math.pi*120.0/180.0, c)
+    # apply rotation to ca-n vector
+    cb_at_origin = n.left_multiply(rot)
+    # put on top of ca atom
+    cb = cb_at_origin + ca
+    return cb
+
+
+def genCBjones(res):
+    # code by DT Jones, based on
+    # Prot. Engr vol. 2, issue 2, p. 121 (1 July, 1988)
+    # Model building of disulfide bonds in proteins with known three-
+    # dimensional structure
+    # Hazes and Dijkstra, pp 119-125
+    # https://doi.org/10.1093/protein/2.2.119
+    # https://academic.oup.com/peds/article/2/2/119/1484803
+    # TODO: update the constants!  Choose for Ala
+    n = res['N'].coord
+    c = res['C'].coord
+    ca = res['CA'].coord
+    
+    nca = ca - n
+    cca = ca - c
+    xx = nca + cca
+    yy = numpy.cross(nca, cca)
+    kCACBDIST = 1.538
+    kTETH_ANG = 0.9128
+
+    sx = kCACBDIST * math.cos(kTETH_ANG) / math.sqrt(xx.dot(xx))
+    sy = kCACBDIST * math.sin(kTETH_ANG) / math.sqrt(yy.dot(yy))
+    cb = ca +(xx * sx + yy * sy)
+    return cb    
 
 class HedronMatchError(Exception):
     pass
@@ -294,11 +345,14 @@ class PIC_Dihedron:
 
         self.updated = False
 
+    def dihedron_from_atoms(self, atom_coords):
+        pass
 
+    
 class Hedron:
     def __init__(self, h_dict):  # kwargs because parsed into group.dict
         self.id = h_dict['a1'] + ':' + h_dict['a2'] + ':' + h_dict['a3']
-
+        # print('initialising', self.id)
         if 'len1' in h_dict:
             # distance between 1st and 2nd atom
             self.len1 = float(h_dict['len1'])
@@ -367,6 +421,8 @@ class Hedron:
 
         self.updated = False
 
+    def hedron_from_atoms(self, atom_coords):
+        pass
 # ------------ add to residue class
 
 
@@ -400,6 +456,9 @@ class PIC_Residue:
             self.atom_coords[ak] = numpy.array(arr41, dtype=numpy.float64)
 
         # print(self.atom_coords)
+
+    def __str__(self):
+        return(str(self.ndx) + self.lc + '(' + str(self.residue.id) + ')')
 
     def pic_load(self, di_hedron):
         dhk = PIC_Utils.gen_key([di_hedron['a1'], di_hedron['a2'],
@@ -494,34 +553,34 @@ class PIC_Residue:
                 self.atom_coords[ak] = rn.atom_coords[ak]
 
             self.dihedra[pu.gen_key([sN, sCA, sC, nN])] = PIC_Dihedron(
-                {'a1': sN, 'a2': sCA, 'a3': sC, 'a4': nN})   # psi
+                pu.zdh([sN, sCA, sC, nN]))   # psi
 
             self.dihedra[pu.gen_key([sCA, sC, nN, nCA])] = PIC_Dihedron(
-                {'a1': sCA, 'a2': sC, 'a3': nN, 'a4': nCA})   # omega i+1
+                pu.zdh([sCA, sC, nN, nCA]))   # omega i+1
 
             self.dihedra[pu.gen_key([sC, nN, nCA, nC])] = PIC_Dihedron(
-                {'a1': sC, 'a2': nN, 'a3': nCA, 'a4': nC})   # phi i+1
+                pu.zdh([sC, nN, nCA, nC]))   # phi i+1
 
             rn.hedra[pu.gen_key([nN, nCA, nC])] = Hedron(
-                {'a1': nN, 'a2': nCA, 'a3': nC})
+                pu.zdh([nN, nCA, nC]))
 
         # backbone O and C-beta hedra and dihedra within this residue
         self.dihedra[pu.gen_key([sN, sCA, sC, sO])] = PIC_Dihedron(
-            {'a1': sN, 'a2': sCA, 'a3': sC, 'a4': sO})
+            pu.zdh([sN, sCA, sC, sO]))
         self.dihedra[pu.gen_key([sO, sC, sCA, sCB])] = PIC_Dihedron(
-            {'a1': sO, 'a2': sC, 'a3': sCA, 'a4': sCB})
+            pu.zdh([sO, sC, sCA, sCB]))
 
         sNCaCKey = pu.gen_key([sN, sCA, sC])
         if sNCaCKey not in self.hedra:
-            self.hedra[sNCaCKey] = Hedron({'a1': sN, 'a2': sCA, 'a3': sC})
+            self.hedra[sNCaCKey] = Hedron(pu.zdh([sN, sCA, sC]))
 
         self.hedra[pu.gen_key([sCA, sC, sO])] = Hedron(
-            {'a1': sCA, 'a2': sC, 'a3': sO})
+            pu.zdh([sCA, sC, sO]))
 
         self.hedra[pu.gen_key([sCB, sCA, sC])] = Hedron(
-            {'a1':  sCB, 'a2': sCA, 'a3': sC})
+            pu.zdh([sCB, sCA, sC]))
 
-        # if res is not G or A then
+        # if res is not G or A
         # only needed for sidechain CG residues
         # (not gly or ala or any missing rest of side chain)
         if ((skbase + 'CG') in self.atom_coords or
@@ -530,17 +589,53 @@ class PIC_Residue:
             (skbase + 'OG1') in self.atom_coords or
                 (skbase + 'SG') in self.atom_coords):
             self.hedra[pu.gen_key([sN, sCA, sCB])] = Hedron(
-                {'a1': sN, 'a2': sCA, 'a3': sCB})
+                pu.zdh([sN, sCA, sCB]))
 
         # amide proton N H if present
         sH = skbase + 'H'
         if sH in self.atom_coords:
             self.hedra[pu.gen_key([sH, sN, sCA])] = Hedron(
-                {'a1': sH, 'a2': sN, 'a3': sCA})
-            self.hedra[pu.gen_key([sC, sCA, sN, sH])] = PIC_Dihedron(
-                {'a1': sC, 'a2': sCA, 'a3': sN, 'a4': sH})
+                pu.zdh([sH, sN, sCA]))
+            self.dihedra[pu.gen_key([sC, sCA, sN, sH])] = PIC_Dihedron(
+                pu.zdh([sC, sCA, sN, sH]))
 
+        # sidechain hedra and dihedra
+
+        sidechain = pic_data_sidechains.get(self.lc, [])
+        for hdh in sidechain:
+            r_hdh = [skbase + a for a in hdh]
+            if 4 > len(r_hdh):  # then is hedron
+                self.hedra[pu.gen_key(r_hdh)] = Hedron(pu.zdh(r_hdh))
+            elif r_hdh[3] in self.atom_coords:  # skip if 4th atom not present
+                self.dihedra[pu.gen_key(r_hdh)] = PIC_Dihedron(pu.zdh(r_hdh))
+                
+        if sCB not in self.atom_coords:  # add C-beta for Gly
+            self.atom_coords[sCB] = numpy.append(
+                genCBjones(self.residue), [1])
+            # print(self.atom_coords[sCB])
+
+        # testing C-beta generation against Ala:
+        # if 'A' == self.lc:
+        #    aj = genCBjones(self.residue)
+        #    ah = genCBhamryck(self.residue)
+        #    cac = self.residue['CB'].coord
+        #    cav = self.residue['CB'].get_vector()
+        #    dj = aj - cac
+        #    dh = ah - cav
+        #    print('deltaJ=',dj,'deltaH=',dh,aj,cac)
+
+        self.link_dehedra()
         
+        for d in self.dihedra.values():
+            # populate values and hedra for dihedron ojects
+            d.dihedron_from_atoms(self.atom_coords)
+        for h in self.hedra.values():
+            # miss redundant hedra above, needed for some chi1 angles
+            if h.len1 is None:
+                # print(h)
+                h.hedron_from_atoms(self.atom_coords)
+                
+                
 
 # Residue.pic_init = residue_pic_init
 # Residue.pic_load = residue_pic_load
