@@ -245,17 +245,19 @@ function geom3d.coordSpace(a1,a2,a3, r)
    local sc = geom3d.getSphericalCoordinates(p3)
 
    if dbg then
-      print(sc:pretty())
+      print('p', p3:transpose():pretty())
+      print('sc', sc:transpose():pretty())
    end
    
    local mrz = geom3d.genMrz(-sc[1][1])  -- rotate translated a3 -theta about Z
    local mry = geom3d.genMry(-sc[2][1])  -- rotate translated a3 -phi about Y
    
    local mt = mrz * tm
+   
    mt = mry * mt                  -- mt completes a2-a3 on Z-axis, still need to align a1 with XZ plane
 
    if dbg then
-      print((mt * a3):pretty())
+      print('mt * a3', (mt * a3):transpose():pretty())
    end
    
    p3 = mt * a1                   -- p3 not needed, re-use it here
