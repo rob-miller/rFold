@@ -1,5 +1,9 @@
-# per residue sidechain hedra and dihedra definitions, in order of output for internal coordinates specification file
+# per residue sidechain hedra and dihedra definitions, in order of output for
+# internal coordinates specification file
 
+pic_data_backbone = {
+    
+}
 pic_data_sidechains = {
     'V': [
         ['CA', 'CB', 'CG1'],
@@ -193,4 +197,5 @@ pic_data_sidechains = {
     ]
 }
 
-# http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/formuleAA/ for naming of individual atoms
+# http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/formuleAA/ 
+# for naming of individual atoms
