@@ -41,8 +41,9 @@ except ImportError:
 
 from PIC_Data import pic_data_sidechains
 
+from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-02-22 21:31:27'
+__updated__ = '2019-02-26 15:11:24'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -150,6 +151,49 @@ def load_pic_file(file):
                 pass
 
 
+def write_PIC(entity, pdbid=None, chainid=None, s=''):
+    try:
+        if 'A' == entity.level:
+            raise PDBException("No PIC output at Atom level")
+        elif 'R' == entity.level:
+            s += str(entity.get_full_id()) + ' ' + entity.resname + '\n'
+            if hasattr(entity, 'pic'):
+                if not chainid or not pdbid:
+                    chain = entity.parent
+                    if not chainid:
+                        chainid = chain.id
+                    if not pdbid:
+                        struct = chain.parent.parent
+                        pdbid = struct.header.get('idcode', '0PDB')
+                s = entity.pic.write_PIC(pdbid, chainid, s)
+        elif 'C' == entity.level:
+            if not chainid:
+                chainid = entity.id
+            for res in entity:
+                s = write_PIC(res, pdbid, chainid, s)
+                pass
+        elif 'M' == entity.level:
+            for chn in entity:
+                s = write_PIC(chn, pdbid, chainid, s)
+        elif 'S' == entity.level:
+            if not pdbid:
+                pdbid = entity.header.get('idcode', None)
+            hdr = entity.header.get('head', None)
+            if hdr:
+                s += 'HEADER    ' + hdr.upper() + ' ' + (pdbid or '') + '\n'
+            nam = entity.header.get('name', None)
+            if nam:
+                s += 'TITLE     ' + nam.upper() + '\n'
+            for mdl in entity:
+                s = write_PIC(mdl, pdbid, chainid, s)
+        else:
+            raise PDBException("Cannot identify level: " + str(entity.level))
+    except KeyError:
+        raise Exception("write_PIC: argument is not a Biopython PDB Entity "
+                        + str(entity))
+    return s
+
+        
 def zdh(lst):
     return dict(zip(['a1', 'a2', 'a3', 'a4'], lst))
 
@@ -298,26 +342,125 @@ class DihedronIncompleteError(Exception):
     pass
 
 
-class PIC_Dihedron:
-    def __init__(self, dh_dict):  # kwargs because parsed into group.dict
-
-        self.a14 = [dh_dict['a1'], dh_dict['a2'], dh_dict['a3'], dh_dict['a4']]
-        self.id = gen_key(self.a14)
+class DH_Base(object):
+    atomre = re.compile(r'^(\d+)([a-zA-Z])(\w+)(?:-(\d\.\d?\d?))?(?:-(\w))?$')
         
-        if 'dihedral1' in dh_dict:
-            self.dihedral1 = float(dh_dict['dihedral1'])
+    def __init__(self, *args, **kwargs):
+        self.aks = [kwargs['a1'], kwargs['a2'], kwargs['a3']]
+        try:
+            self.aks.append(kwargs['a4'])
+        except KeyError:
+            pass
+        self.id = gen_key(self.aks)
+
+        # flag indicting that atom coordinates are up to date
+        # (do not need to be recalculated from dihedral1)
+        self.updated = True
+
+        # no residue or position, just atoms 
+        self.dh_class = ''
+        # same but residue specific
+        self.rdh_class = ''
+
+        for ak in self.aks:
+            m = self.atomre.match(ak)
+            self.dh_class += m.group(3)
+            self.rdh_class += (m.group(2) + m.group(3))
+    
+    backbone_sort_keys = {'N': 0, 'CA': 1, 'C': 2, 'O': 3, 'H': 4}
+    
+    def _cmp(self, other):
+        for ak_s, ak_o in zip(self.aks, other.aks):
+            if ak_s != ak_o:
+                m_s = self.atomre.match(ak_s)
+                m_o = self.atomre.match(ak_o)
+                if m_s and m_o:
+                    for g in range(1,5):  
+                        s, o = m_s.group(g), m_o.group(g)                    
+                        if s != o:
+                            if (3 != g):  # not atom
+                                return s, o
+                            else:
+                                if (s in self.backbone_sort_keys
+                                    and o in self.backbone_sort_keys):
+                                    return (self.backbone_sort_keys[s], 
+                                            self.backbone_sort_keys[o])
+                                elif (s in self.backbone_sort_keys
+                                        and o not in self.backbone_sort_keys):
+                                    return 0, 1
+                                elif (s not in self.backbone_sort_keys
+                                        and o in self.backbone_sort_keys):
+                                    return 1, 0
+                                else:
+                                    return s, o
+                else:
+                    return NotImplemented  # no re match
+        return 1, 1
+            
+                    
+                    
+                    
+            
+            
+    def __eq__(self, other):
+        """Test for equality."""
+        if isinstance(other, type(self)):
+            return self.id == other.id
+        else:
+            return NotImplemented
+
+    def __ne__(self, other):
+        """Test for inequality."""
+        if isinstance(other, type(self)):
+            return self.id != other.id
+        else:
+            return NotImplemented
+
+    def __gt__(self, other):
+        """Test greater than."""
+        if isinstance(other, type(self)):
+            rslt = self._cmp(other)
+            return rslt[0] > rslt[1]
+        else:
+            return NotImplemented
+
+    def __ge__(self, other):
+        """Test greater or equal."""
+        if isinstance(other, type(self)):
+            rslt = self._cmp(other)
+            return rslt[0] >= rslt[1]
+        else:
+            return NotImplemented
+
+    def __lt__(self, other):
+        """Test less than."""
+        if isinstance(other, type(self)):
+            rslt = self._cmp(other)
+            return rslt[0] < rslt[1]
+        else:
+            return NotImplemented
+
+    def __le__(self, other):
+        """Test less or equal."""
+        if isinstance(other, type(self)):
+            rslt = self._cmp(other)
+            return rslt[0] <= rslt[1]
+        else:
+            return NotImplemented
+
+
+
+class PIC_Dihedron(DH_Base):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if 'dihedral1' in kwargs:
+            self.dihedral1 = float(kwargs['dihedral1'])
         else:
             self.dihedral1 = None
 
-        # no residue or position, just atoms # maybe also grab residue?
-        self.dclass = ''
-        atomre = re.compile(r'^\d+[a-zA-Z](\w+)$')
-        for ak in self.a14:
-            m = atomre.match(ak)
-            self.dclass += m.group(1)
-
-        self.id3 = gen_key(self.a14[0:3])
-        self.id32 = gen_key(self.a14[1:4])
+        self.id3 = gen_key(self.aks[0:3])
+        self.id32 = gen_key(self.aks[1:4])
 
         # hedra making up this dihedron; set by self:set_hedra()
         self.hedron1 = None
@@ -337,14 +480,10 @@ class PIC_Dihedron:
         # order of atoms in dihedron is reversed from order of atoms in hedra
         self.reverse = False
 
-        # flag indicting that atom coordinates are up to date
-        # (do not need to be recalculated from dihedral1)
-        self.updated = True
-
         # print(self, self.dclass)
 
     def __str__(self):
-        return ('4-' + str(self.id) + ' ' + self.dclass + ' ' +
+        return ('4-' + str(self.id) + ' ' + self.rdh_class + ' ' +
                 str(self.dihedral1) + ' (' + str(self.residue) + ')')
 
     # find specified hedron on this residue or its adjacent neighbors
@@ -362,15 +501,15 @@ class PIC_Dihedron:
     def set_hedra(self):
         rev = False
         res = self.residue
-        h1key = gen_key(self.a14[0:3])
+        h1key = gen_key(self.aks[0:3])
         hedron1 = PIC_Dihedron.get_hedron(res, h1key)
         if not hedron1:
             rev = True
-            h1key = gen_key(self.a14[2::-1])
+            h1key = gen_key(self.aks[2::-1])
             hedron1 = PIC_Dihedron.get_hedron(res, h1key)
-            h2key = gen_key(self.a14[3:0:-1])
+            h2key = gen_key(self.aks[3:0:-1])
         else:
-            h2key = gen_key(self.a14[1:4])
+            h2key = gen_key(self.aks[1:4])
 
         if not hedron1:
             raise HedronMatchError(res, "can't find 1st hedron", h1key, self)
@@ -504,7 +643,7 @@ class PIC_Dihedron:
         #    raise DihedronIncompleteError(self, 'missing hedra', hed1, hed2)
 
         atom_coords = self.residue.atom_coords
-        aks = self.a14
+        aks = self.aks
         acs = []
         estr = ''
         for ak in aks:
@@ -578,30 +717,22 @@ class PIC_Dihedron:
         # print(hed2)
         
 
-class Hedron:
-    def __init__(self, h_dict):  # kwargs because parsed into group.dict
-        self.a13 = [h_dict['a1'], h_dict['a2'], h_dict['a3']]
-        self.id = gen_key(self.a13)
+class Hedron(DH_Base):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # print('initialising', self.id)
-        if 'len1' in h_dict:
+        if 'len1' in kwargs:
             # distance between 1st and 2nd atom
-            self.len1 = float(h_dict['len1'])
+            self.len1 = float(kwargs['len1'])
             # angle formed between 3 atoms
-            self.angle2 = float(h_dict['angle2'])
+            self.angle2 = float(kwargs['angle2'])
             # distance between 2nd and 3rd atoms
-            self.len3 = float(h_dict['len3'])
+            self.len3 = float(kwargs['len3'])
         else:
             self.len1 = None
             self.angle2 = None
             self.len3 = None
-
-        # no position or residue, just atom chars at end of key
-        self.hclass = ''
-        atomre = re.compile(r'^\d+[a-zA-Z](\w+)$')
-        for ak in (self.a13):
-            m = atomre.match(ak)
-            self.hclass += m.group(1)
 
         # 3 matrices specifying hedron space coordinates of constituent atoms,
         # initially atom3 on +Z axis
@@ -610,12 +741,10 @@ class Hedron:
         # initially atom1 on +Z axis
         self.atomsR = []
 
-        self.updated = True
-
         # print(self)
 
     def __str__(self):
-        return ('3-' + self.id + ' ' + self.hclass + ' ' + str(self.len1)
+        return ('3-' + self.id + ' ' + self.rdh_class + ' ' + str(self.len1)
                 + ' ' + str(self.angle2) + ' ' + str(self.len3))
  
     def init_pos(self):
@@ -658,7 +787,6 @@ class Hedron:
         a0 = acs[0].squeeze()
         a1 = acs[1].squeeze()
         a2 = acs[2].squeeze()
-        a3 = acs[2].squeeze()
         
         a0a1 = numpy.linalg.norm(a0-a1)
         a1a2 = numpy.linalg.norm(a1-a2)
@@ -671,9 +799,9 @@ class Hedron:
                 )
         )   
         return a0a1, a0a1a2, a1a2
-        
+    
     def hedron_from_atoms(self, atom_coords):
-        aks = self.a14
+        aks = self.aks
         acs = []
         estr = ''
         for ak in aks:
@@ -697,7 +825,7 @@ class Hedron:
 
 class PIC_Residue:
 
-    def __init__(self, parent, ndx):
+    def __init__(self, parent, ndx, ALT_OK=True):
         self.residue = parent
         self.ndx = ndx
         # dict of hedron objects indexed by hedron keys ([resPos res atom] x3)
@@ -719,20 +847,43 @@ class PIC_Residue:
         self.atom_coords = {}
         # TODO: remove bp_atoms, just for testing against bp vector()
         self.bp_atoms = {}
+        if ALT_OK:
+            self.alt_ids = []
         rbase = str(ndx) + self.lc
         for atom in parent.get_atoms():
-            if hasattr(atom, 'selected_child'):
-                # if disordered choice take the preferred one
-                atom = atom.selected_child
-            ak = rbase + atom.name
-            # TODO: are 4x1 arrays necessary?
-            arr41 = numpy.append(atom.coord, [1])
-            self.atom_coords[ak] = numpy.array(arr41, dtype=numpy.float64)[
-                numpy.newaxis].transpose()
-            self.bp_atoms[ak] = atom
+            if hasattr(atom, 'child_dict'):
+                if ALT_OK:
+                    for atm in atom.child_dict.values():
+                        self.add_atom(atm, rbase, atm.altloc)
+                else:
+                    self.add_atom(atom.selected_child, rbase)
+            else:
+                self.add_atom(atom, rbase)
 
         # print(self.atom_coords)
-
+        
+    accept_atoms = ('N', 'CA', 'C', 'O', 'H', 'CB', 'CG', 'CG1', 'OG1', 'SG', 
+                    'CG2', 'CD', 'CD1', 'SD', 'OD1', 'ND1', 'CD2', 'ND2', 'CE',
+                    'CE1', 'NE', 'OE1', 'NE1', 'CE2', 'OE2', 'NE2', 'CE3', 'CZ',
+                    'NZ', 'CZ2', 'CZ3')
+    
+    def add_atom(self, atm, rbase, alt_id=None):
+        if atm.name not in self.accept_atoms:
+            # print('skip:', atm.name)
+            return
+        ak = rbase + atm.name
+        if atm.occupancy != 1.00:
+            ak += '-' + str(atm.occupancy) 
+            if alt_id is not None:
+                ak += '-' + alt_id
+                self.alt_ids.append(alt_id)
+        
+        # TODO: are 4x1 arrays necessary?
+        arr41 = numpy.append(atm.coord, [1])
+        self.atom_coords[ak] = numpy.array(arr41, dtype=numpy.float64)[
+            numpy.newaxis].transpose()
+        self.bp_atoms[ak] = atm
+  
     def __str__(self):
         return(str(self.ndx) + self.lc + '(' + str(self.residue.id) + ')')
 
@@ -812,6 +963,69 @@ class PIC_Residue:
 
     pass
 
+    altloc_re = re.compile(r'-([A-Z])\Z')
+
+    def split_akl(self, lst):
+        dhl = []
+        altlocs = set()
+        for ak in lst:
+            if ak in self.atom_coords:
+                dhl.append([ak])
+            else:
+                ak2 = ak + '-'
+                ak2_lst = []
+                for key in self.atom_coords:
+                    if key.startswith(ak2):
+                        # print(key)
+                        ak2_lst.append(key)
+                        m = self.altloc_re.search(key)
+                        if m:
+                            altlocs.add(m.group(1))
+                dhl.append(ak2_lst)
+        maxc = 0
+        for akl in dhl:
+            lakl = len(akl)
+            if 0 == lakl:
+                return []    # atom missing in atom_coords, cannot form object
+            elif maxc < lakl:
+                maxc = lakl
+        if 1 == maxc:
+            nlst = []
+            for akl in dhl:
+                nlst.append(akl[0])
+            return [nlst]
+        else:
+            ndhl = []
+            for al in altlocs:
+                tail = '-' + al
+                alhl = []
+                for akl in dhl:
+                    if 1 == len(akl):
+                        alhl.append(akl[0])
+                    else:
+                        for ak in akl:
+                            if ak.endswith(tail):
+                                alhl.append(ak)
+                ndhl.append(alhl)
+            # print(ndhl)
+            return ndhl
+
+        return dhl 
+
+    def gen_edra(self, lst):
+        if 4 > len(lst):
+            dct, obj = self.hedra, Hedron
+        else:
+            dct, obj = self.dihedra, PIC_Dihedron
+
+        if all(ak in self.atom_coords for ak in lst):
+            hl = [lst]
+        else:
+            hl = self.split_akl(lst)
+
+        for nlst in hl:
+            dct[gen_key(nlst)] = obj(**zdh(nlst))
+        
     def dihedra_from_atoms(self):
         skbase = str(self.ndx) + self.lc
         sN, sCA, sC, sO, sCB = skbase + 'N', skbase + \
@@ -825,70 +1039,92 @@ class PIC_Residue:
             nN, nCA, nC = nkbase + 'N', nkbase + 'CA', nkbase + 'C'
 
             for ak in (nN, nCA, nC):
-                self.atom_coords[ak] = rn.atom_coords[ak]
+                if ak in rn.atom_coords:
+                    self.atom_coords[ak] = rn.atom_coords[ak]
+                else:
+                    ak2 = ak + '-'
+                    for key in rn.atom_coords.keys():
+                        if key.startswith(ak2):
+                            self.atom_coords[key] = rn.atom_coords[key]
 
-            self.dihedra[gen_key([sN, sCA, sC, nN])] = PIC_Dihedron(
-                zdh([sN, sCA, sC, nN]))   # psi
+            self.gen_edra([sN, sCA, sC, nN])  # psi
 
-            self.dihedra[gen_key([sCA, sC, nN, nCA])] = PIC_Dihedron(
-                zdh([sCA, sC, nN, nCA]))   # omega i+1
-
-            self.dihedra[gen_key([sC, nN, nCA, nC])] = PIC_Dihedron(
-                zdh([sC, nN, nCA, nC]))   # phi i+1
-
-            self.hedra[gen_key([sCA, sC, nN])] = Hedron(
-                zdh([sCA, sC, nN]))
-
-            self.hedra[gen_key([sC, nN, nCA])] = Hedron(
-                zdh([sC, nN, nCA]))
-
-            rn.hedra[gen_key([nN, nCA, nC])] = Hedron(
-                zdh([nN, nCA, nC]))
-
+#            self.dihedra[gen_key([sCA, sC, nN, nCA])] = PIC_Dihedron(
+#                **zdh([sCA, sC, nN, nCA]))   # omega i+1
+            self.gen_edra([sCA, sC, nN, nCA])  # omega i+1
+            
+#            self.dihedra[gen_key([sC, nN, nCA, nC])] = PIC_Dihedron(
+#                **zdh([sC, nN, nCA, nC]))   # phi i+1
+            self.gen_edra([sC, nN, nCA, nC])  # phi i+1
+            
+#            self.hedra[gen_key([sCA, sC, nN])] = Hedron(
+#                **zdh([sCA, sC, nN]))
+            self.gen_edra([sCA, sC, nN])
+            
+#            self.hedra[gen_key([sC, nN, nCA])] = Hedron(
+#                **zdh([sC, nN, nCA]))
+            self.gen_edra([sC, nN, nCA])
+            
+#            rn.hedra[gen_key([nN, nCA, nC])] = Hedron(
+#                **zdh([nN, nCA, nC]))
+            self.gen_edra([nN, nCA, nC])
+            
         # backbone O and C-beta hedra and dihedra within this residue
-        self.dihedra[gen_key([sN, sCA, sC, sO])] = PIC_Dihedron(
-            zdh([sN, sCA, sC, sO]))
-        self.dihedra[gen_key([sO, sC, sCA, sCB])] = PIC_Dihedron(
-            zdh([sO, sC, sCA, sCB]))
-
-        sNCaCKey = gen_key([sN, sCA, sC])
+#        self.dihedra[gen_key([sN, sCA, sC, sO])] = PIC_Dihedron(
+#            **zdh([sN, sCA, sC, sO]))
+        self.gen_edra([sN, sCA, sC, sO])
+#        self.dihedra[gen_key([sO, sC, sCA, sCB])] = PIC_Dihedron(
+#            **zdh([sO, sC, sCA, sCB]))
+        self.gen_edra([sO, sC, sCA, sCB])
+        
+        sNCaCKey = gen_key([sN, sCA, sC])  # missing if 1st in chain
         if sNCaCKey not in self.hedra:
-            self.hedra[sNCaCKey] = Hedron(zdh([sN, sCA, sC]))
-
-        self.hedra[gen_key([sCA, sC, sO])] = Hedron(
-            zdh([sCA, sC, sO]))
-
-        self.hedra[gen_key([sCB, sCA, sC])] = Hedron(
-            zdh([sCB, sCA, sC]))
-
+#            self.hedra[sNCaCKey] = Hedron(**zdh([sN, sCA, sC]))
+            self.gen_edra([sN, sCA, sC])
+        
+#        self.hedra[gen_key([sCA, sC, sO])] = Hedron(
+#            **zdh([sCA, sC, sO]))
+        self.gen_edra([sCA, sC, sO])
+        
+#        self.hedra[gen_key([sCB, sCA, sC])] = Hedron(
+#            **zdh([sCB, sCA, sC]))
+        self.gen_edra([sCB, sCA, sC])
+        
         # if res is not G or A
         # only needed for sidechain CG residues
         # (not gly or ala or any missing rest of side chain)
-        if ((skbase + 'CG') in self.atom_coords or
-            (skbase + 'CG1') in self.atom_coords or
-            (skbase + 'OG') in self.atom_coords or
-            (skbase + 'OG1') in self.atom_coords or
-                (skbase + 'SG') in self.atom_coords):
-            self.hedra[gen_key([sN, sCA, sCB])] = Hedron(
-                zdh([sN, sCA, sCB]))
+        if 'G' != self.lc and 'A' != self.lc:
+            for ak in self.atom_coords:
+                if (ak.startswith(skbase + 'CG')
+                    or ak.startswith(skbase + 'OG')
+                        or ak.startswith(skbase + 'SG')):
+                    self.gen_edra([sN, sCA, sCB])
+                    break
+        # if ((skbase + 'CG') in self.atom_coords or
+        #    (skbase + 'CG1') in self.atom_coords or
+        #    (skbase + 'OG') in self.atom_coords or
+        #    (skbase + 'OG1') in self.atom_coords or
+        #        (skbase + 'SG') in self.atom_coords):
+        #    self.gen_edra([sN, sCA, sCB])
+            # self.hedra[gen_key([sN, sCA, sCB])] = Hedron(
+            #    **zdh([sN, sCA, sCB]))
 
         # amide proton N H if present
         sH = skbase + 'H'
-        if sH in self.atom_coords:
-            self.hedra[gen_key([sH, sN, sCA])] = Hedron(
-                zdh([sH, sN, sCA]))
-            self.dihedra[gen_key([sC, sCA, sN, sH])] = PIC_Dihedron(
-                zdh([sC, sCA, sN, sH]))
+        self.gen_edra([sH, sN, sCA])
+        self.gen_edra([sC, sCA, sN, sH])
+        # if sH in self.atom_coords:
+        #    self.hedra[gen_key([sH, sN, sCA])] = Hedron(
+        #        **zdh([sH, sN, sCA]))
+        #    self.dihedra[gen_key([sC, sCA, sN, sH])] = PIC_Dihedron(
+        #        **zdh([sC, sCA, sN, sH]))
 
         # sidechain hedra and dihedra
 
         sidechain = pic_data_sidechains.get(self.lc, [])
-        for hdh in sidechain:
-            r_hdh = [skbase + a for a in hdh]
-            if 4 > len(r_hdh):  # then is hedron
-                self.hedra[gen_key(r_hdh)] = Hedron(zdh(r_hdh))
-            elif r_hdh[3] in self.atom_coords:  # skip if 4th atom not present
-                self.dihedra[gen_key(r_hdh)] = PIC_Dihedron(zdh(r_hdh))
+        for edra in sidechain:
+            r_edra = [skbase + atom for atom in edra]
+            self.gen_edra(r_edra[0:4])  # 0:4 clips label on some table entries
 
         if sCB not in self.atom_coords:  # add C-beta for Gly
             cb = numpy.append(genCBjones(self.residue), [1])
@@ -916,17 +1152,17 @@ class PIC_Residue:
                 # print(h)
                 h.hedron_from_atoms(self.atom_coords)
 
-    def write_PIC(self, pdbid, chainid, stats=False):
-        s = ''
+    def write_PIC(self, pdbid, chainid, s='', stats=False):
+        # TODO: lose pdbid .. chainid format after lua compare?
         base = pdbid + ' ' + chainid + ' '
-        for h in self.hedra.values():
+        for h in sorted(self.hedra.values()):
             try:
                 s += (base + h.id + ' ' + "{:9.5f} {:9.5f} {:9.5f}".format(
                      h.len1, h.angle2, h.len3))
             except KeyError:
                 pass
             s += '\n'
-        for d in self.dihedra.values():
+        for d in sorted(self.dihedra.values()):
             try:
                 s += (base + d.id + ' ' + "{:9.5f}".format(d.dihedral1))
             except KeyError:
@@ -966,8 +1202,9 @@ class PIC_Chain:
                 ndx += 1
                 last_ord_res = res
             else:
-                print('skipping res ' + str(res.id) + ' ' + res.resname
-                      + (' disordered' if res.disordered else ' not disordered'))
+                # print('skipping res ' + str(res.id) + ' ' + res.resname
+                #       + (' disordered' if res.disordered else ' not disordered'))
+                pass
             last_res = res
 
     def pic_load(self, di_hedra):
@@ -1031,14 +1268,6 @@ class PIC_Chain:
         for rpic in self.ordered_aa_pic_list:
             rpic.dihedra_from_atoms()
             
-    def write_PIC(self):
-        s = ''
-        for r in self.ordered_aa_pic_list:
-            s += str(r.ndx) + ' ' + str(r.residue.id) + ' ' + r.residue.resname + '\n'
-            s += r.write_PIC(self.chain.parent.parent.header.get('idcode', ''), 
-                             self.chain.id)
-        return s
-
 
 # Chain.pic_init = chain_init_pic
 # Chain.pic_load = chain_pic_load
@@ -1173,7 +1402,7 @@ for target in toProcess:
     #              'disordered' if res.disordered else '')
         pdb_chain.pic = PIC_Chain(pdb_chain)
         pdb_chain.pic.dihedra_from_atoms()
-        f = pdb_chain.pic.write_PIC()
+        f = write_PIC(pdb_structure)
         print(f)
     else:
         print('parsed pic input ', filename)
