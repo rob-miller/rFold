@@ -43,7 +43,7 @@ from PIC_Data import pic_data_sidechains
 
 from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-02-27 19:20:25'
+__updated__ = '2019-02-27 20:07:37'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -178,8 +178,8 @@ def load_pic_file(file):
                     print(m.groupdict())
                     # pdb_chain.pic_load(m.groupdict())
                     pass
-                else:
-                    print('parse fail on: ', aline)
+                elif aline.strip():
+                    print('parse fail on: .', aline, '.')
                     return None
     return 1
 
@@ -383,11 +383,11 @@ class DH_Base(object):
                          r'(?:-(?P<occ>\d\.\d?\d?))?(?:-(?P<aid>\w))?$')
     edron_re = re.compile(
         # pdbid and chain id
-        r'^(?P<pdbid>\w+)\s+(?P<chn>\w?)\s*'
+        r'^(?P<pdbid>\w+)\s(?P<chn>[\w|\s])\s'
         # 3 atom specifiers for hedron
-        r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w-]+):(?P<a3>-?[\w-]+)'
+        r'(?P<a1>[\w\-\.]+):(?P<a2>[\w\-\.]+):(?P<a3>[\w\-\.]+)'
         # 4th atom speicfier for dihedron
-        r'(:(?P<a4>-?[\w-]+))?'
+        r'(:(?P<a4>[\w\-\.]+))?'
         r'\s+'
         # len-angle-len for hedron
         r'(((?P<len1>\S+)\s+(?P<angle2>\S+)\s+(?P<len3>\S+)\s*$)|'
