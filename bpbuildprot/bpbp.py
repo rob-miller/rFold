@@ -43,56 +43,37 @@ from PIC_Data import pic_data_sidechains
 
 from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-02-26 17:56:38'
+__updated__ = '2019-02-27 19:20:25'
 print('ver: ' + __updated__)
 print(sys.version)
 
 
-class PIC_Utils:
+# class PIC_Utils:
 
-    # ------------ utility functions
+# ------------ utility functions
 
-    akre = re.compile(r'(?P<pos>\d+)(?P<res>[A-Za-z])(?P<atm>[A-Za-z]+)')
-    dhkre = re.compile(r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w_]+):(?P<a3>-?[\w_]+)'
-                       r'(:(?P<a4>-?[\w_]+))?')
-    di_hedron_re = re.compile(
-        # pdbid and chain id
-        r'^(?P<pdbid>\w+)\s+(?P<chn>\w?)\s*'
-        # 3 atom specifiers for hedron
-        r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w_]+):(?P<a3>-?[\w_]+)'
-        # 4th atom speicfier for dihedron
-        r'(:(?P<a4>-?[\w_]+))?'
-        r'\s+'
-        # len-angle-len for hedron
-        r'(((?P<len1>\S+)\s+(?P<angle2>\S+)\s+(?P<len3>\S+)\s*$)|'
-        # dihedral angle for dihedron
-        r'((?P<dihedral1>\S+)\s*$))')
+# akre = re.compile(
+# r'(?P<pos>\d+)(?P<res>[A-Za-z])(?P<atm>[A-Za-z]+)(?P<occ>')
+# dhkre = re.compile(r'(?P<a1>-?[\w-]+):(?P<a2>-?[\w-]+):(?P<a3>-?[\w-]+)'
+#                    r'(:(?P<a4>-?[\w-]+))?')
 
-    @staticmethod
-    def split_atom_key(atom_key):
-        rslt = PIC_Utils.akre.match(atom_key)
-        return rslt.groups()
+#    @staticmethod
+#    def split_atom_key(atom_key):
+#        rslt = PIC_Utils.akre.match(atom_key)
+#        return rslt.groups()
 
-    @staticmethod
-    def split_dh_key(dh_key):
-        rslt = PIC_Utils.dhkre.match(dh_key)
-        return rslt.groups()
+#    @staticmethod
+#    def split_dh_key(dh_key):
+#        rslt = PIC_Utils.dhkre.match(dh_key)
+#        return rslt.groups()
 
-
-def gen_key(di_hedron):
-    kl = di_hedron[0:3]
-    if 4 == len(di_hedron):
-        kl.append(di_hedron[3])
-    return ':'.join(kl)
-
-
-def check_res(res):
-    rid = res.id
-    if ' ' != rid[0]:
-        return False
-    if ' ' != rid[2]:
-        return False
-    return True
+# def check_res(res):
+#    rid = res.id
+#    if ' ' != rid[0]:
+#        return False
+#    if ' ' != rid[2]:
+#        return False
+#    return True
 
 
 def gen_Mrot(angle_rads, axis):
@@ -142,13 +123,65 @@ def internal_to_atom_coordinates(struct):
 
 
 def load_pic_file(file):
+    pdb_hdr_re = re.compile(r'HEADER\s{4}(?P<cf>.{1,40})'
+                            r'(?:\s+(?P<dd>\d\d\d\d-\d\d-\d\d|\d\d-\w\w\w-\d\d))?'
+                            r'(?:\s+(?P<id>[1-9][0-9A-Z]{3}))?\s*\Z',
+                             )
+    pdb_ttl_re = re.compile(r'TITLE\s{5}(?P<ttl>.+)\s*\Z')
+    biop_id_re = re.compile(r'\(\'(?P<pid>\w*)\',\s(?P<mdl>\d+),\s'
+                            r'\'(?P<chn>\w)\',\s\(\'(?P<het>\s|[\w-]+)'
+                            r'\',\s(?P<pos>\d+),\s\'(?P<alc>\s|\w)\'\)\)'
+                            r'\s(?P<res>[A-Z]{3})')
+    pdb_atm_re = re.compile(r'^ATOM\s\s(?:\s*(?P<ser>\d+))\s(?P<atm>[\w\s]{4})'
+                            r'(?P<alc>\w|\s)(?P<res>[A-Z]{3})\s(?P<chn>.)'
+                            r'(?P<pos>[\s\-\d]{4})(?P<icode>[A-Za-z\s])\s\s\s'
+                            r'(?P<x>[\s\-\d\.]{8})(?P<y>[\s\-\d\.]{8})'
+                            r'(?P<z>[\s\-\d\.]{8})(?P<occ>[\s\d\.]{6})'
+                            r'(?P<tfac>[\s\d\.]{6})\s{10}(?P<elm>.{2})'
+                            r'(?P<chg>.{2})?')
+    
     with as_handle(file, mode='rU') as handle:
         for aline in handle.readlines():
-            m = PIC_Utils.di_hedron_re.match(aline)
-            if m:
-                # print(m.groupdict())
-                # pdb_chain.pic_load(m.groupdict())
+            if aline.startswith('HEADER '):
+                m = pdb_hdr_re.match(aline)
+                if m:
+                    print('HDR: classification: ', m.group('cf').strip(),
+                          'dep date: ', m.group('dd')
+                          if m.group('dd') else '',
+                          'idcode: ', m.group('id')
+                          if m.group('id') else ''
+                          )
+                else:
+                    print('HEADER fail: ', aline)
                 pass
+            elif aline.startswith('TITLE '):
+                m = pdb_ttl_re.match(aline)
+                if m:
+                    print('TTL: ', m.group('ttl').strip())
+                else:
+                    print('TITLE fail:, ', aline)
+            elif aline.startswith('('):
+                m = biop_id_re.match(aline)
+                if m:
+                    print('res id:', m.groupdict())
+                else:
+                    print('res fail: ', aline)
+            elif aline.startswith('ATOM '):
+                m = pdb_atm_re.match(aline)
+                if m:
+                    print('atom: ', m.groupdict())
+                else:
+                    print('atom fail: ', aline)
+            else:
+                m = DH_Base.edron_re.match(aline)
+                if m:
+                    print(m.groupdict())
+                    # pdb_chain.pic_load(m.groupdict())
+                    pass
+                else:
+                    print('parse fail on: ', aline)
+                    return None
+    return 1
 
 
 def write_PIC(entity, pdbid=None, chainid=None, s=''):
@@ -346,7 +379,20 @@ class DihedronIncompleteError(Exception):
 
 
 class DH_Base(object):
-    atomre = re.compile(r'^(\d+)([a-zA-Z])(\w+)(?:-(\d\.\d?\d?))?(?:-(\w))?$')
+    atom_re = re.compile(r'^(?P<pos>\d+)(?P<res>[a-zA-Z])(?P<atm>\w+)'
+                         r'(?:-(?P<occ>\d\.\d?\d?))?(?:-(?P<aid>\w))?$')
+    edron_re = re.compile(
+        # pdbid and chain id
+        r'^(?P<pdbid>\w+)\s+(?P<chn>\w?)\s*'
+        # 3 atom specifiers for hedron
+        r'(?P<a1>-?[\w_]+):(?P<a2>-?[\w-]+):(?P<a3>-?[\w-]+)'
+        # 4th atom speicfier for dihedron
+        r'(:(?P<a4>-?[\w-]+))?'
+        r'\s+'
+        # len-angle-len for hedron
+        r'(((?P<len1>\S+)\s+(?P<angle2>\S+)\s+(?P<len3>\S+)\s*$)|'
+        # dihedral angle for dihedron
+        r'((?P<dihedral1>\S+)\s*$))')
 
     def __init__(self, *args, **kwargs):
         self.aks = [kwargs['a1'], kwargs['a2'], kwargs['a3']]
@@ -354,7 +400,7 @@ class DH_Base(object):
             self.aks.append(kwargs['a4'])
         except KeyError:
             pass
-        self.id = gen_key(self.aks)
+        self.id = DH_Base.gen_key(self.aks)
 
         # flag indicting that atom coordinates are up to date
         # (do not need to be recalculated from dihedral1)
@@ -366,17 +412,17 @@ class DH_Base(object):
         self.rdh_class = ''
 
         for ak in self.aks:
-            m = self.atomre.match(ak)
-            self.dh_class += m.group(3)
-            self.rdh_class += (m.group(2) + m.group(3))
+            m = self.atom_re.match(ak)
+            self.dh_class += m.group('atm')
+            self.rdh_class += (m.group('res') + m.group('atm'))
 
     backbone_sort_keys = {'N': 0, 'CA': 1, 'C': 2, 'O': 3, 'H': 4}
 
     def _cmp(self, other):
         for ak_s, ak_o in zip(self.aks, other.aks):
             if ak_s != ak_o:
-                m_s = self.atomre.match(ak_s)
-                m_o = self.atomre.match(ak_o)
+                m_s = self.atom_re.match(ak_s)
+                m_o = self.atom_re.match(ak_o)
                 if m_s and m_o:
                     for g in range(1, 6):
                         s, o = m_s.group(g), m_o.group(g)
@@ -446,6 +492,13 @@ class DH_Base(object):
         else:
             return NotImplemented
 
+    @staticmethod
+    def gen_key(di_hedron):
+        kl = di_hedron[0:3]
+        if 4 == len(di_hedron):
+            kl.append(di_hedron[3])
+        return ':'.join(kl)
+
 
 class PIC_Dihedron(DH_Base):
     def __init__(self, *args, **kwargs):
@@ -456,8 +509,8 @@ class PIC_Dihedron(DH_Base):
         else:
             self.dihedral1 = None
 
-        self.id3 = gen_key(self.aks[0:3])
-        self.id32 = gen_key(self.aks[1:4])
+        self.id3 = DH_Base.gen_key(self.aks[0:3])
+        self.id32 = DH_Base.gen_key(self.aks[1:4])
 
         # hedra making up this dihedron; set by self:set_hedra()
         self.hedron1 = None
@@ -498,15 +551,15 @@ class PIC_Dihedron(DH_Base):
     def set_hedra(self):
         rev = False
         res = self.residue
-        h1key = gen_key(self.aks[0:3])
+        h1key = DH_Base.gen_key(self.aks[0:3])
         hedron1 = PIC_Dihedron.get_hedron(res, h1key)
         if not hedron1:
             rev = True
-            h1key = gen_key(self.aks[2::-1])
+            h1key = DH_Base.gen_key(self.aks[2::-1])
             hedron1 = PIC_Dihedron.get_hedron(res, h1key)
-            h2key = gen_key(self.aks[3:0:-1])
+            h2key = DH_Base.gen_key(self.aks[3:0:-1])
         else:
-            h2key = gen_key(self.aks[1:4])
+            h2key = DH_Base.gen_key(self.aks[1:4])
 
         if not hedron1:
             raise HedronMatchError(res, "can't find 1st hedron", h1key, self)
@@ -578,7 +631,7 @@ class PIC_Dihedron(DH_Base):
         a4_pre_rotation[2][0] *= -1
         # hedron2 shift up so a2 at 0,0,0
         a4_pre_rotation[2][0] += a4shift
-        mrz = PIC_Utils.gen_Mrot(numpy.deg2rad(self.dihedral1), 'z')
+        mrz = gen_Mrot(numpy.deg2rad(self.dihedral1), 'z')
         initial[3] = mrz * a4_pre_rotation
 
         self.initial_coords = initial
@@ -885,8 +938,8 @@ class PIC_Residue:
         return(str(self.ndx) + self.lc + '(' + str(self.residue.id) + ')')
 
     def pic_load(self, di_hedron):
-        dhk = gen_key([di_hedron['a1'], di_hedron['a2'],
-                       di_hedron['a3'], di_hedron['a4']])
+        dhk = DH_Base.gen_key([di_hedron['a1'], di_hedron['a2'],
+                               di_hedron['a3'], di_hedron['a4']])
         # parse regex defaults this to None instead of KeyError
         if di_hedron['a4'] is not None:
             self.dihedra[dhk] = PIC_Dihedron(di_hedron)
@@ -1021,7 +1074,7 @@ class PIC_Residue:
             hl = self.split_akl(lst)
 
         for nlst in hl:
-            dct[gen_key(nlst)] = obj(**zdh(nlst))
+            dct[DH_Base.gen_key(nlst)] = obj(**zdh(nlst))
 
     def dihedra_from_atoms(self):
         skbase = str(self.ndx) + self.lc
@@ -1055,7 +1108,7 @@ class PIC_Residue:
         self.gen_edra([sN, sCA, sC, sO])
         self.gen_edra([sO, sC, sCA, sCB])
 
-        # sNCaCKey = gen_key([sN, sCA, sC])  # missing if 1st in chain
+        # sNCaCKey = DH_Base.gen_key([sN, sCA, sC])  # missing if 1st in chain
         # if sNCaCKey not in self.hedra:
         #    self.gen_edra([sN, sCA, sC])
         if not self.rprev:
@@ -1119,20 +1172,20 @@ class PIC_Residue:
         s = ('{:6}{:5d} {:4}{:1}{:3} {:1}{:4}{:1}   {:8.3f}{:8.3f}{:8.3f}'
              '{:6.2f}{:6.2f}        {:>4}\n'
              ).format('ATOM', atm.serial_number, atm.fullname, atm.altloc,
-                      res.resname, chn.id, res.id[1], res.id[2], atm.coord[0],  
-                      atm.coord[1], atm.coord[2], atm.occupancy, atm.bfactor, 
+                      res.resname, chn.id, res.id[1], res.id[2], atm.coord[0],
+                      atm.coord[1], atm.coord[2], atm.occupancy, atm.bfactor,
                       atm.element)
         # print(s)
         return s
-        
+
     def write_PIC(self, pdbid, chainid, s='', stats=False):
-        s += (str(self.residue.get_full_id()) 
+        s += (str(self.residue.get_full_id())
               + ' ' + self.residue.resname + '\n')
         if not self.rprev:
             s += self.pdb_atom_string(self.residue['N'])
             s += self.pdb_atom_string(self.residue['CA'])
             s += self.pdb_atom_string(self.residue['C'])
-            
+
         # TODO: lose pdbid .. chainid format after lua compare?
         base = pdbid + ' ' + chainid + ' '
         for h in sorted(self.hedra.values()):
@@ -1190,7 +1243,7 @@ class PIC_Chain:
 
     def pic_load(self, di_hedra):
         # NOT READY
-        sak = PIC_Utils.split_atom_key(di_hedra['a1'])
+        sak = None  # PIC_Utils.split_atom_key(di_hedra['a1'])
         res_id = self._translate_id(int(sak[0]))
         try:
             res = self.__getitem__(res_id)
@@ -1321,7 +1374,7 @@ for target in toProcess:
     pdb_input = False
     pic_input = False
     pdb_structure = None
-    pdb_chain = None
+    # pdb_chain = None
     prot_id = ''
 
     pdbidMatch = pdbidre.match(target)
@@ -1336,7 +1389,7 @@ for target in toProcess:
         filename = target
         prot_id = target
         if '.' in prot_id:
-            prot_id = prot_id[0:prot_id.find('.')]
+            prot_id = prot_id[0:prot_id.rfind('.')]
         if '/' in prot_id:
             prot_id = prot_id[prot_id.rfind('/')+1:]
         if 'pdb' in prot_id:
@@ -1370,29 +1423,28 @@ for target in toProcess:
         else:
             print('chain ' + pdbidMatch.group(3) + ' not found in ' + filename)
             continue
-    else:
-        if (len(pdb_structure) > 1) or (len(pdb_structure[0].child_list) > 1):
-            print(pdb_structure.header['idcode'],
-                  'selecting first model, first chain only')
-        pdb_chain = pdb_structure[0].child_list[0]  # first model, first chain
 
     if pdb_input:
         print('parsed pdb input', prot_id, filename)
     #    for res in pdb_chain.get_residues():   # pdb_structure.get_residues():
     #        print(res.get_full_id(), res.resname,
     #              'disordered' if res.disordered else '')
-        pdb_chain.pic = PIC_Chain(pdb_chain)
-        pdb_chain.pic.dihedra_from_atoms()
-        f = write_PIC(pdb_structure)
-        print(f)
+        for chn in pdb_structure.get_chains():
+            chn.pic = PIC_Chain(chn)
+            chn.pic.dihedra_from_atoms()
     else:
         print('parsed pic input ', filename)
-        PIC_Utils.internal_to_atom_coordinates(pdb_structure)
+        internal_to_atom_coordinates(pdb_structure)
 
-    print(pdb_structure.header['idcode'], pdb_chain.id, ':',
-          pdb_structure.header['head'])
+    # print(pdb_structure.header['idcode'], pdb_chain.id, ':',
+    #      pdb_structure.header['head'])
 
     if args.wp:
         io = PDBIO()
         io.set_structure(pdb_structure)
         io.save(target + '.PyPDB')
+
+    if args.wi:
+        pic_str = write_PIC(pdb_structure)
+        with open(target + '.PyPIC', 'w') as outf:
+            print(pic_str, file=outf)
