@@ -27,7 +27,8 @@ from Bio.PDB.Residue import Residue
 
 from Bio.Data import IUPACData
 
-# from Bio.PDB.StructureBuilder import StructureBuilder
+from Bio.PDB.StructureBuilder import StructureBuilder
+from Bio.PDB.parse_pdb_header import _parse_pdb_header_list
 
 import math
 from Bio.PDB.vectors import rotaxis2m, calc_dihedral
@@ -43,7 +44,7 @@ from PIC_Data import pic_data_sidechains
 
 from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-02-27 20:07:37'
+__updated__ = '2019-03-01 16:09:05'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -122,56 +123,126 @@ def internal_to_atom_coordinates(struct):
 #        chn.pic.dihedra_from_atoms()
 
 
+# 
+# read pic file
+#
+# file format:
+#   (opt) PDB HEADER record
+#       - idcode and deposition date recommended but optional
+#       - deposition date in PDB format or as changed by Biopython
+#   (opt) PDB TITLE record
+#   repeat:
+#   Biopython Residue Full ID - sets ID of returned structure
+#   PDB ATOM records for chain start N, CA, C (optional)
+#   PIC Hedra records for residue
+#   PIC Dihedra records for residue
+#
+# returns either
+#    Biopython Structure object, Residues with .pic attributes
+#      but no coordinates except for chain start N, CA, C atoms
+#  or
+#    None on parse fail
+#
+
 def load_pic_file(file):
-    pdb_hdr_re = re.compile(r'HEADER\s{4}(?P<cf>.{1,40})'
-                            r'(?:\s+(?P<dd>\d\d\d\d-\d\d-\d\d|\d\d-\w\w\w-\d\d))?'
-                            r'(?:\s+(?P<id>[1-9][0-9A-Z]{3}))?\s*\Z',
-                             )
-    pdb_ttl_re = re.compile(r'TITLE\s{5}(?P<ttl>.+)\s*\Z')
-    biop_id_re = re.compile(r'\(\'(?P<pid>\w*)\',\s(?P<mdl>\d+),\s'
+    pdb_hdr_re = re.compile(
+        r'^HEADER\s{4}(?P<cf>.{1,40})'
+        r'(?:\s+(?P<dd>\d\d\d\d-\d\d-\d\d|\d\d-\w\w\w-\d\d))?'
+        r'(?:\s+(?P<id>[1-9][0-9A-Z]{3}))?\s*$',
+        )
+    pdb_ttl_re = re.compile(r'^TITLE\s{5}(?P<ttl>.+)\s*$')
+    biop_id_re = re.compile(r'^\(\'(?P<pid>\w*)\',\s(?P<mdl>\d+),\s'
                             r'\'(?P<chn>\w)\',\s\(\'(?P<het>\s|[\w-]+)'
-                            r'\',\s(?P<pos>\d+),\s\'(?P<alc>\s|\w)\'\)\)'
-                            r'\s(?P<res>[A-Z]{3})')
+                            r'\',\s(?P<pos>\d+),\s\'(?P<icode>\s|\w)\'\)\)'
+                            r'\s(?P<res>[A-Z]{3})'
+                            r'\s\[(?P<segid>[a-zA-z\s]{4})\]\s*$')
     pdb_atm_re = re.compile(r'^ATOM\s\s(?:\s*(?P<ser>\d+))\s(?P<atm>[\w\s]{4})'
                             r'(?P<alc>\w|\s)(?P<res>[A-Z]{3})\s(?P<chn>.)'
                             r'(?P<pos>[\s\-\d]{4})(?P<icode>[A-Za-z\s])\s\s\s'
                             r'(?P<x>[\s\-\d\.]{8})(?P<y>[\s\-\d\.]{8})'
                             r'(?P<z>[\s\-\d\.]{8})(?P<occ>[\s\d\.]{6})'
-                            r'(?P<tfac>[\s\d\.]{6})\s{10}(?P<elm>.{2})'
-                            r'(?P<chg>.{2})?')
+                            r'(?P<tfac>[\s\d\.]{6})\s{6}'
+                            r'(?P<segid>[a-zA-z\s]{4})(?P<elm>.{2})'
+                            r'(?P<chg>.{2})?\s*$')
     
+    struct_builder = StructureBuilder()
+
+    # init empty header dict
+    # - could use to parse HEADERR and TITLE lines except
+    # -- deposition_date format changed from original PDB header
+    header_dict = _parse_pdb_header_list([])
+    
+    curr_SMCS = [None, None, None, None]  # struct model chain seg
+    SMCS_init = [
+        struct_builder.init_structure,
+        struct_builder.init_model,
+        struct_builder.init_chain,
+        struct_builder.init_seg
+    ]
+    curr_res = None
+
     with as_handle(file, mode='rU') as handle:
         for aline in handle.readlines():
             if aline.startswith('HEADER '):
                 m = pdb_hdr_re.match(aline)
                 if m:
-                    print('HDR: classification: ', m.group('cf').strip(),
-                          'dep date: ', m.group('dd')
-                          if m.group('dd') else '',
-                          'idcode: ', m.group('id')
-                          if m.group('id') else ''
-                          )
+                    header_dict['head'] = m.group('cf')  # classification
+                    header_dict['idcode'] = m.group('id')
+                    header_dict['deposition_date'] = m.group('dd')
+                    
+                    # print('HDR: classification: ', m.group('cf').strip(),
+                    #      'dep date: ', m.group('dd')
+                    #      if m.group('dd') else '',
+                    #      'idcode: ', m.group('id')
+                    #      if m.group('id') else ''
+                    #      )
                 else:
-                    print('HEADER fail: ', aline)
+                    print('Reading pic file', file, 'HEADER fail: ', aline)
                 pass
             elif aline.startswith('TITLE '):
                 m = pdb_ttl_re.match(aline)
                 if m:
-                    print('TTL: ', m.group('ttl').strip())
+                    header_dict['name'] = m.group('ttl').strip()
+                    # print('TTL: ', m.group('ttl').strip())
                 else:
-                    print('TITLE fail:, ', aline)
+                    print('Reading pic file', file, 'TITLE fail:, ', aline)
             elif aline.startswith('('):
                 m = biop_id_re.match(aline)
                 if m:
-                    print('res id:', m.groupdict())
+                    this_SMCS = [m.group(0), m.group(1),
+                                 m.group(2), m.group(7)]
+                    if curr_SMCS != this_SMCS:
+                        for i in range(4):
+                            if curr_SMCS[i] != this_SMCS[i]:
+                                SMCS_init[i](this_SMCS[i])
+                                curr_SMCS[i] = this_SMCS[i]
+                            if 0 == i:  # 0 means init structure level
+                                struct_builder.set_header(header_dict)
+
+                    struct_builder.init_residue(
+                        m.group('res'), m.group('het'),
+                        m.group('pos'), m.group('icode'))
+                    # print('res id:', m.groupdict())
+                    curr_res = m.group('res') + m.group('pos')
                 else:
-                    print('res fail: ', aline)
+                    print('Reading pic file', file, 'res fail: ', aline)
             elif aline.startswith('ATOM '):
                 m = pdb_atm_re.match(aline)
                 if m:
-                    print('atom: ', m.groupdict())
+                    if curr_res != m.group('res') + m.group('pos').strip():
+                        # ATOM without res spec, not a pic file
+                        return None
+                    coord = numpy.array(
+                        (float(m.group('x')), float(m.group('y')), 
+                         float(m.group('z'))), "f")
+                    struct_builder.init_atom(
+                        m.group('atm').strip(), coord, float(m.group('tfac')),
+                        float(m.group('occ')), m.group('alc'), m.group('atm'),
+                        int(m.group('ser')), m.group('elm').strip())
+                  
+                    # print('atom: ', m.groupdict())
                 else:
-                    print('atom fail: ', aline)
+                    print('Reading pic file', file, 'ATOM fail: ', aline)
             else:
                 m = DH_Base.edron_re.match(aline)
                 if m:
@@ -179,9 +250,10 @@ def load_pic_file(file):
                     # pdb_chain.pic_load(m.groupdict())
                     pass
                 elif aline.strip():
-                    print('parse fail on: .', aline, '.')
+                    # print('Reading PIC file', file, 'parse fail on: .', aline, '.')
                     return None
-    return 1
+                    
+    return struct_builder.get_structure()
 
 
 def write_PIC(entity, pdbid=None, chainid=None, s=''):
@@ -199,7 +271,7 @@ def write_PIC(entity, pdbid=None, chainid=None, s=''):
                         pdbid = struct.header.get('idcode', '0PDB')
                 s = entity.pic.write_PIC(pdbid, chainid, s)
             else:
-                s += str(entity.get_full_id()) + ' ' + entity.resname + '\n'
+                s += PIC_Residue.residue_string(entity)
         elif 'C' == entity.level:
             if not chainid:
                 chainid = entity.id
@@ -1177,10 +1249,14 @@ class PIC_Residue:
                       atm.element)
         # print(s)
         return s
-
+    @staticmethod
+    def residue_string(res):
+        return (str(res.get_full_id())
+                + ' ' + res.resname
+                + ' [' + res.get_segid() + ']\n')
+                  
     def write_PIC(self, pdbid, chainid, s='', stats=False):
-        s += (str(self.residue.get_full_id())
-              + ' ' + self.residue.resname + '\n')
+        s += PIC_Residue.residue_string(self.residue)
         if not self.rprev:
             s += self.pdb_atom_string(self.residue['N'])
             s += self.pdb_atom_string(self.residue['CA'])
