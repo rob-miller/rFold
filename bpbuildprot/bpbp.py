@@ -21,11 +21,11 @@ from Bio.File import as_handle
 from Bio.PDB.Polypeptide import three_to_one
 
 # from Bio.PDB.Chain import Chain
-from Bio.PDB.Residue import Residue
+# from Bio.PDB.Residue import Residue
 # from Bio.PDB.Atom import Atom
 # from Bio.PDB.Entity import Entity
 
-from Bio.Data import IUPACData
+# from Bio.Data import IUPACData
 
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.PDB.parse_pdb_header import _parse_pdb_header_list
@@ -44,7 +44,7 @@ from PIC_Data import pic_data_sidechains
 
 from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-03-01 16:09:05'
+__updated__ = '2019-03-04 14:03:35'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -110,13 +110,15 @@ def gen_Mtrans(xyz):
 
 def internal_to_atom_coordinates(struct):
     for chn in struct.get_chains():
-        chn.set_first_last()
-    for chn in struct.get_chains():
-        chn.link_residues()
-    for chn in struct.get_chains():
-        chn.render_dihedra()
-    for chn in struct.get_chains():
-        chn.assemble_residues()
+        if hasattr(chn, 'pic'):
+            chnPIC = chn.pic
+            chnPIC.set_first_last()
+    # for chn in struct.get_chains():
+            chnPIC.link_residues()
+    # for chn in struct.get_chains():
+            chnPIC.render_dihedra()
+    # for chn in struct.get_chains():
+            chnPIC.assemble_residues()
 
 #    @staticmethod
 #    def atoms_to_internal_coordinates(chn):
@@ -155,7 +157,9 @@ def load_pic_file(file):
                             r'\'(?P<chn>\w)\',\s\(\'(?P<het>\s|[\w-]+)'
                             r'\',\s(?P<pos>\d+),\s\'(?P<icode>\s|\w)\'\)\)'
                             r'\s(?P<res>[A-Z]{3})'
-                            r'\s\[(?P<segid>[a-zA-z\s]{4})\]\s*$')
+                            r'\s\[(?P<segid>[a-zA-z\s]{4})\]'
+                            r'\s(?P<ndx>\d+)?'
+                            r'\s*$')
     pdb_atm_re = re.compile(r'^ATOM\s\s(?:\s*(?P<ser>\d+))\s(?P<atm>[\w\s]{4})'
                             r'(?P<alc>\w|\s)(?P<res>[A-Z]{3})\s(?P<chn>.)'
                             r'(?P<pos>[\s\-\d]{4})(?P<icode>[A-Za-z\s])\s\s\s'
@@ -179,7 +183,8 @@ def load_pic_file(file):
         struct_builder.init_chain,
         struct_builder.init_seg
     ]
-    curr_res = None
+    
+    sb_res = None
 
     with as_handle(file, mode='rU') as handle:
         for aline in handle.readlines():
@@ -206,32 +211,45 @@ def load_pic_file(file):
                     # print('TTL: ', m.group('ttl').strip())
                 else:
                     print('Reading pic file', file, 'TITLE fail:, ', aline)
-            elif aline.startswith('('):
+            elif aline.startswith('('):  # Biopython ID line for Residue
                 m = biop_id_re.match(aline)
                 if m:
-                    this_SMCS = [m.group(0), m.group(1),
-                                 m.group(2), m.group(7)]
-                    if curr_SMCS != this_SMCS:
+                    # check Structure, Model, Chain, SegID
+                    this_SMCS = [m.group(1), int(m.group(2)),
+                                 m.group(3), m.group(8)]
+                    if curr_SMCS != this_SMCS: 
                         for i in range(4):
                             if curr_SMCS[i] != this_SMCS[i]:
                                 SMCS_init[i](this_SMCS[i])
                                 curr_SMCS[i] = this_SMCS[i]
-                            if 0 == i:  # 0 means init structure level
-                                struct_builder.set_header(header_dict)
+                                if 0 == i:
+                                    # 0 = init structure level so add header
+                                    struct_builder.set_header(header_dict)
 
                     struct_builder.init_residue(
                         m.group('res'), m.group('het'),
-                        m.group('pos'), m.group('icode'))
+                        int(m.group('pos')), m.group('icode'))
+
+                    sb_res = struct_builder.residue
+                    sb_res.pic = PIC_Residue(sb_res, m.group('ndx'))
                     # print('res id:', m.groupdict())
-                    curr_res = m.group('res') + m.group('pos')
+                    # print(report_PIC(struct_builder.get_structure()))
                 else:
                     print('Reading pic file', file, 'res fail: ', aline)
             elif aline.startswith('ATOM '):
                 m = pdb_atm_re.match(aline)
                 if m:
-                    if curr_res != m.group('res') + m.group('pos').strip():
-                        # ATOM without res spec, not a pic file
+                    if sb_res is None:
+                        # ATOM without res spec already loaded, not a pic file
+                        print('no sb_res - not pic file', aline)
                         return None
+                    if (sb_res.resname != m.group('res')
+                       or sb_res.id[1] != int(m.group('pos'))):
+                        # TODO: better exception here?
+                        raise Exception('pic ATOM read confusion:', 
+                                        sb_res.resname, str(sb_res.id), 
+                                        aline)
+
                     coord = numpy.array(
                         (float(m.group('x')), float(m.group('y')), 
                          float(m.group('z'))), "f")
@@ -246,13 +264,13 @@ def load_pic_file(file):
             else:
                 m = DH_Base.edron_re.match(aline)
                 if m:
-                    print(m.groupdict())
-                    # pdb_chain.pic_load(m.groupdict())
-                    pass
+                    sb_res.pic.load_PIC(m.groupdict())
                 elif aline.strip():
-                    # print('Reading PIC file', file, 'parse fail on: .', aline, '.')
+                    print('Reading PIC file', file,
+                          'parse fail on: .', aline, '.')
                     return None
                     
+    # print(report_PIC(struct_builder.get_structure()))
     return struct_builder.get_structure()
 
 
@@ -291,7 +309,7 @@ def write_PIC(entity, pdbid=None, chainid=None, s=''):
                       ).format(hdr.upper(), (dd or ''), (pdbid or ''))
             nam = entity.header.get('name', None)
             if nam:
-                s += 'TITLE    ' + nam.upper() + '\n'
+                s += 'TITLE     ' + nam.upper() + '\n'
             for mdl in entity:
                 s = write_PIC(mdl, pdbid, chainid, s)
         else:
@@ -300,6 +318,53 @@ def write_PIC(entity, pdbid=None, chainid=None, s=''):
         raise Exception("write_PIC: argument is not a Biopython PDB Entity "
                         + str(entity))
     return s
+
+
+def report_PIC(entity, reportDict=None):
+    if reportDict is None:
+        reportDict = {'idc': None, 'hdr': 0, 'mdl': 0, 'chn': 0,
+                      'res': 0, 'res_e': 0, 'dih': 0, 'hed': 0}
+    try:
+        if 'A' == entity.level:
+            raise PDBException("No PIC output at Atom level")
+        elif 'R' == entity.level:
+            if hasattr(entity, 'pic'):
+                reportDict['res'] += 1
+                dlen = len(entity.pic.dihedra)
+                hlen = len(entity.pic.hedra)
+                if 0 < dlen or 0 < hlen:
+                    reportDict['res_e'] += 1
+                    reportDict['dih'] += dlen
+                    reportDict['hed'] += hlen
+
+        elif 'C' == entity.level:
+            reportDict['chn'] += 1
+            for res in entity:
+                reportDict = report_PIC(res, reportDict)
+
+        elif 'M' == entity.level:
+            reportDict['mdl'] += 1
+            for chn in entity:
+                reportDict = report_PIC(chn, reportDict)
+                
+        elif 'S' == entity.level:
+            if reportDict['idc'] is None:
+                reportDict['idc'] = entity.header.get('idcode', None)
+
+            hdr = entity.header.get('head', None)
+            if hdr:
+                reportDict['hdr'] += 1
+            nam = entity.header.get('name', None)
+            if nam:
+                reportDict['hdr'] += 1                
+            for mdl in entity:
+                reportDict = report_PIC(mdl, reportDict)
+        else:
+            raise PDBException("Cannot identify level: " + str(entity.level))
+    except KeyError:
+        raise Exception("write_PIC: argument is not a Biopython PDB Entity "
+                        + str(entity))
+    return reportDict
 
 
 def zdh(lst):
@@ -469,7 +534,8 @@ class DH_Base(object):
     def __init__(self, *args, **kwargs):
         self.aks = [kwargs['a1'], kwargs['a2'], kwargs['a3']]
         try:
-            self.aks.append(kwargs['a4'])
+            if kwargs['a4'] is not None:
+                self.aks.append(kwargs['a4'])
         except KeyError:
             pass
         self.id = DH_Base.gen_key(self.aks)
@@ -565,10 +631,10 @@ class DH_Base(object):
             return NotImplemented
 
     @staticmethod
-    def gen_key(di_hedron):
-        kl = di_hedron[0:3]
-        if 4 == len(di_hedron):
-            kl.append(di_hedron[3])
+    def gen_key(edron):
+        kl = edron[0:3]
+        if 4 == len(edron) and edron[3] is not None:
+            kl.append(edron[3])
         return ':'.join(kl)
 
 
@@ -948,6 +1014,7 @@ class Hedron(DH_Base):
 class PIC_Residue:
 
     def __init__(self, parent, ndx, ALT_OK=True):
+        # ALT_OK=False will turn off alotloc positions and just use selected
         self.residue = parent
         self.ndx = ndx
         # dict of hedron objects indexed by hedron keys ([resPos res atom] x3)
@@ -963,7 +1030,10 @@ class PIC_Residue:
         self.rprev = None
         self.rnext = None
         # one letter amino acid code
-        self.lc = three_to_one(parent.resname).upper()
+        try:
+            self.lc = three_to_one(parent.resname).upper()
+        except KeyError:
+            self.lc = None
         # generated from dihedra include i+1 atoms, not residue.atoms
         # or initialised here from parent residue if loaded from coordinates
         self.atom_coords = {}
@@ -971,18 +1041,19 @@ class PIC_Residue:
         self.bp_atoms = {}
         if ALT_OK:
             self.alt_ids = []
-        rbase = str(ndx) + self.lc
-        for atom in parent.get_atoms():
-            if hasattr(atom, 'child_dict'):
-                if ALT_OK:
-                    for atm in atom.child_dict.values():
-                        self.add_atom(atm, rbase, atm.altloc)
+        if self.lc is not None:
+            rbase = str(ndx) + self.lc
+            for atom in parent.get_atoms():
+                if hasattr(atom, 'child_dict'):
+                    if ALT_OK:
+                        for atm in atom.child_dict.values():
+                            self.add_atom(atm, rbase, atm.altloc)
+                    else:
+                        self.add_atom(atom.selected_child, rbase)
                 else:
-                    self.add_atom(atom.selected_child, rbase)
-            else:
-                self.add_atom(atom, rbase)
+                    self.add_atom(atom, rbase)
 
-        # print(self.atom_coords)
+            # print(self.atom_coords)
 
     accept_atoms = ('N', 'CA', 'C', 'O', 'H', 'CB', 'CG', 'CG1', 'OG1', 'SG',
                     'CG2', 'CD', 'CD1', 'SD', 'OD1', 'ND1', 'CD2', 'ND2', 'CE',
@@ -1009,14 +1080,14 @@ class PIC_Residue:
     def __str__(self):
         return(str(self.ndx) + self.lc + '(' + str(self.residue.id) + ')')
 
-    def pic_load(self, di_hedron):
-        dhk = DH_Base.gen_key([di_hedron['a1'], di_hedron['a2'],
-                               di_hedron['a3'], di_hedron['a4']])
+    def load_PIC(self, edron):
+        dhk = DH_Base.gen_key([edron['a1'], edron['a2'],
+                               edron['a3'], edron['a4']])
         # parse regex defaults this to None instead of KeyError
-        if di_hedron['a4'] is not None:
-            self.dihedra[dhk] = PIC_Dihedron(di_hedron)
+        if edron['a4'] is not None:
+            self.dihedra[dhk] = PIC_Dihedron(**edron)
         else:
-            self.hedra[dhk] = Hedron(di_hedron)
+            self.hedra[dhk] = Hedron(**edron)
 
     def link_dihedra(self):
         id3i = {}
@@ -1249,19 +1320,25 @@ class PIC_Residue:
                       atm.element)
         # print(s)
         return s
+        
     @staticmethod
-    def residue_string(res):
+    def residue_string(res, ndx=None):
         return (str(res.get_full_id())
                 + ' ' + res.resname
-                + ' [' + res.get_segid() + ']\n')
+                + ' [' + res.get_segid() + ']'
+                + (' ' + str(ndx) if ndx is not None else '')
+                + '\n')
                   
     def write_PIC(self, pdbid, chainid, s='', stats=False):
-        s += PIC_Residue.residue_string(self.residue)
+        s += PIC_Residue.residue_string(self.residue, self.ndx)
         if not self.rprev:
-            s += self.pdb_atom_string(self.residue['N'])
-            s += self.pdb_atom_string(self.residue['CA'])
-            s += self.pdb_atom_string(self.residue['C'])
-
+            try:
+                ts = self.pdb_atom_string(self.residue['N'])
+                ts += self.pdb_atom_string(self.residue['CA'])
+                ts += self.pdb_atom_string(self.residue['C'])
+                s += ts  # only if have all 3 atoms
+            except KeyError:
+                pass
         # TODO: lose pdbid .. chainid format after lua compare?
         base = pdbid + ' ' + chainid + ' '
         for h in sorted(self.hedra.values()):
@@ -1301,14 +1378,15 @@ class PIC_Chain:
         last_ord_res = None
         for res in parent.get_residues():
             # select only not hetero
-            if res.id[0] == ' ':  # and not res.disordered:
-                res.pic = PIC_Residue(res, ndx)
+            # if res.id[0] == ' ':  # and not res.disordered:
+            res.pic = PIC_Residue(res, ndx)
+            ndx += 1
+            if res.id[0] == ' ':  # TODO: in set of supported hetatms?
                 self.ordered_aa_pic_list.append(res.pic)
                 if last_res and last_ord_res == last_res:
                     # no missing or hetatm
                     last_ord_res.pic.rnext = res.pic
                     res.pic.rprev = last_ord_res.pic
-                ndx += 1
                 last_ord_res = res
             else:
                 # print('skipping res ' + str(res.id) + ' ' + res.resname
@@ -1316,22 +1394,6 @@ class PIC_Chain:
                 #           if res.disordered else ' not disordered'))
                 pass
             last_res = res
-
-    def pic_load(self, di_hedra):
-        # NOT READY
-        sak = None  # PIC_Utils.split_atom_key(di_hedra['a1'])
-        res_id = self._translate_id(int(sak[0]))
-        try:
-            res = self.__getitem__(res_id)
-        except KeyError:
-            # print(res_id,IUPACData.protein_letters_1to3[sak[1]].upper())
-            # do outside Chain - so Chain() does not know about Residue()
-            res = Residue(res_id,
-                          IUPACData.protein_letters_1to3[sak[1]].upper(), ' ')
-            self.add(res)
-            res.pic_init()
-            # print('created',res, 'for',di_hedra['a1'])
-        res.pic.pic_load(di_hedra)
 
     def link_residues(self):
         for rpic in self.ordered_aa_pic_list:
@@ -1465,7 +1527,7 @@ for target in toProcess:
         filename = target
         prot_id = target
         if '.' in prot_id:
-            prot_id = prot_id[0:prot_id.rfind('.')]
+            prot_id = prot_id[0:prot_id.find('.')]
         if '/' in prot_id:
             prot_id = prot_id[prot_id.rfind('/')+1:]
         if 'pdb' in prot_id:
@@ -1475,10 +1537,10 @@ for target in toProcess:
         pdb_structure = load_pic_file(
             gzip.open(filename, mode='rt')
             if filename.endswith('.gz') else filename)
-        if pdb_structure:
+        if pdb_structure is not None:
             pic_input = True
 
-    if not pdb_structure:
+    if pdb_structure is None:
         pdb_input = True
         pdb_structure = PDB_parser.get_structure(
             prot_id,
@@ -1510,6 +1572,7 @@ for target in toProcess:
             chn.pic.dihedra_from_atoms()
     else:
         print('parsed pic input ', filename)
+        print(report_PIC(pdb_structure))
         internal_to_atom_coordinates(pdb_structure)
 
     # print(pdb_structure.header['idcode'], pdb_chain.id, ':',
