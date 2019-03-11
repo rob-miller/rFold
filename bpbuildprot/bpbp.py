@@ -31,7 +31,8 @@ from Bio.PDB.Polypeptide import three_to_one
 
 from Bio.PDB.StructureBuilder import StructureBuilder
 from Bio.PDB.parse_pdb_header import _parse_pdb_header_list
-from Bio.PDB.Atom import Atom
+from Bio.PDB.Atom import Atom, DisorderedAtom
+
 # from Bio.PDB.Residue import Residue
 
 import math
@@ -48,7 +49,7 @@ from PIC_Data import pic_data_sidechains
 
 from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-03-09 18:21:49'
+__updated__ = '2019-03-11 21:53:41'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -524,12 +525,14 @@ class DihedronIncompleteError(Exception):
 
 
 class Atom_Key(object):
-    atom_re = re.compile(r'^(?P<respos>\d+)(?P<icode>[A-Za-z])?'
+    atom_re = re.compile(r'^(?P<respos>-?\d+)(?P<icode>[A-Za-z])?'
                          r'_(?P<resname>[a-zA-Z]+)_(?P<atm>\w+)'
                          r'(?:_(?P<occ>\d\.\d?\d?))?(?:_(?P<altloc>\w))?$')
     # PDB altLoc = Character = [\w ] (any non-ctrl ASCII incl space)
     # PDB iCode = AChar = [A-Za-z]
-    fields = ['respos', 'icode', 'resname', 'atm', 'occ', 'altloc']
+    fieldNames = ['respos', 'icode', 'resname', 'atm', 'occ', 'altloc']
+    fields = {'respos': 0, 'icode': 1, 'resname': 2,
+              'atm': 3, 'occ': 4, 'altloc': 5}
 
     def __init__(self, *args, **kwargs):
         # pass me:
@@ -543,14 +546,10 @@ class Atom_Key(object):
         self.id = None
 
         for arg in args:
-            if '_' in arg:
-                # got atom key, recurse with regex parse
-                m = self.atom_re.match(arg)
-                self.__init__(m.groupdict)  # recursively call initializer
-            elif isinstance(arg, PIC_Residue):
+            if isinstance(arg, PIC_Residue):
                 if [] != akl:
                     raise Exception('Atom Key init Residue not first argument')
-                akl = arg.rbase
+                akl += arg.rbase
             elif isinstance(arg, Atom):
                 if 3 != len(akl):
                     raise Exception('Atom Key init Atom before Residue info')
@@ -559,37 +558,63 @@ class Atom_Key(object):
                 akl.append(occ if occ != 1.00 else None)
                 akl.append(arg.altloc)
                 print('is altloc None')
+            elif isinstance(arg, list):
+                akl += arg
+            elif '_' in arg:
+                # got atom key string, recurse with regex parse
+                m = self.atom_re.match(arg)
+                self.__init__(m.groupdict)  # recursively call initializer
             else:
-                if isinstance(arg, list):
-                    akl += arg
-                else:
-                    akl.append(arg)
+                akl.append(arg)
+
         if self.id is None:
             # did not initialize recursively above so continue here
+            akl[0] = str(akl[0])
             for i in range(6):
                 if len(akl) <= i:
-                    akl.append(kwargs.get(self.fields[i], None))
+                    akl.append(kwargs.get(self.fieldNames[i], None))
+
+            if akl[4] is not None:
+                akl[4] = str(akl[4])
 
             # now we have len(akl) = 6
             #  start with Residue object if supplied
             #  then args in order
-            #  then kwargs or None according to self.fields
+            #  then kwargs or None according to self.fieldNames
 
-            self.respos, self.icode, self.resname, self.atm, self.occ,
-            self.altloc = akl
+            (self.respos, self.icode, self.resname, self.atm, self.occ,
+             self.altloc) = akl
 
-            self.akl = akl
+            self.akl = tuple(akl)
 
-            self.id = '-'.join(
+            self.id = '_'.join(
                 [''.join(filter(None, akl[:2])),
                  akl[2],
                  '_'.join(filter(None, akl[3:]))]
             )
+            #pass
 
     def __repr__(self):
         return self.id
 
+    def __str__(self):
+        return self.id
+        
+    def __hash__(self):
+        return hash(self.id)
+        
     backbone_sort_keys = {'N': 0, 'CA': 1, 'C': 2, 'O': 3}
+
+    def altloc_match(self, other):
+        if isinstance(other, type(self)):
+            return self.akl[:5] == other.akl[:5]
+        else:
+            return NotImplemented
+
+    def is_sidechain_gamma(self):
+        if 'G' in self.akl[3]:
+            return True
+        return False
 
     def _cmp(self, other):
         akl_s = self.akl
@@ -622,14 +647,14 @@ class Atom_Key(object):
     def __eq__(self, other):
         """Test for equality."""
         if isinstance(other, type(self)):
-            return self.id == other.id
+            return self.akl == other.akl
         else:
             return NotImplemented
 
     def __ne__(self, other):
         """Test for inequality."""
         if isinstance(other, type(self)):
-            return self.id != other.id
+            return self.akl != other.akl
         else:
             return NotImplemented
 
@@ -694,11 +719,13 @@ class DH_Base(object):
                 if arg is not None:
                     self.aks.append(arg)
         if [] == self.aks:
-            self.aks = [Atom_Key(kwargs['a1']), Atom_Key(kwargs['a2']), 
-                        Atom_Key(kwargs['a3'])]
+            #self.aks = [Atom_Key(kwargs['a1']), Atom_Key(kwargs['a2']),
+            #            Atom_Key(kwargs['a3'])]
+            self.aks = [kwargs['a1'], kwargs['a2'], kwargs['a3']]
             try:
                 if kwargs['a4'] is not None:
-                    self.aks.append(Atom_Key(kwargs['a4']))
+                    #self.aks.append(Atom_Key(kwargs['a4']))
+                    self.aks.append(kwargs['a4'])
             except KeyError:
                 pass
 
@@ -1239,7 +1266,7 @@ class PIC_Residue(object):
         if atm.name not in self.accept_atoms:
             # print('skip:', atm.name)
             return
-        ak = Atom_Key(self.residue, atm)
+        ak = Atom_Key(self, atm)
 
         # TODO: are 4x1 arrays necessary?
         arr41 = numpy.append(atm.coord, [1])
@@ -1253,7 +1280,7 @@ class PIC_Residue(object):
     def load_PIC(self, edron):
         ek = [Atom_Key(edron['a1']), Atom_Key(edron['a2']),
               Atom_Key(edron['a3'])]
-        
+
         if edron['a4'] is not None:
             ek.append(Atom_Key(edron['a4']))
             self.dihedra[ek] = PIC_Dihedron(ek, **edron)
@@ -1281,7 +1308,7 @@ class PIC_Residue(object):
             if d.updated:
                 d.init_pos()
 
-    #def NCaCKeySplit(self):
+    # def NCaCKeySplit(self):
     #    # rbase = self.ndx + self.lc
     #    return [self.rbase + 'N', self.rbase + 'CA', self.rbase + 'C']
 
@@ -1411,53 +1438,77 @@ class PIC_Residue(object):
     altloc_re = re.compile(r'-([A-Z])\Z')
 
     def split_akl(self, lst):
-        dhl = []
+        # given a list of Atom_Keys (aks) for a Hedron or Dihedron,
+        #  return:
+        #       list of matching aks that have atom_coords in this residue
+        #            (ak may change if occupancy != 1.00)
+        #    or
+        #       multiple lists of matching aks expanded for all atom altlocs
+        #    or
+        #       empty list if any of atom_coord(ak) missing
+
+        altloc_ndx = Atom_Key.fields['altloc']
+
+        # step 1
+        # given a list of Atom_Keys (aks)
+        #  form a new list of same aks with coords in this residue
+        #      plus lists of matching altloc aks in this residue
+        edraLst = []
         altlocs = set()
         for ak in lst:
             if ak in self.atom_coords:
-                dhl.append([ak])
+                edraLst.append([ak])
             else:
-                ak2 = ak + '-'
                 ak2_lst = []
-                for key in self.atom_coords:
-                    if key.startswith(ak2):
+                for ak2 in self.atom_coords:
+                    if ak.altloc_match(ak2):
                         # print(key)
-                        ak2_lst.append(key)
-                        m = self.altloc_re.search(key)
-                        if m:
-                            altlocs.add(m.group(1))
-                dhl.append(ak2_lst)
+                        ak2_lst.append(ak2)
+                        altloc = ak2.akl[altloc_ndx]
+                        if altloc is not None:
+                            altlocs.add(altloc)
+                edraLst.append(ak2_lst)
+
+        # step 2
+        # check and finish for
+        #   missing atoms
+        #   simple case no altlocs
+        #
         maxc = 0
-        for akl in dhl:
-            lakl = len(akl)
-            if 0 == lakl:
+        for akl in edraLst:
+            lenAKL = len(akl)
+            if 0 == lenAKL:
                 return []    # atom missing in atom_coords, cannot form object
-            elif maxc < lakl:
-                maxc = lakl
-        if 1 == maxc:
-            nlst = []
-            for akl in dhl:
-                nlst.append(akl[0])
-            return [nlst]
+            elif maxc < lenAKL:
+                maxc = lenAKL
+        if 1 == maxc:        # simple case no altlocs for any ak in list
+            newAKL = []
+            for akl in edraLst:
+                newAKL.append(akl[0])
+            return [newAKL]
         else:
-            ndhl = []
+            new_edraLst = []
             for al in altlocs:
-                tail = '-' + al
+                # form complete new list for each altloc
                 alhl = []
-                for akl in dhl:
+                for akl in edraLst:
                     if 1 == len(akl):
-                        alhl.append(akl[0])
+                        alhl.append(akl[0])  # not all atoms will have altloc
                     else:
                         for ak in akl:
-                            if ak.endswith(tail):
+                            if ak.akl[altloc_ndx] == al:
                                 alhl.append(ak)
-                ndhl.append(alhl)
-            # print(ndhl)
-            return ndhl
+                new_edraLst.append(alhl)
+            # print(new_edraLst)
+            return new_edraLst
 
-        return dhl
+        # can't reach here
 
     def gen_edra(self, lst):
+        # given list of Atom_Keys defining hedron or dihedron
+        #  convert to Atom_Keys with coordinates in this residue
+        #  add appropriately to self.di/hedra, expand as needed atom altlocs
+
         if 4 > len(lst):
             dct, obj = self.hedra, Hedron
         else:
@@ -1472,26 +1523,26 @@ class PIC_Residue(object):
             dct[DH_Base.gen_key(nlst)] = obj(**zdh(nlst))
 
     def dihedra_from_atoms(self):
-        
-        skbase = str(self.ndx) + self.lc
-        sN, sCA, sC, sO, sCB = skbase + 'N', skbase + \
-            'CA', skbase + 'C', skbase + 'O', skbase + 'CB'
+        AK = Atom_Key
+        S = self
+
+        sN, sCA, sC = AK(S, 'N'), AK(S, 'CA'), AK(S, 'C')
+        sO, sCB = AK(S, 'O'), AK(S, 'CB')
+        sN = Atom_Key(self, 'N')
 
         if self.rnext:
             # atom_coords, hedra and dihedra for backbone dihedra
             # which reach into next residue
             rn = self.rnext
-            nkbase = str(rn.ndx) + rn.lc
-            nN, nCA, nC = nkbase + 'N', nkbase + 'CA', nkbase + 'C'
+            nN, nCA, nC = AK(rn, 'N'), AK(rn, 'CA'), AK(rn, 'C')
 
             for ak in (nN, nCA, nC):
                 if ak in rn.atom_coords:
                     self.atom_coords[ak] = rn.atom_coords[ak]
                 else:
-                    ak2 = ak + '-'
-                    for key in rn.atom_coords.keys():
-                        if key.startswith(ak2):
-                            self.atom_coords[key] = rn.atom_coords[key]
+                    for rn_ak in rn.atom_coords.keys():
+                        if rn_ak.altloc_match(ak):
+                            self.atom_coords[rn_ak] = rn.atom_coords[rn_ak]
 
             self.gen_edra([sN, sCA, sC, nN])  # psi
             self.gen_edra([sCA, sC, nN, nCA])  # omega i+1
@@ -1515,14 +1566,12 @@ class PIC_Residue(object):
         # (not gly or ala or any missing rest of side chain)
         if 'G' != self.lc and 'A' != self.lc:
             for ak in self.atom_coords:
-                if (ak.startswith(skbase + 'CG')
-                    or ak.startswith(skbase + 'OG')
-                        or ak.startswith(skbase + 'SG')):
+                if ak.is_sidechain_gamma():
                     self.gen_edra([sN, sCA, sCB])
                     break
 
         # amide proton N H if present
-        sH = skbase + 'H'
+        sH = AK(S, 'H')
         self.gen_edra([sH, sN, sCA])
         self.gen_edra([sC, sCA, sN, sH])
 
@@ -1530,8 +1579,8 @@ class PIC_Residue(object):
 
         sidechain = pic_data_sidechains.get(self.lc, [])
         for edra in sidechain:
-            r_edra = [skbase + atom for atom in edra]
-            self.gen_edra(r_edra[0:4])  # 0:4 clips label on some table entries
+            r_edra = [AK(S, atom) for atom in edra]
+            self.gen_edra(r_edra[0:4])  # [4] is label on some table entries
 
         if sCB not in self.atom_coords:  # add C-beta for Gly
             cb = numpy.append(genCBjones(self.residue), [1])
@@ -1607,24 +1656,59 @@ class PIC_Residue(object):
         return s
 
     def coords_to_residue(self):
+        seqpos, icode = self.residue.id[1:3]
+        spNdx, icNdx, atmNdx, occNdx, altlocNdx = [
+            Atom_Key.fields.get(k) for k in
+            ['respos', 'icode', 'atm', 'occ', 'altloc']
+        ]
+        Res = self.residue
+        ndx = Res.parent.pic.ndx
+
         for ak in sorted(self.atom_coords):
             print(ak)
-            ac = self.atom_coords[ak]
-            m = DH_Base.atom_re.match(ak)
-            if self.ndx == m.group('pos'):
-                if m.group('occ') is None:
-                    try:
-                        res_atm = self.residue[m.group('atm')]
-                        # print('update', ak)
-                        res_atm.set_coord(ac[:3])
-                    except KeyError:
-                        print('new', ak)
-                        res_atm = Atom(
-                            m.group('atm'), ac[:3], 0.0,
-                            1.0, ' ', m.group('atm'), 1,
-                            m.group('atm')[0]
-                        )
-                        self.residue.add(res_atm)
+            if (seqpos == ak.akl[spNdx] and
+                ((icode == ' ' and ak.akl[icNdx] is None)
+                 or icode == ak.akl[icNdx])):
+
+                ac = self.atom_coords[ak]
+                akl = ak.akl
+                atm, altloc = akl[atmNdx], akl[altlocNdx]
+
+                Atm = None
+                newAtom = None
+                
+                if Res.has_id(atm):
+                    Atm = Res[atm]
+                
+                if (Atm is None
+                    or (2 == Atm.is_disordered()
+                        and not Atm.disordered_has_id(altloc))):
+                    print('new', ak)
+                    newAtom = Atom(atm, ac[:3], 0.0,
+                                   (1.00 if akl.occ is None else akl.occ),
+                                   ' ', atm, ndx, atm[0])
+                    ndx += 1
+                    if Atm is None:
+                        if altloc is None:
+                            Res.add(newAtom)
+                        else:
+                            disordered_atom = DisorderedAtom(atm)
+                            Res.add(disordered_atom)
+                            disordered_atom.disordered_add(newAtom)
+                            Res.flag_disordered()
+                    else:
+                        Atm.disordered_add(newAtom)
+                else:
+                    # Atm is not None, might be disordered with altloc
+                    print('new', ak)                    
+                    if (2 == Atm.is_disordered()
+                        and Atm.disordered_has_id(altloc)):
+                        Atm.disordered_select(altloc)
+                    Atm.set_coord(ac[:3])
+                    ndx = Atm.get_serial_number()
+                    
+        Res.parent.pic.ndx = ndx
+
 
             # print(ak, ac)
 
@@ -1670,12 +1754,15 @@ class PIC_Chain:
                     res.pic.rprev = last_ord_res.pic
                 else:
                     # chain break, stash coords to restart
-                    respos = res.id[1]
-                    self.initNCaC[respos] = {}
-                    rb = res.pic.rbase
-                    self.initNCaC[respos][rb + 'N'] = npat(res['N'].coord)
-                    self.initNCaC[respos][rb + 'CA'] = npat(res['CA'].coord)
-                    self.initNCaC[respos][rb + 'C'] = npat(res['C'].coord)
+                    respos = str(res.id[1])
+                    if ' ' != res.id[2]:
+                        respos += res.id[2]  # need icode if set
+                    initNCaC = {}                        
+                    rpic = res.pic
+                    initNCaC[Atom_Key(rpic, 'N')] = npat(res['N'].coord)
+                    initNCaC[Atom_Key(rpic, 'CA')] = npat(res['CA'].coord)
+                    initNCaC[Atom_Key(rpic, 'C')] = npat(res['C'].coord)
+                    self.initNCaC[respos] = initNCaC
                 last_ord_res = res
             else:
                 # print('skipping res ' + str(res.id) + ' ' + res.resname
@@ -1716,7 +1803,7 @@ class PIC_Chain:
                     startPos = {}
                     rp = rpic.rprev
                     # nb akl for this res n-ca-c in rp dihedra
-                    akl = rpic.NCaCKey  #Split()
+                    akl = rpic.NCaCKey  # Split()
                     for ak in akl:
                         startPos[ak] = rp.atom_coords[ak]
                 else:
@@ -1730,6 +1817,7 @@ class PIC_Chain:
             rpic.dihedra_from_atoms()
 
     def coords_to_structure(self):
+        self.ndx = 0
         for res in self.chain.get_residues():
             if hasattr(res, 'pic'):
                 res.pic.coords_to_residue()
