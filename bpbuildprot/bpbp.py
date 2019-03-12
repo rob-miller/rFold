@@ -49,7 +49,7 @@ from PIC_Data import pic_data_sidechains
 
 from Bio.PDB.PDBExceptions import PDBException
 
-__updated__ = '2019-03-12 16:45:03'
+__updated__ = '2019-03-12 17:24:36'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -1703,6 +1703,7 @@ class PIC_Residue(object):
                  or icode == ak.akl[icNdx])):
 
                 ac = self.atom_coords[ak]
+                atm_coords = ac[:3].transpose()[0]
                 akl = ak.akl
                 atm, altloc = akl[atmNdx], akl[altlocNdx]
 
@@ -1716,7 +1717,7 @@ class PIC_Residue(object):
                     or (2 == Atm.is_disordered()
                         and not Atm.disordered_has_id(altloc))):
                     #print('new', ak)
-                    newAtom = Atom(atm, ac[:3], 0.0,
+                    newAtom = Atom(atm, atm_coords, 0.0,
                                    (1.00 if akl[occNdx] is None else akl[occNdx]),
                                    ' ', atm, ndx, atm[0])
                     ndx += 1
@@ -1736,7 +1737,7 @@ class PIC_Residue(object):
                     if (2 == Atm.is_disordered()
                             and Atm.disordered_has_id(altloc)):
                         Atm.disordered_select(altloc)
-                    Atm.set_coord(ac[:3])
+                    Atm.set_coord(atm_coords)
                     ndx = Atm.get_serial_number()
 
         Res.parent.pic.ndx = ndx
