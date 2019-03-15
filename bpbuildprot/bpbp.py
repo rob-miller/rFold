@@ -41,7 +41,7 @@ from Bio.PDB.Atom import Atom, DisorderedAtom
 # from Bio.PDB.Residue import Residue
 
 import math
-from Bio.PDB.vectors import rotaxis2m, calc_dihedral
+from Bio.PDB.vectors import rotaxis2m   # , calc_dihedral
 
 try:
     import numpy
@@ -57,7 +57,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-15 16:52:17'
+__updated__ = '2019-03-15 21:11:34'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -89,7 +89,7 @@ def gen_Mrot(angle_rads, axis):
 
 
 def gen_Mtrans(xyz):
-    """Generate a 4x4 numpy translation matrix
+    """Generate a 4x4 numpy translation matrix.
 
     :param list[3] xyz: translation in each axis
     """
@@ -300,7 +300,7 @@ def write_PIC(entity, file, pdbid=None, chainid=None):
                             pdbid = struct.header.get('idcode', '0PDB')
                     fp.write(entity.pic.write_PIC(pdbid, chainid))
                 else:
-                    fp.write(PIC_Residue.residue_string(entity))
+                    fp.write(PIC_Residue._residue_string(entity))
             elif 'C' == entity.level:
                 if not chainid:
                     chainid = entity.id
@@ -591,6 +591,7 @@ class AtomKey(object):
     is_sidechain_gamma()
         returns true if atom name contains 'G', meaning it is gamma element
         of sidechain
+
     """
     atom_re = re.compile(r'^(?P<respos>-?\d+)(?P<icode>[A-Za-z])?'
                          r'_(?P<resname>[a-zA-Z]+)_(?P<atm>\w+)'
@@ -666,9 +667,11 @@ class AtomKey(object):
         # pass
 
     def __repr__(self):
+        """Repr string from id."""
         return self.id
 
     def __hash__(self):
+        """Hash calculated at init from akl tuple."""
         return self._hash
 
     _backbone_sort_keys = {'N': 0, 'CA': 1, 'C': 2, 'O': 3}
@@ -689,8 +692,7 @@ class AtomKey(object):
         return False
 
     def _cmp(self, other):
-        """Comparison function ranking self vs. other.
-        """
+        """Comparison function ranking self vs. other."""
         akl_s = self.akl
         akl_o = other.akl
         atmNdx = self.fields.atm
@@ -798,8 +800,10 @@ class DH_Base(object):
     -------
     gen_key([AtomKey, ...] or AtomKey, ...) (Static Method)
         generate a ':'-joined string of AtomKey Ids
+    gen_acs(atom_coords) : generate list of atom coords for keys in self.aks
 
     """
+
     edron_re = re.compile(
         # pdbid and chain id
         r'^(?P<pdbid>\w+)\s(?P<chn>[\w|\s])\s'
@@ -815,7 +819,7 @@ class DH_Base(object):
 
     @staticmethod
     def gen_key(lst):
-        """Generate string of ':'-joined AtomKey strings for input
+        """Generate string of ':'-joined AtomKey strings from input
 
         :param lst: list of AtomKey objects or id strings
         """
@@ -876,10 +880,32 @@ class DH_Base(object):
             self.dh_class += akl[atmNdx]
             self.rdh_class += akl[resNdx] + akl[atmNdx]
 
+    def gen_acs(self, atom_coords):
+        """Generate list of atom coords for keys in self.aks
+
+        :param atom_coords: AtomKey dict of atom coords for residue
+        :raises: MissingAtomError any atoms in self.aks missing coordinates
+        """
+        aks = self.aks
+        acs = []
+        estr = ''
+        for ak in aks:
+            ac = atom_coords[ak]
+            if ac is None:
+                estr += ak + ' '
+            else:
+                acs.append(ac)
+        if estr != '':
+            raise MissingAtomError(
+                self, 'missing coordinates for', estr)
+        return acs
+
     def __repr__(self):
+        """Tuple of AtomKeys is default repr string."""
         return self.aks
 
     def __hash__(self):
+        """Hash calculated at init from aks tuple."""
         return self._hash
 
     def _cmp(self, other):
@@ -967,11 +993,12 @@ class PIC_Dihedron(DH_Base):
         nd a4_pre_rotation
     dihedron_from_atoms()
         Compute dihedral and bond lengths, angles from PIC_Residue atom_coords
+
     """
 
     def __init__(self, *args, **kwargs):
         """Initialize Dihedron with sequence of AtomKeys and optional dihedral angle.
-        
+
         Acceptable input:
             As for DH_Base, plus optional 'dihedral1' keyworded angle value.
         """
@@ -1007,13 +1034,13 @@ class PIC_Dihedron(DH_Base):
         # print(self, self.dclass)
 
     def __str__(self):
+        """Printed string for Dihedron object"""
         return ('4-' + str(self.id) + ' ' + self.rdh_class + ' ' +
                 str(self.dihedral1) + ' (' + str(self.residue_pic) + ')')
 
     @staticmethod
     def _get_hedron(pic_res, id3):
-        """find specified hedron on this residue or its adjacent neighbors
-        """
+        """find specified hedron on this residue or its adjacent neighbors."""
         hedron = pic_res.hedra.get(id3, None)
         if (not hedron and pic_res.rprev
                 and (' ' == pic_res.rprev.residue.id[0])):  # not hetero
@@ -1024,8 +1051,7 @@ class PIC_Dihedron(DH_Base):
         return hedron
 
     def _set_hedra(self):
-        """Work out hedra keys and set rev flag.
-        """
+        """Work out hedra keys and set rev flag."""
         rev = False
         res = self.pic_residue
         h1key = self.id3
@@ -1162,19 +1188,7 @@ class PIC_Dihedron(DH_Base):
         hed2 = self.hedron2
 
         atom_coords = self.pic_residue.atom_coords
-        aks = self.aks
-        acs = []
-        estr = ''
-        for ak in aks:
-            ac = atom_coords[ak]
-            if ac is None:
-                estr += ak + ' '
-            else:
-                acs.append(ac)
-        if estr != '':
-            raise MissingAtomError(
-                self, 'missing coordinates for', estr)
-
+        acs = self.gen_acs(atom_coords)
         mt = coord_space(acs[:3])
         do4 = mt @ acs[3]
 
@@ -1234,7 +1248,35 @@ class PIC_Dihedron(DH_Base):
 
 
 class Hedron(DH_Base):
+    """Class to represent three joined atoms forming a plane
+
+    Attributes
+    ----------
+    len1 : float
+        distance between 1st and 2nd atom
+    angle2 : float
+        angle formed by 3 atoms
+    len3 : float
+        distance between 2nd and 3rd atoms
+    atoms : list[3] of numpy arrays [4][1]
+        3 atoms comprising hedron, 1st on XZ, 2nd at origin, 3rd on +Z
+    atomsR : list[3] of numpy arrays [4][1]
+        atoms reversed, 1st on +Z, 2nd at origin, 3rd on XZ plane
+
+    Methods
+    -------
+    init_pos()
+    hedron_from_atoms()
+
+    """
+
     def __init__(self, *args, **kwargs):
+        """Initialize Hedron with sequence of AtomKeys, kwargs.
+
+        Acceptable input:
+            As for DH_Base, plus optional 'len1', 'angle2', 'len3' 
+            keyworded values.
+        """
         super().__init__(*args, **kwargs)
 
         # print('initialising', self.id)
@@ -1260,19 +1302,20 @@ class Hedron(DH_Base):
         # print(self)
 
     def __str__(self):
+        """Print string for Hedron object."""
         return ('3-' + self.id + ' ' + self.rdh_class + ' ' + str(self.len1)
                 + ' ' + str(self.angle2) + ' ' + str(self.len3))
 
     def init_pos(self):
-
+        """Initialize Hedron by creating atom coordinate numpy arrays."""
         # build hedron with a2 on +Z axis, a1 at origin,
         # a0 in -Z at angle n XZ plane
-        for i in range(0, 3):
+        for _ in range(3):
             # note this initializes a1 to 0,0,0 origin
             self.atoms.append(numpy.array([[0], [0], [0], [1]],
                                           dtype=numpy.float64))  # 4x1 array
 
-        # supplement: angles which add to 180 are supplementary
+        # supplementary angle radian: angles which add to 180 are supplementary
         sar = numpy.deg2rad(180.0 - self.angle2)
 
         # a2 is len3 up from a2 on Z axis, X=Y=0
@@ -1284,7 +1327,7 @@ class Hedron(DH_Base):
         self.atoms[0][2][0] = - (numpy.cos(sar) * self.len1)
 
         # same again but 'reversed' : a0 on Z axis, a1 at origin, a2 in -Z
-        for i in range(0, 3):
+        for _ in range(3):
             # atom[1] to 0,0,0 origin
             self.atomsR.append(numpy.array([[0], [0], [0], [1]],
                                            dtype=numpy.float64))
@@ -1299,7 +1342,11 @@ class Hedron(DH_Base):
         self.updated = False
 
     @staticmethod
-    def get_dad(acs):
+    def _get_dad(acs):
+        """Get distance, angle, distance for 3 atoms.
+
+        :param acs: list[3] of numpy arrays [4][[1]]
+        """
         a0 = acs[0].squeeze()
         a1 = acs[1].squeeze()
         a2 = acs[2].squeeze()
@@ -1317,40 +1364,71 @@ class Hedron(DH_Base):
         return a0a1, a0a1a2, a1a2
 
     def hedron_from_atoms(self, atom_coords):
-        aks = self.aks
-        acs = []
-        estr = ''
-        for ak in aks:
-            ac = atom_coords[ak]
-            if ac is None:
-                estr += ak + ' '
-            else:
-                acs.append(ac)
-        if estr != '':
-            raise MissingAtomError(
-                self, 'missing coordinates for', estr)
+        acs = self.gen_acs(atom_coords)
 
-        len1, angle2, len3 = Hedron.get_dad(acs)
+        len1, angle2, len3 = Hedron._get_dad(acs)
         self.len1 = set_accuracy_95(len1)
         self.angle2 = set_accuracy_95(angle2)
         self.len3 = set_accuracy_83(len3)
 
 
-# ------------ add to residue class
-
-
 class PIC_Residue(object):
+    """Class to extend Biopython Residue with internal coordinate data.
 
-    def __init__(self, parent, NO_ALTLOC=False):  # , ALT_OK=True):
+    Attributes
+    ----------
+    residue : Biopython Residue object reference
+        The Residue object this extends
+    hedra : dict indexed by 3-tuples of AtomKeys
+        Hedra forming this residue
+    dihedra : dict indexed by 4-tuples of AtomKeys
+        Dihedra forming (overlapping) this residue
+    rprev, rnext : PIC_Residue objects
+        References to adjacent (bonded, not missing) residues in chain
+    atom_coords : AtomKey indexed dict of numpy [4][1] arrays
+        Local copy of atom coordinates for work distinct from Residue/Atom
+    alt_ids : list of char
+        AltLoc IDs from PDB file
+
+    Methods
+    -------
+    atm241(coord) :
+        Convert 1x3 cartesian coords to 4x1 homogeneous coords
+    load_PIC(edron) :
+        Process parsed (di-/h-)edron data from PIC file
+    link_dihedra() :
+        Link dihedra to this residue, form id3_dh_index
+    render_hedra() :
+        Call init_pos for each hedron in hedra
+    render_dihedra() :
+        Call init_pos for each dihedron in dihedra
+    assemble(atomCoordsIn, transforms) :
+        Compute atom coordinates for this residue from internal coordinates
+    dihedra_from_atoms() :
+        Create hedra and dihedra for atom coordinates
+    write_PIC(pdbid, chainId, s, stats) :
+        Generate PIC format strings for this residue
+    coords_to_residue() :
+        Convert homogeneous PIC atom coords to cartesian Atom coordd
+        
+    """
+
+    def __init__(self, parent, NO_ALTLOC=False):
+        """Initialize PIC_Residue with parent Biopython Residue.
+
+        :param parent: Biopython Residue object
+            The Biopython Residue this object extends
+        :param NO_ALTLOC: bool default False
+            Option to disable processing altloc disordered atoms, use selected.    
+        """
         # NO_ALTLOC=True will turn off alotloc positions and just use selected
         self.residue = parent
         # self.ndx = ndx
-        # dict of hedron objects indexed by hedron keys ([resPos res atom] x3)
+        # dict of hedron objects indexed by hedron keys
         self.hedra = {}
         # dict of dihedron objects indexed by dihedron keys
-        # ([resPos res atom] x4)
         self.dihedra = {}
-        # map of dihedron key (first 3 atom ids) to dihedron
+        # map of dihedron key (first 3 atom keys) to dihedron
         # for all dihedra in Residue
         # set by Residue.link_dihedra()
         self.id3_dh_index = {}
@@ -1366,7 +1444,7 @@ class PIC_Residue(object):
         # or initialised here from parent residue if loaded from coordinates
         self.atom_coords = {}
         # TODO: remove bp_atoms, just for testing against bp vector()
-        self.bp_atoms = {}
+        # self.bp_atoms = {}
         if not NO_ALTLOC:
             self.alt_ids = []
 
@@ -1391,12 +1469,12 @@ class PIC_Residue(object):
             for atom in parent.get_atoms():
                 if hasattr(atom, 'child_dict'):
                     if NO_ALTLOC:
-                        self.add_atom(atom.selected_child)
+                        self._add_atom(atom.selected_child)
                     else:
                         for atm in atom.child_dict.values():
-                            self.add_atom(atm)
+                            self._add_atom(atm)
                 else:
-                    self.add_atom(atom)
+                    self._add_atom(atom)
 
             # print(self.atom_coords)
 
@@ -1405,36 +1483,45 @@ class PIC_Residue(object):
                     'CE1', 'NE', 'OE1', 'NE1', 'CE2', 'OE2', 'NE2', 'CE3',
                     'CZ', 'NZ', 'CZ2', 'CZ3')
 
-    def add_atom(self, atm):
+    @staticmethod
+    def atm241(coord):
+        """Convert 1x3 cartesian coordinates to 4x1 homogeneous coordinates."""
+        arr41 = numpy.append(coord, [1])
+        return numpy.array(arr41, dtype=numpy.float64)[
+            numpy.newaxis].transpose()
+
+    def _add_atom(self, atm):
+        """Filter atm with accept_atoms and save homogeneous coordinates."""
         if atm.name not in self.accept_atoms:
             # print('skip:', atm.name)
             return
         ak = AtomKey(self, atm)
-
-        # TODO: are 4x1 arrays necessary?
-        arr41 = numpy.append(atm.coord, [1])
-        self.atom_coords[ak] = numpy.array(arr41, dtype=numpy.float64)[
-            numpy.newaxis].transpose()
-        self.bp_atoms[ak] = atm
+        self.atom_coords[ak] = PIC_Residue.atm241(atm.coord)
+        # self.bp_atoms[ak] = atm
 
     def __str__(self):
+        """Print string is parent Residue ID."""
         return('(' + str(self.residue.id) + ')')
 
     def load_PIC(self, edron):
+        """Process parsed (di-/h-)edron data from PIC file.
+
+        :param edron: parse dictionary from DH_Base.edron_re
+        """
         ek = [edron['a1'], edron['a2'], edron['a3']]
 
         if edron['a4'] is not None:
             ek.append(edron['a4'])
-            # self.dihedra[DH_Base.gen_key(ek)] = PIC_Dihedron(ek, **edron)
             self.dihedra[tuple(ek)] = PIC_Dihedron(ek, **edron)
         else:
             # self.hedra[DH_Base.gen_key(ek)] = Hedron(ek, **edron)
             self.hedra[tuple(ek)] = Hedron(ek, **edron)
 
     def link_dihedra(self):
+        """Link dihedra to this residue, form id3_dh_index."""
         id3i = {}
         for dh in self.dihedra.values():
-            dh.pic_residue = self        # each dihedron can find its pic_residue
+            dh.pic_residue = self  # each dihedron can find its pic_residue
             id3 = dh.id3
             if id3 not in id3i:
                 id3i[id3] = []
@@ -1443,30 +1530,36 @@ class PIC_Residue(object):
         self.id3_dh_index = id3i
 
     def render_hedra(self):
+        """Call init_pos for each hedron in hedra."""
         for h in self.hedra.values():
             if h.updated:
                 h.init_pos()
 
     def render_dihedra(self):
+        """Call init_pos for each dihedron in dihedra."""
         for d in self.dihedra.values():
             if d.updated:
                 d.init_pos()
 
-    # def NCaCKeySplit(self):
-    #    # rbase = self.ndx + self.lc
-    #    return [self.rbase + 'N', self.rbase + 'CA', self.rbase + 'C']
+    def assemble(self, atomCoordsIn, transforms=False):
+        """Compute atom coordinates for this residue from internal coordinates.
 
-    def assemble(self, atomCoordsIn, genSCAD=False):
+        :param atomCoordsIn: list[3] of numpy arrays
+            N, Ca, C coordinates of previous residue to build this one on to
+        :param transforms: bool default False
+            Option to return transformation matrices for each hedron instead
+                of coordinates.
+        """
         '''
         --- join dihedrons from N-CA-C and N-CA-CB hedrons, computing protein
                 space coordinates for backbone and sidechain atoms
         -- @param atomCoordsIn optional table of atom_token : 4x1 matrix of
                 protein space coordinates
-        -- @param genSCAD boolean if true, return table of transformation
+        -- @param transforms boolean if true, return table of transformation
                 matrices for each hedron key (called from Chain:writeSCAD())
         -- @return atomCoords for residue in protein space relative to
                 acomCoordsIn OR table of transformation matrices according to
-                genSCAD parameter
+                transforms parameter
         '''
 
         '''
@@ -1501,7 +1594,7 @@ class PIC_Residue(object):
         atomCoords = atomCoordsIn
         NCaCKey = self.NCaCKey
 
-        if genSCAD:
+        if transforms:
             transformations[NCaCKey] = numpy.identity(4, dtype=numpy.float64)
         # gk = DH_Base.gen_key
         q = deque([
@@ -1552,11 +1645,12 @@ class PIC_Residue(object):
                             # print('    3- call coord_space')
                             mt, mtr = coord_space(
                                 [atomCoords[a] for a in akl[:3]], True)
-                            if genSCAD:
+                            if transforms:
                                 transformations[h1k] = mtr
                             if dbg:
                                 print(
-                                    '        initial_coords[3]=', d.initial_coords[3].transpose())
+                                    '        initial_coords[3]=',
+                                    d.initial_coords[3].transpose())
                             acak3 = mtr @ d.initial_coords[3]
                             if dbg:
                                 print('        acak3=', acak3.transpose())
@@ -1565,7 +1659,8 @@ class PIC_Residue(object):
                             atomCoords[akl[3]] = acak3
                             if dbg:
                                 print(
-                                    '        3- finished, ak:', akl[3], 'coords:', atomCoords[akl[3]].transpose())
+                                    '        3- finished, ak:', akl[3],
+                                    'coords:', atomCoords[akl[3]].transpose())
                             q.appendleft(d_h2key)
                         else:
                             print('no coords to start', d)
@@ -1574,22 +1669,28 @@ class PIC_Residue(object):
                         print('no initial coords for', d)
                         pass
         # print('coord_space returning')
-        if genSCAD:
+        if transforms:
             return transformations
         else:
             return atomCoords
 
     altloc_re = re.compile(r'-([A-Z])\Z')
 
-    def split_akl(self, lst):
-        # given a list of AtomKeys (aks) for a Hedron or Dihedron,
-        #  return:
-        #       list of matching aks that have id3_dh in this residue
-        #            (ak may change if occupancy != 1.00)
-        #    or
-        #       multiple lists of matching aks expanded for all atom altlocs
-        #    or
-        #       empty list if any of atom_coord(ak) missing
+    def _split_akl(self, lst):
+        """Get AtomKeys for this residue given generic list of AtomKeys.
+
+        Given a list of AtomKeys (aks) for a Hedron or Dihedron,
+          return:
+               list of matching aks that have id3_dh in this residue
+                    (ak may change if occupancy != 1.00)
+            or
+               multiple lists of matching aks expanded for all atom altlocs
+            or
+               empty list if any of atom_coord(ak) missing
+
+        :param lst: list[3] or [4] of AtomKeys
+            non-altloc AtomKeys to match to specific AtomKeys for this residue 
+        """
 
         altloc_ndx = AtomKey.fields.altloc
 
@@ -1648,11 +1749,16 @@ class PIC_Residue(object):
 
         # can't reach here
 
-    def gen_edra(self, lst):
-        # given list of AtomKeys defining hedron or dihedron
-        #  convert to AtomKeys with coordinates in this residue
-        #  add appropriately to self.di/hedra, expand as needed atom altlocs
+    def _gen_edra(self, lst):
+        """Populate hedra/dihedra given edron ID tuple.
+        
+        Given list of AtomKeys defining hedron or dihedron
+          convert to AtomKeys with coordinates in this residue
+          add appropriately to self.di/hedra, expand as needed atom altlocs
 
+        :param lst: tuple of AtomKeys
+            Specifies Hedron or Dihedron
+        """
         if 4 > len(lst):
             dct, obj = self.hedra, Hedron
         else:
@@ -1661,7 +1767,7 @@ class PIC_Residue(object):
         if all(ak in self.atom_coords for ak in lst):
             hl = [lst]
         else:
-            hl = self.split_akl(lst)
+            hl = self._split_akl(lst)
 
         for nlst in hl:
             # dct[DH_Base.gen_key(nlst)] = obj(**zdh(nlst))
@@ -1669,6 +1775,7 @@ class PIC_Residue(object):
             dct[tuple(nlst)] = obj(nlst)
 
     def dihedra_from_atoms(self):
+        """Create hedra and dihedra for atom coordinates."""
         AK = AtomKey
         S = self
 
@@ -1690,22 +1797,22 @@ class PIC_Residue(object):
                         if rn_ak.altloc_match(ak):
                             self.atom_coords[rn_ak] = rn.atom_coords[rn_ak]
 
-            self.gen_edra([sN, sCA, sC, nN])  # psi
-            self.gen_edra([sCA, sC, nN, nCA])  # omega i+1
-            self.gen_edra([sC, nN, nCA, nC])  # phi i+1
-            self.gen_edra([sCA, sC, nN])
-            self.gen_edra([sC, nN, nCA])
-            self.gen_edra([nN, nCA, nC])
+            self._gen_edra([sN, sCA, sC, nN])  # psi
+            self._gen_edra([sCA, sC, nN, nCA])  # omega i+1
+            self._gen_edra([sC, nN, nCA, nC])  # phi i+1
+            self._gen_edra([sCA, sC, nN])
+            self._gen_edra([sC, nN, nCA])
+            self._gen_edra([nN, nCA, nC])
 
         # backbone O and C-beta hedra and dihedra within this residue
-        self.gen_edra([sN, sCA, sC, sO])
-        self.gen_edra([sO, sC, sCA, sCB])
+        self._gen_edra([sN, sCA, sC, sO])
+        self._gen_edra([sO, sC, sCA, sCB])
 
         if not self.rprev:
-            self.gen_edra([sN, sCA, sC])
+            self._gen_edra([sN, sCA, sC])
 
-        self.gen_edra([sCA, sC, sO])
-        self.gen_edra([sCB, sCA, sC])
+        self._gen_edra([sCA, sC, sO])
+        self._gen_edra([sCB, sCA, sC])
 
         # if res is not G or A
         # only needed for sidechain CG residues
@@ -1714,20 +1821,20 @@ class PIC_Residue(object):
         if 'G' != self.lc and 'A' != self.lc:
             for ak in self.atom_coords:
                 if ak.is_sidechain_gamma():
-                    self.gen_edra([sN, sCA, sCB])
+                    self._gen_edra([sN, sCA, sCB])
                     break
 
         # amide proton N H if present
         sH = AK(S, 'H')
-        self.gen_edra([sH, sN, sCA])
-        self.gen_edra([sC, sCA, sN, sH])
+        self._gen_edra([sH, sN, sCA])
+        self._gen_edra([sC, sCA, sN, sH])
 
         # sidechain hedra and dihedra
 
         sidechain = pic_data_sidechains.get(self.lc, [])
         for edra in sidechain:
             r_edra = [AK(S, atom) for atom in edra]
-            self.gen_edra(r_edra[0:4])  # [4] is label on some table entries
+            self._gen_edra(r_edra[0:4])  # [4] is label on some table entries
 
         if sCB not in self.atom_coords:  # add C-beta for Gly
             cb = numpy.append(genCBjones(self.residue), [1])
@@ -1755,7 +1862,11 @@ class PIC_Residue(object):
                 # print(h)
                 h.hedron_from_atoms(self.atom_coords)
 
-    def pdb_atom_string(self, atm):
+    def _pdb_atom_string(self, atm):
+        """Generate PDB ATOM record.
+        
+        :param atm: Biopython Atom object reference
+        """
         res = atm.parent
         chn = res.parent
         s = ('{:6}{:5d} {:4}{:1}{:3} {:1}{:4}{:1}   {:8.3f}{:8.3f}{:8.3f}'
@@ -1768,7 +1879,13 @@ class PIC_Residue(object):
         return s
 
     @staticmethod
-    def residue_string(res):
+    def _residue_string(res):
+        """Generate PIC Residue string.
+        
+        Enough to create Biopython Residue object without actual Atoms.
+        
+        :param res: Biopython Residue object reference
+        """
         return (str(res.get_full_id())
                 + ' ' + res.resname
                 + ' [' + res.get_segid() + ']'
@@ -1776,12 +1893,19 @@ class PIC_Residue(object):
                 + '\n')
 
     def write_PIC(self, pdbid, chainid, s='', stats=False):
-        s += PIC_Residue.residue_string(self.residue)
+        """Write PIC format lines for this residue.
+        
+        :param str pdbid: PDB idcode string
+        :param str chainid: PDB Chain ID character
+        :param str s: result string to add to
+        :param bool stats: option to output counts TODO: what stats???
+        """
+        s += PIC_Residue._residue_string(self.residue)
         if not self.rprev:
             try:
-                ts = self.pdb_atom_string(self.residue['N'])
-                ts += self.pdb_atom_string(self.residue['CA'])
-                ts += self.pdb_atom_string(self.residue['C'])
+                ts = self._pdb_atom_string(self.residue['N'])
+                ts += self._pdb_atom_string(self.residue['CA'])
+                ts += self._pdb_atom_string(self.residue['C'])
                 s += ts  # only if have all 3 atoms
             except KeyError:
                 pass
@@ -1803,6 +1927,7 @@ class PIC_Residue(object):
         return s
 
     def coords_to_residue(self):
+        """Convert homogeneous PIC atom coords to cartesian Atom coords."""
         seqpos, icode = self.residue.id[1:3]
         seqpos = str(seqpos)
         spNdx, icNdx, resnNdx, atmNdx, occNdx, altlocNdx = AtomKey.fields
@@ -1860,20 +1985,10 @@ class PIC_Residue(object):
         # print(ak, ac)
 
 
-# Residue.pic_init = residue_pic_init
-# Residue.pic_load = residue_pic_load
-# Residue.link_dihedra = residue_link_dehedra
-# Residue.render_hedra = residue_render_hedra
-# Residue.render_dihedra = residue_render_dihedra
-# Residue.NCaCKeySplit = residue_NCaCKeySplit
-# Residue.assemble = residue_assemble
-
-# ------------ add to chain class
-
-def npat(arr):
-    arr41 = numpy.append(arr, [1])
-    return numpy.array(arr41, dtype=numpy.float64)[
-        numpy.newaxis].transpose()
+# def npat(arr):
+#    arr41 = numpy.append(arr, [1])
+#    return numpy.array(arr41, dtype=numpy.float64)[
+#        numpy.newaxis].transpose()
 
 
 class PIC_Chain:
@@ -1906,9 +2021,9 @@ class PIC_Chain:
                         respos += res.id[2]  # need icode if set
                     initNCaC = {}
                     rpic = res.pic
-                    initNCaC[AtomKey(rpic, 'N')] = npat(res['N'].coord)
-                    initNCaC[AtomKey(rpic, 'CA')] = npat(res['CA'].coord)
-                    initNCaC[AtomKey(rpic, 'C')] = npat(res['C'].coord)
+                    for atm in ('N', 'CA', 'C'):
+                        initNCaC[AtomKey(rpic, atm)] = PIC_Residue.atm241(
+                            res[atm].coord)
                     self.initNCaC[respos] = initNCaC
                 last_ord_res = res
             else:
