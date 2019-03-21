@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 """Interconversion between PDB atom and internal coordinates.
 
 Atom coordinates are cartesian X, Y, Z coordinates as specified in a PDB file.
@@ -8,7 +9,7 @@ coordinates.  Also supported is writing PDB internal coordinate data as
 OpenSCAD code to generate STL output for printing protein structures on a
 3D printer.
 """
-# -*- coding: latin-1 -*-
+
 # from Bio import PDB
 
 from collections import deque, namedtuple
@@ -48,7 +49,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-18 21:46:08'
+__updated__ = '2019-03-21 17:38:24'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -116,8 +117,9 @@ def internal_to_atom_coordinates(struct):
         if hasattr(chn, 'pic'):
             chn.pic.internal_to_atom_coordinates()
         else:
-            raise Exception('Structure', struct, 'Chain', chn,
-                            'does not have internal coordinates set')
+            raise Exception(
+                'Structure %s Chain %s does not have internal coordinates set'
+                % (struct, chn))
 
 
 def read_PIC(file):
@@ -237,9 +239,9 @@ def read_PIC(file):
                     if (sb_res.resname != m.group('res')
                             or sb_res.id[1] != int(m.group('pos'))):
                         # TODO: better exception here?
-                        raise Exception('pic ATOM read confusion:',
-                                        sb_res.resname, str(sb_res.id),
-                                        aline)
+                        raise Exception('pic ATOM read confusion: %s %s %s'
+                                        % (sb_res.resname, str(sb_res.id),
+                                            aline))
 
                     coord = numpy.array(
                         (float(m.group('x')), float(m.group('y')),
@@ -396,11 +398,11 @@ def report_PIC(entity, reportDict=None):
 
 
 def genCBhamelryck(res):
-    """Generate virtual Cβ residue, Hamelryck method.
+    """Generate virtual C-beta residue, Hamelryck method.
 
     Method from
     https://biopython.org/wiki/The_Biopython_Structural_Bioinformatics_FAQ
-    'How do I put a virtual Cβ on a Gly residue?'
+    'How do I put a virtual C-beta on a Gly residue?'
 
     :param Residue res: Biopython Residue object
     :returns: numpy 1x3 array, coordinates of virtual C-beta
@@ -421,7 +423,7 @@ def genCBhamelryck(res):
 
 
 def genCBjones(res):
-    """Generate virtual Cβ residue, Hazes and Dijkstra / Jones method.
+    """Generate virtual C-beta residue, Hazes and Dijkstra / Jones method.
 
     Based on Prot. Engr vol. 2, issue 2, p. 121 (1 July, 1988)
     'Model building of disulfide bonds in proteins with known three-
@@ -609,14 +611,15 @@ class AtomKey(object):
 
         Examples of acceptable input:
             (<PIC_Residue>, 'CA', ...)    : PIC_Residue with atom info
+            (<PIC_Residue>, <Atom>)       : PIC_Residue with Biopython Atom
             ([52, None, 'G', 'CA', ...])  : list of ordered data fields
             (52, None, 'G', 'CA', ...)    : multiple ordered arguments
-            {respos: 52, icode: None, resname: 'G', ...} : dict with fieldNames
+            ({respos: 52, icode: None, atm: 'CA', ...}) : dict with fieldNames
+            (respos: 52, icode: None, atm: 'CA', ...) : kwargs with fieldNames
             52_G_CA, 52B_G_CA, 52_G_CA_0.33, 52_G_CA_0.33_B  : id strings
         """
         akl = []
         self.id = None
-
         for arg in args:
             if isinstance(arg, PIC_Residue):
                 if [] != akl:
@@ -632,18 +635,22 @@ class AtomKey(object):
                 akl.append(altloc if altloc != ' ' else None)
             elif isinstance(arg, list):
                 akl += arg
+            elif isinstance(arg, dict):
+                for k in self.fieldNames:
+                    akl.append(arg.get(k, None))
             elif '_' in arg:
                 # got atom key string, recurse with regex parse
                 m = self.atom_re.match(arg)
                 if [] != akl:
                     raise Exception(
-                        'Atom Key init full key not first argument', arg)
+                        'Atom Key init full key not first argument: ' + arg)
                 for fn in AtomKey.fieldNames:
                     akl.append(m.group(fn))
             else:
                 akl.append(arg)
 
-        # initialize occ and altloc to None if not specified above
+        # process kwargs, initialize occ and altloc to None
+        # if not specified above
         for i in range(6):
             if len(akl) <= i:
                 akl.append(kwargs.get(self.fieldNames[i], None))
@@ -687,7 +694,7 @@ class AtomKey(object):
                             'CE2': 7, 'OE2': 7, 'NE2': 7,
                             'CE3': 8,
                             'CZ': 9, 'CZ2': 9, 'NZ': 9,
-                            'NH1': 10, 'OH': 10, 'CZ3': 10, 
+                            'NH1': 10, 'OH': 10, 'CZ3': 10,
                             'CH2': 11, 'NH2': 11,
                             'OXT': 12,
                             'H': 13
@@ -929,7 +936,7 @@ class Edron_Base(object):
                 acs.append(ac)
         if estr != '':
             raise MissingAtomError(
-                self, 'missing coordinates for', estr)
+                '%s missing coordinates for %s' % (self, estr))
         return tuple(acs)
 
     def __repr__(self):
@@ -1098,14 +1105,16 @@ class Dihedron(Edron_Base):
             h2key = self.id32
 
         if not hedron1:
-            raise HedronMatchError(res, "can't find 1st hedron", h1key, self)
+            raise HedronMatchError(
+                "can't find 1st hedron for key %s dihedron %s" % (h1key, self))
 
         hedron2 = Dihedron._get_hedron(res, h2key)
 
         if not hedron2:
             # print(res.hedra)
             # print(res.rnext.hedra)
-            raise HedronMatchError(res, "can't find 2nd hedron", h2key, self)
+            raise HedronMatchError(
+                "can't find 2nd hedron for key %s dihedron %s" % (h2key, self))
 
         self.hedron1 = hedron1
         self.h1key = h1key
@@ -1137,7 +1146,7 @@ class Dihedron(Edron_Base):
             if a is not None:
                 acount += 1
         if 6 > acount:
-            raise MissingAtomError('dihedron: hedra missing atoms', self)
+            raise MissingAtomError('dihedron: hedra missing atoms: ' + self)
 
         initial = []
 
@@ -1521,7 +1530,7 @@ class PIC_Residue(object):
         # for all dihedra in Residue
         # set by Residue.link_dihedra()
         self.id3_dh_index = {}
-        # set of AtomKeys involved in dihedra
+        # set of AtomKeys involved in dihedra, used by split_akl
         self.ak_set = set()
         # reference to adjacent residues in chain
         self.rprev = None
@@ -1581,7 +1590,7 @@ class PIC_Residue(object):
             numpy.newaxis].transpose()
 
     def _add_atom(self, atm):
-        """Filter atm with accept_atoms and update atom_coords, ak_set."""
+        """Filter Biopython Atom with accept_atoms; set atom_coords, ak_set."""
         if atm.name not in self.accept_atoms:
             # print('skip:', atm.name)
             return
@@ -1686,7 +1695,7 @@ class PIC_Residue(object):
             (AtomKey(self, 'N'), AtomKey(self, 'CA'), AtomKey(self, 'CB')),
             (AtomKey(self, 'O'), AtomKey(self, 'C'), AtomKey(self, 'CA')),
             self.NCaCKey
-                ]:
+        ]:
             startLst.extend(self._split_akl(lst))
 
         q = deque(startLst)
@@ -1868,7 +1877,7 @@ class PIC_Residue(object):
 
         sN, sCA, sC = AK(S, 'N'), AK(S, 'CA'), AK(S, 'C')
         sO, sCB = AK(S, 'O'), AK(S, 'CB')
-        sN = AtomKey(self, 'N')
+        # sN = AtomKey(self, 'N')
 
         if self.rnext:
             # atom_coords, hedra and dihedra for backbone dihedra
@@ -1879,10 +1888,12 @@ class PIC_Residue(object):
             for ak in (nN, nCA, nC):
                 if ak in rn.atom_coords:
                     self.atom_coords[ak] = rn.atom_coords[ak]
+                    self.ak_set.add(ak)
                 else:
                     for rn_ak in rn.atom_coords.keys():
                         if rn_ak.altloc_match(ak):
                             self.atom_coords[rn_ak] = rn.atom_coords[rn_ak]
+                            self.ak_set.add(rn_ak)
 
             self._gen_edra([sN, sCA, sC, nN])  # psi
             self._gen_edra([sCA, sC, nN, nCA])  # omega i+1
@@ -1923,7 +1934,8 @@ class PIC_Residue(object):
             r_edra = [AK(S, atom) for atom in edra]
             self._gen_edra(r_edra[0:4])  # [4] is label on some table entries
 
-        if sCB not in self.atom_coords:  # add C-beta for Gly
+        if ('G' == self.lc and sCB not in self.atom_coords):
+            # add C-beta for Gly
             cb = numpy.append(genCBjones(self.residue), [1])
             self.atom_coords[sCB] = numpy.array(cb, dtype=numpy.float64)[
                 numpy.newaxis].transpose()
@@ -2071,7 +2083,7 @@ class PIC_Residue(object):
                     aloc = akl[altlocNdx]
                     bfac = self.bfactors.get(ak.id, None)
                     newAtom = Atom(atm, atm_coords,
-                                   (0.0 if bfac is None else bfac), 
+                                   (0.0 if bfac is None else bfac),
                                    (1.00 if occ is None else float(occ)),
                                    (' ' if aloc is None else aloc),
                                    atm, ndx, atm[0])
@@ -2230,9 +2242,8 @@ class PIC_Chain:
                     icode = rpic.residue.id[2]
                     NCaCselect = str(respos) + '' if icode == ' ' else icode
                     startPos = self.initNCaC[NCaCselect]
-                # rtm unlike lua assemble() mods res coords
-                # TODO: correct comment or change back
                 rpic.atom_coords = rpic.assemble(startPos)
+                rpic.ak_set = rpic.atom_coords.keys()
 
     def coords_to_structure(self):
         """All pic atom_coords to Biopython Residue/Atom coords."""
