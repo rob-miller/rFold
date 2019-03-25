@@ -49,7 +49,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-21 17:38:24'
+__updated__ = '2019-03-22 17:16:04'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -1487,6 +1487,9 @@ class PIC_Residue(object):
         AltLoc IDs from PDB file
     bfactors : dict
         AtomKey indexed B-factors as read from PDB file
+    NCaCKey : List tuples of AtomKeys
+        List of tuples of N, Ca, C backbone atom AtomKeys; usually only 1
+        but more if backbone altlocs
 
     Methods
     -------
@@ -1561,9 +1564,9 @@ class PIC_Residue(object):
         self.lc = rbase[2]
 
         if is20AA:
-            self.NCaCKey = (AtomKey(self, 'N'),
-                            AtomKey(self, 'CA'),
-                            AtomKey(self, 'C'))
+            self.NCaCKey = [(AtomKey(self, 'N'),
+                             AtomKey(self, 'CA'),
+                             AtomKey(self, 'C'))]
 
             for atom in parent.get_atoms():
                 if hasattr(atom, 'child_dict'):
@@ -1601,7 +1604,7 @@ class PIC_Residue(object):
 
     def __str__(self):
         """Print string is parent Residue ID."""
-        return('(' + str(self.residue.id) + ')')
+        return(str(self.residue.full_id))
 
     def load_PIC(self, edron):
         """Process parsed (di-/h-)edron data from PIC file.
@@ -1618,7 +1621,12 @@ class PIC_Residue(object):
             self.hedra[tuple(ek)] = Hedron(ek, **edron)
 
     def link_dihedra(self):
-        """Link dihedra to this residue, form id3_dh_index and ak_set."""
+        """Housekeeping after loading all residues and dihedra.
+        - Link dihedra to this residue
+        - form id3_dh_index
+        - form ak_set
+        - fix NCaCKey to be available AtomKeys
+        """
         id3i = {}
         for dh in self.dihedra.values():
             dh.pic_residue = self  # each dihedron can find its pic_residue
@@ -1629,6 +1637,15 @@ class PIC_Residue(object):
             self.ak_set.update(id3)
         # map to find each dihedron from atom tokens 1-3
         self.id3_dh_index = id3i
+        # more efficient to catch NCaC KeyError later, but fixing here
+        # avoids having to test/find altloc problem in future code
+        #need to handle differently - want list of tuples not list of atomkeys
+        newNCaCKey = []
+        for tpl in self.NCaCKey:
+            newNCaCKey.extend(self._split_akl(tpl))
+        self.NCaCKey = newNCaCKey
+        #self.NCaCKey = self._split_akl(self.NCaCKey)
+        pass
 
     def render_dihedra(self):
         # TODO: check!
@@ -1687,16 +1704,16 @@ class PIC_Residue(object):
         NCaCKey = self.NCaCKey
 
         if transforms:
-            transformations[NCaCKey] = numpy.identity(4, dtype=numpy.float64)
+            for akl in NCaCKey:
+                transformations[akl] = numpy.identity(4, dtype=numpy.float64)
 
         startLst = []
         for lst in [
             (AtomKey(self, 'C'), AtomKey(self, 'CA'), AtomKey(self, 'N')),
             (AtomKey(self, 'N'), AtomKey(self, 'CA'), AtomKey(self, 'CB')),
-            (AtomKey(self, 'O'), AtomKey(self, 'C'), AtomKey(self, 'CA')),
-            self.NCaCKey
-        ]:
+                (AtomKey(self, 'O'), AtomKey(self, 'C'), AtomKey(self, 'CA'))]:
             startLst.extend(self._split_akl(lst))
+        startLst.extend(NCaCKey)
 
         q = deque(startLst)
 
@@ -1704,7 +1721,8 @@ class PIC_Residue(object):
         # then use N-CA-C initial coords from creating dihedral
         if atomCoords is None:
             atomCoords = {}
-            dlist = self.id3_dh_index[NCaCKey]
+            dlist = [self.id3_dh_index[akl] for akl in NCaCKey]
+            #dlist = self.id3_dh_index[NCaCKey]
             for d in dlist:
                 for i, a in enumerate(d.aks):
                     atomCoords[a] = d.initial_coords[i]
@@ -1774,7 +1792,7 @@ class PIC_Residue(object):
     altloc_re = re.compile(r'-([A-Z])\Z')
 
     def _split_akl(self, lst):
-        """Get AtomKeys for this residue ak_set given generic list of AtomKeys.
+        """Get AtomKeys for this residue (ak_set) given generic list of AtomKeys.
 
         Given a list of AtomKeys (aks) for a Hedron or Dihedron,
           return:
@@ -2230,11 +2248,14 @@ class PIC_Chain:
                     (fin[0] == respos and fin[1] > resicode))):
                 go = False
             if go:
-                if rpic.rprev:
+                if rpic.rprev is not None:
                     startPos = {}
                     rp = rpic.rprev
-                    # nb akl for this res n-ca-c in rp dihedra
-                    akl = rpic.NCaCKey  # .split(':')  # Split()
+                    # nb akl for this res n-ca-c in rp (prev res) dihedra
+                    akl = []
+                    for tpl in rpic.NCaCKey:
+                        akl.extend(tpl)
+                    #akl = rpic.NCaCKey  # .split(':')  # Split()
                     for ak in akl:
                         startPos[ak] = rp.atom_coords[ak]
                 else:
