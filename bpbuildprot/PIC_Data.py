@@ -1,16 +1,56 @@
 # per residue sidechain hedra and dihedra definitions, in order of output for
 # internal coordinates specification file
 
-pic_data_backbone = {
-    
-}
+pic_data_backbone = [
+    ['N', 'CA', 'C', 'O'],   # locate backbone O
+    ['O', 'C', 'CA', 'CB'],  # locate CB
+    ['CA', 'C', 'O'],
+    ['CB', 'CA', 'C'],
+    ['CA', 'C', 'OXT'],      # OXT if present
+    ['N', 'CA', 'C', 'OXT'],
+    ['H', 'N', 'CA'],        # amide proton if present
+    ['C', 'CA', 'N', 'H'],
+    ['HA', 'N', 'CA'],       # CA proton
+    ['C', 'CA', 'N', 'HA'],
+    ['HA1', 'N', 'CA'],      # CA protons GLY
+    ['C', 'CA', 'N', 'HA1'],
+    ['HA2', 'N', 'CA'],
+    ['C', 'CA', 'N', 'HA2'],
+    ['N', 'CA', 'CB'],
+    ['N', 'CA', 'CB', 'HB'],  # CB protons
+    ['N', 'CA', 'CB', 'HB1'],
+    ['N', 'CA', 'CB', 'HB2'],
+    ['N', 'CA', 'CB', 'HB3'],
+    ['CA', 'CB', 'HB'],
+    ['CA', 'CB', 'HB1'],
+    ['CA', 'CB', 'HB2'],
+    ['CA', 'CB', 'HB3'],
+    ['H1', 'N', 'CA'],       # chain start protons
+    ['H2', 'N', 'CA'],
+    ['H3', 'N', 'CA'],
+    ['C', 'CA', 'N', 'H1'],
+    ['C', 'CA', 'N', 'H2'],
+    ['C', 'CA', 'N', 'H3'],
+]
+
 pic_data_sidechains = {
     'V': [
         ['CA', 'CB', 'CG1'],
         ['N', 'CA', 'CB', 'CG1', 'chi1'],  # chi1
         ['CA', 'CB', 'CG2'],
         ['N', 'CA', 'CB', 'CG2'],
-        # 'chi1': 1
+        ['CB', 'CG1', 'HG11'],
+        ['CB', 'CG1', 'HG12'],
+        ['CB', 'CG1', 'HG13'],
+        ['CB', 'CG2', 'HG21'],
+        ['CB', 'CG2', 'HG22'],
+        ['CB', 'CG2', 'HG23'],
+        ['CA', 'CB', 'CG1', 'HG11'],
+        ['CA', 'CB', 'CG1', 'HG12'],
+        ['CA', 'CB', 'CG1', 'HG13'],
+        ['CA', 'CB', 'CG2', 'HG21'],
+        ['CA', 'CB', 'CG2', 'HG22'],
+        ['CA', 'CB', 'CG2', 'HG23'],
     ],
     'L': [
         ['CA', 'CB', 'CG'],
@@ -19,7 +59,8 @@ pic_data_sidechains = {
         ['CA', 'CB', 'CG', 'CD1', 'chi2'],  # chi2
         ['CB', 'CG', 'CD2'],
         ['CA', 'CB', 'CG', 'CD2'],
-        # 'chi1': 1, 'chi2': 3
+        ['HG', 'CG', 'CB'],
+        ['HG', 'CG', 'CB', 'CA'],
     ],
     'I': [
         ['CA', 'CB', 'CG1'],
@@ -178,7 +219,24 @@ pic_data_sidechains = {
         ['CB', 'CG', 'CD', 'CE', 'chi3'],   # chi3
         ['CD', 'CE', 'NZ'],
         ['CG', 'CD', 'CE', 'NZ', 'chi4'],   # chi4
-        # 'chi1': 1, 'chi2': 3, 'chi3': 5, 'chi4': 7
+        ['CB', 'CG', 'HG2'],
+        ['CB', 'CG', 'HG3'],
+        ['CA', 'CB', 'CG', 'HG2'],
+        ['CA', 'CB', 'CG', 'HG3'],
+        ['CG', 'CD', 'HD2'],
+        ['CG', 'CD', 'HD3'],
+        ['CB', 'CG', 'CD', 'HD2'],
+        ['CB', 'CG', 'CD', 'HD3'],
+        ['CD', 'CE', 'HE2'],
+        ['CD', 'CE', 'HE3'],
+        ['CG', 'CD', 'CE', 'HE2'],
+        ['CG', 'CD', 'CE', 'HE3'],
+        ['CE', 'NZ', 'HZ1'],
+        ['CE', 'NZ', 'HZ2'],
+        ['CE', 'NZ', 'HZ3'],
+        ['CD', 'CE', 'NZ', 'HZ1'],
+        ['CD', 'CE', 'NZ', 'HZ2'],
+        ['CD', 'CE', 'NZ', 'HZ3'],
     ],
     'R': [
         ['CA', 'CB', 'CG'],
@@ -197,5 +255,5 @@ pic_data_sidechains = {
     ]
 }
 
-# http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/formuleAA/ 
+# http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/formuleAA/
 # for naming of individual atoms

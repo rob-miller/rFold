@@ -42,14 +42,14 @@ except ImportError:
     raise MissingPythonDependencyError(
         "Install NumPy to build proteins from internal coordinates.")
 
-from PIC_Data import pic_data_sidechains
+from PIC_Data import pic_data_sidechains, pic_data_backbone
 
 from Bio.PDB.PDBExceptions import PDBException
 
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-22 17:16:04'
+__updated__ = '2019-03-26 15:08:51'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -571,7 +571,7 @@ class AtomKey(object):
     Supports rich comparison and multiple ways to instantiate.
     AtomKeys contain:
      residue position, insertion code, 1 or 3 char residue name,
-     atom name, occupancy, and altloc
+     atom name, altloc, and occupancy
 
     Attributes
     ----------
@@ -591,20 +591,20 @@ class AtomKey(object):
     altloc_match(other)
         Returns True if this AtomKey matches other AtomKey excluding altloc
         and occupancy fields
-    is_sidechain_gamma()
-        Returns True if atom name contains 'G', meaning it is gamma element
-        of sidechain
+    #is_sidechain_gamma()
+    #    Returns True if atom name contains 'G', meaning it is gamma element
+    #    of sidechain
 
     """
 
     atom_re = re.compile(r'^(?P<respos>-?\d+)(?P<icode>[A-Za-z])?'
-                         r'_(?P<resname>[a-zA-Z]+)_(?P<atm>\w+)'
-                         r'(?:_(?P<occ>\d\.\d?\d?))?(?:_(?P<altloc>\w))?$')
+                         r'_(?P<resname>[a-zA-Z]+)_(?P<atm>[A-Za-z0-9]+)'
+                         r'(?:_(?P<altloc>\w))?(?:_(?P<occ>\d\.\d?\d?))?$')
     # PDB altLoc = Character = [\w ] (any non-ctrl ASCII incl space)
     # PDB iCode = AChar = [A-Za-z]
-    fieldNames = ('respos', 'icode', 'resname', 'atm', 'occ', 'altloc')
+    fieldNames = ('respos', 'icode', 'resname', 'atm', 'altloc', 'occ')
     fields = namedtuple('fieldsDef', 'respos, icode, resname, '
-                        'atm, occ, altloc')(0, 1, 2, 3, 4, 5)
+                        'atm, altloc, occ')(0, 1, 2, 3, 4, 5)
 
     def __init__(self, *args, **kwargs):
         """Initialize AtomKey with residue and atom data.
@@ -616,7 +616,7 @@ class AtomKey(object):
             (52, None, 'G', 'CA', ...)    : multiple ordered arguments
             ({respos: 52, icode: None, atm: 'CA', ...}) : dict with fieldNames
             (respos: 52, icode: None, atm: 'CA', ...) : kwargs with fieldNames
-            52_G_CA, 52B_G_CA, 52_G_CA_0.33, 52_G_CA_0.33_B  : id strings
+            52_G_CA, 52B_G_CA, 52_G_CA_0.33, 52_G_CA_B_0.33  : id strings
         """
         akl = []
         self.id = None
@@ -629,10 +629,10 @@ class AtomKey(object):
                 if 3 != len(akl):
                     raise Exception('Atom Key init Atom before Residue info')
                 akl.append(arg.name)
-                occ = float(arg.occupancy)
-                akl.append(occ if occ != 1.00 else None)
                 altloc = arg.altloc
                 akl.append(altloc if altloc != ' ' else None)
+                occ = float(arg.occupancy)
+                akl.append(occ if occ != 1.00 else None)
             elif isinstance(arg, list):
                 akl += arg
             elif isinstance(arg, dict):
@@ -658,8 +658,9 @@ class AtomKey(object):
         # tweak local akl to generate id string
         akl[0] = str(akl[0])  # numeric residue position to string
 
-        if akl[4] is not None:
-            akl[4] = str(akl[4])  # numeric occupancy to string
+        occNdx = self.fields.occ
+        if akl[occNdx] is not None:
+            akl[occNdx] = str(akl[occNdx])  # numeric occupancy to string
 
         # unused option:
         # (self.respos, self.icode, self.resname, self.atm, self.occ,
@@ -699,6 +700,14 @@ class AtomKey(object):
                             'OXT': 12,
                             'H': 13
                             }
+    _proton_sort_keys = {'H1': 0, 'H2': 1, 'H3': 2, 'H': 3,
+                         'HA': 4, 'HA1': 5, 'HA2': 6,
+                         'HB': 7, 'HB2': 8, 'HB3': 9,
+                         'HG2': 10, 'HG3': 11,
+                         'HD2': 12, 'HD3': 13,
+                         'HE2': 14, 'HE3': 15,
+                         'HZ1': 16, 'HZ2': 17, 'HZ3': 18,
+                         }
 
     def altloc_match(self, other):
         """Test AtomKey match other discounting occupancy and altloc."""
@@ -707,11 +716,11 @@ class AtomKey(object):
         else:
             return NotImplemented
 
-    def is_sidechain_gamma(self):
-        """Test atom name contains 'G', then it is sidechain gamma atom."""
-        if 'G' in self.akl[3]:
-            return True
-        return False
+    #def is_sidechain_gamma(self):
+    #    """Test atom name contains 'G', then it is sidechain gamma atom."""
+    #    if 'G' in self.akl[3]:
+    #        return True
+    #    return False
 
     def _cmp(self, other):
         """Comparison function ranking self vs. other."""
@@ -730,9 +739,9 @@ class AtomKey(object):
                         tmp = s
                         s = o
                         o = tmp  # swap so higher occupancy comes first
-                    if s is None:  # no insert code before named insert code
+                    if s is None and o is not None:  # no insert code before named insert code
                         return 0, 1
-                    elif o is None:
+                    elif o is None and s is not None:
                         return 1, 0
                     else:
                         return s, o
@@ -747,11 +756,11 @@ class AtomKey(object):
                     return 1, 0
                 # finished backbone and backbone vs. sidechain atoms
                 # now hydrogens after sidechain
-                s0, o0 = s[0], o[0]
-                if (s0 == 'H' and o0 != 'H'):
-                    return 1, 0
-                elif (s0 != 'H' and o0 == 'H'):
-                    return 0, 1
+                #s0, o0 = s[0], o[0]
+                # if (s0 == 'H' and o0 != 'H'):
+                #    return 1, 0
+                # elif (s0 != 'H' and o0 == 'H'):
+                #    return 0, 1
                 ss = self._sidechain_sort_keys.get(s, None)
                 os = self._sidechain_sort_keys.get(o, None)
                 if (ss is not None and os is not None):
@@ -760,8 +769,12 @@ class AtomKey(object):
                     return 0, 1
                 elif (ss is None and os is not None):
                     return 1, 0
+                sh = self._proton_sort_keys.get(s, None)
+                oh = self._proton_sort_keys.get(o, None)
+                if (sh is not None and oh is not None):
+                    return sh, oh
                 else:
-                    return s, o
+                    return s, o  # raise exception?
         return 1, 1
 
     def __eq__(self, other):
@@ -1583,7 +1596,11 @@ class PIC_Residue(object):
     accept_atoms = ('N', 'CA', 'C', 'O', 'H', 'CB', 'CG', 'CG1', 'OG1', 'SG',
                     'CG2', 'CD', 'CD1', 'SD', 'OD1', 'ND1', 'CD2', 'ND2', 'CE',
                     'CE1', 'NE', 'OE1', 'NE1', 'CE2', 'OE2', 'NE2', 'CE3',
-                    'CZ', 'NZ', 'CZ2', 'CZ3')
+                    'CZ', 'NZ', 'CZ2', 'CZ3', 'OXT', 'H1', 'H2', 'H3', 'HA',
+                    'HB', 'HB1', 'HB2', 'HB3', 'HG2', 'HG3', 'HD2', 'HD3',
+                    'HE2', 'HE3', 'HZ1', 'HZ2', 'HZ3', 'HG11', 'HG12', 'HG13',
+                    'HG21', 'HG22', 'HG23',
+                    )
 
     @staticmethod
     def atm241(coord):
@@ -1639,7 +1656,7 @@ class PIC_Residue(object):
         self.id3_dh_index = id3i
         # more efficient to catch NCaC KeyError later, but fixing here
         # avoids having to test/find altloc problem in future code
-        #need to handle differently - want list of tuples not list of atomkeys
+        # need to handle differently - want list of tuples not list of atomkeys
         newNCaCKey = []
         for tpl in self.NCaCKey:
             newNCaCKey.extend(self._split_akl(tpl))
@@ -1789,7 +1806,7 @@ class PIC_Residue(object):
         else:
             return atomCoords
 
-    altloc_re = re.compile(r'-([A-Z])\Z')
+    #altloc_re = re.compile(r'-([A-Z])\Z')
 
     def _split_akl(self, lst):
         """Get AtomKeys for this residue (ak_set) given generic list of AtomKeys.
@@ -1921,29 +1938,42 @@ class PIC_Residue(object):
             self._gen_edra([nN, nCA, nC])
 
         # backbone O and C-beta hedra and dihedra within this residue
-        self._gen_edra([sN, sCA, sC, sO])
-        self._gen_edra([sO, sC, sCA, sCB])
+        #self._gen_edra([sN, sCA, sC, sO])
+        #self._gen_edra([sO, sC, sCA, sCB])
 
         if not self.rprev:
             self._gen_edra([sN, sCA, sC])
 
-        self._gen_edra([sCA, sC, sO])
-        self._gen_edra([sCB, sCA, sC])
+        #self._gen_edra([sCA, sC, sO])
+        #self._gen_edra([sCB, sCA, sC])
 
         # if res is not G or A
         # only needed for sidechain CG residues
         # (not gly or ala or any missing rest of side chain)
 
-        if 'G' != self.lc and 'A' != self.lc:
-            for ak in self.atom_coords:
-                if ak.is_sidechain_gamma():
-                    self._gen_edra([sN, sCA, sCB])
-                    break
+        # if 'G' != self.lc and 'A' != self.lc:  # need for CB h's
+        #if 'G' != self.lc:
+        ##    for ak in self.atom_coords:
+        #        if ak.is_sidechain_gamma():
+        #            self._gen_edra([sN, sCA, sCB])
+        #            break
+
+        # terminal OXT if present
+        #sOXT = AK(S, 'OXT')
+        # if sOXT in self.atom_coords:  # TODO: remove check done in gen_edra
+        #    self._gen_edra([sCA, sC, sOXT])
+        #    self._gen_edra([sN, sCA, sC, sOXT])
 
         # amide proton N H if present
-        sH = AK(S, 'H')
-        self._gen_edra([sH, sN, sCA])
-        self._gen_edra([sC, sCA, sN, sH])
+        #sH = AK(S, 'H')
+        #self._gen_edra([sH, sN, sCA])
+        #self._gen_edra([sC, sCA, sN, sH])
+
+        # standard backbone atoms independent of neighbours
+        backbone = pic_data_backbone
+        for edra in backbone:
+            r_edra = [AK(S, atom) for atom in edra]
+            self._gen_edra(r_edra[0:4])  # [4] is label on some table entries
 
         # sidechain hedra and dihedra
 
@@ -2071,7 +2101,7 @@ class PIC_Residue(object):
         """Convert homogeneous PIC atom coords to cartesian Atom coords."""
         seqpos, icode = self.residue.id[1:3]
         seqpos = str(seqpos)
-        spNdx, icNdx, resnNdx, atmNdx, occNdx, altlocNdx = AtomKey.fields
+        spNdx, icNdx, resnNdx, atmNdx, altlocNdx, occNdx = AtomKey.fields
 
         Res = self.residue
         ndx = Res.parent.pic.ndx
@@ -2255,7 +2285,7 @@ class PIC_Chain:
                     akl = []
                     for tpl in rpic.NCaCKey:
                         akl.extend(tpl)
-                    #akl = rpic.NCaCKey  # .split(':')  # Split()
+                    # akl = rpic.NCaCKey  # .split(':')  # Split()
                     for ak in akl:
                         startPos[ak] = rp.atom_coords[ak]
                 else:
