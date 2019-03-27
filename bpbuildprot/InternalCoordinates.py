@@ -49,7 +49,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-27 12:34:56'
+__updated__ = '2019-03-27 17:15:24'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -146,19 +146,16 @@ def read_PIC(file):
         r'(?:\s+(?P<dd>\d\d\d\d-\d\d-\d\d|\d\d-\w\w\w-\d\d))?'
         r'(?:\s+(?P<id>[1-9][0-9A-Z]{3}))?\s*$',
     )
+    # ^\('(?P<pid>\w*)',\s(?P<mdl>\d+),\s'(?P<chn>\w)',\s\('(?P<het>\s|[\w-]+)',\s(?P<pos>\d+),\s'(?P<icode>\s|\w)'\)\)\s(?P<res>[A-Z]{3})\s(\[(?P<segid>[a-zA-z\s]{4})\])?\s*$
     pdb_ttl_re = re.compile(r'^TITLE\s{5}(?P<ttl>.+)\s*$')
-    biop_id_re = re.compile(  # r'^\(\'(?P<pid>\w*)\',\s(?P<mdl>\d+),\s'
-        r"^\('(?P<pid>\w*)',\s(?P<mdl>\d+),\s"
-        # r'\'(?P<chn>\w)\',\s\(\'(?P<het>\s|[\w-]+)'
-        r"'(?P<chn>\w)',\s\('(?P<het>\s|[\w-]+)"
-        # r'\',\s(?P<pos>\d+),\s\'(?P<icode>\s|\w)\'\)\)'
-        r"',\s(?P<pos>\d+),\s'(?P<icode>\s|\w)'\)\)"
-        r'\s(?P<res>[A-Z]{3})'
-        r'\s\[(?P<segid>[a-zA-z\s]{4})\]'
-        r'\s(?P<ndx>\d+)?'
-        r'\s*$')
+    biop_id_re = re.compile(r"^\('(?P<pid>\w*)',\s(?P<mdl>\d+),\s"
+                            r"'(?P<chn>\s|\w)',\s\('(?P<het>\s|[\w\s-]+)"
+                            r"',\s(?P<pos>-?\d+),\s'(?P<icode>\s|\w)'\)\)"
+                            r'\s+(?P<res>[\w]{2,3})'
+                            r'(\s\[(?P<segid>[a-zA-z\s]{4})\])?'
+                            r'\s*$')
     pdb_atm_re = re.compile(r'^ATOM\s\s(?:\s*(?P<ser>\d+))\s(?P<atm>[\w\s]{4})'
-                            r'(?P<alc>\w|\s)(?P<res>[A-Z]{3})\s(?P<chn>.)'
+                            r'(?P<alc>\w|\s)(?P<res>[\w]{3})\s(?P<chn>.)'
                             r'(?P<pos>[\s\-\d]{4})(?P<icode>[A-Za-z\s])\s\s\s'
                             r'(?P<x>[\s\-\d\.]{8})(?P<y>[\s\-\d\.]{8})'
                             r'(?P<z>[\s\-\d\.]{8})(?P<occ>[\s\d\.]{6})'
@@ -210,8 +207,11 @@ def read_PIC(file):
                 m = biop_id_re.match(aline)
                 if m:
                     # check SMCS = Structure, Model, Chain, SegID
+                    segid = m.group(8)
+                    if segid is None:
+                        segid = '    '
                     this_SMCS = [m.group(1), int(m.group(2)),
-                                 m.group(3), m.group(8)]
+                                 m.group(3), segid]
                     if curr_SMCS != this_SMCS:
                         # init new SMCS level as needed
                         for i in range(4):
@@ -227,7 +227,7 @@ def read_PIC(file):
                         int(m.group('pos')), m.group('icode'))
 
                     sb_res = struct_builder.residue
-                    sb_res.pic = PIC_Residue(sb_res, m.group('ndx'))
+                    sb_res.pic = PIC_Residue(sb_res)
                     # print('res id:', m.groupdict())
                     # print(report_PIC(struct_builder.get_structure()))
                 else:
@@ -1508,6 +1508,11 @@ class PIC_Residue(object):
     NCaCKey : List tuples of AtomKeys
         List of tuples of N, Ca, C backbone atom AtomKeys; usually only 1
         but more if backbone altlocs
+    accept_resnames : tuple
+        list of 3-letter residue names for HETATMs to accept when calculating
+        PIC results along chain.  Sidechain will be ignored, but normal
+        backbone atoms (N, CA, C, O, CB) will be included.  Currently only
+        CYG to make 4LGY contiguous; override at your own risk.
 
     Methods
     -------
@@ -1531,6 +1536,11 @@ class PIC_Residue(object):
         Convert homogeneous atom_coords to Biopython cartesian Atom coords
 
     """
+    
+    # add 3-letter residue name here for non-standard residues with
+    # normal backbone.  Currently only CYG for test case 4LGY
+    # (1305 residue contiguous chain)
+    accept_resnames = ('CYG')
 
     def __init__(self, parent, NO_ALTLOC=False):
         """Initialize PIC_Residue with parent Biopython Residue.
@@ -1581,7 +1591,7 @@ class PIC_Residue(object):
         self.rbase = rbase
         self.lc = rbase[2]
 
-        if is20AA:
+        if is20AA or rbase[2] in self.accept_resnames:
             self.NCaCKey = [(AtomKey(self, 'N'),
                              AtomKey(self, 'CA'),
                              AtomKey(self, 'C'))]
@@ -1919,8 +1929,8 @@ class PIC_Residue(object):
         AK = AtomKey
         S = self
 
-        sN, sCA, sC = AK(S, 'N'), AK(S, 'CA'), AK(S, 'C')
-        sO, sCB = AK(S, 'O'), AK(S, 'CB')
+        sN, sCA, sC, sCB = AK(S, 'N'), AK(S, 'CA'), AK(S, 'C'), AK(S, 'CB')
+        # sO, sCB = AK(S, 'O'), AK(S, 'CB')
         # sN = AtomKey(self, 'N')
 
         if self.rnext:
@@ -1985,11 +1995,12 @@ class PIC_Residue(object):
             self._gen_edra(r_edra[0:4])  # [4] is label on some table entries
 
         # sidechain hedra and dihedra
-
-        sidechain = pic_data_sidechains.get(self.lc, [])
-        for edra in sidechain:
-            r_edra = [AK(S, atom) for atom in edra]
-            self._gen_edra(r_edra[0:4])  # [4] is label on some table entries
+        if self.lc is not None:
+            sidechain = pic_data_sidechains.get(self.lc, [])
+            for edra in sidechain:
+                r_edra = [AK(S, atom) for atom in edra]
+                # [4] is label on some table entries
+                self._gen_edra(r_edra[0:4])
 
         if ('G' == self.lc and sCB not in self.atom_coords):
             # add C-beta for Gly
@@ -2042,10 +2053,14 @@ class PIC_Residue(object):
 
         :param res: Biopython Residue object reference
         """
+        segid = res.get_segid()
+        if segid == '    ':
+            segid = ''
+        else:
+            segid = ' [' + segid + ']'
         return (str(res.get_full_id())
                 + ' ' + res.resname
-                + ' [' + res.get_segid() + ']'
-                # + (' ' + str(ndx) if ndx is not None else '')
+                + segid
                 + '\n')
 
     def _write_pic_bfac(self, atm, s, col):
@@ -2230,7 +2245,8 @@ class PIC_Chain:
             # if res.id[0] == ' ':  # and not res.disordered:
             if not hasattr(res, 'pic'):
                 res.pic = PIC_Residue(res)  # , ndx)
-            if res.id[0] == ' ':  # TODO: in set of supported hetatms?
+            # res.id[0] == ' ':  # TODO: in set of supported hetatms?
+            if res.id[0] == ' ' or res.pic.rbase[2] in res.pic.accept_resnames:
                 self.ordered_aa_pic_list.append(res.pic)
                 if last_res is not None and last_ord_res == last_res:
                     # no missing or hetatm
