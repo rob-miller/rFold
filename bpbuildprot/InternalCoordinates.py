@@ -49,7 +49,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-26 15:08:51'
+__updated__ = '2019-03-27 12:34:56'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -147,13 +147,16 @@ def read_PIC(file):
         r'(?:\s+(?P<id>[1-9][0-9A-Z]{3}))?\s*$',
     )
     pdb_ttl_re = re.compile(r'^TITLE\s{5}(?P<ttl>.+)\s*$')
-    biop_id_re = re.compile(r'^\(\'(?P<pid>\w*)\',\s(?P<mdl>\d+),\s'
-                            r'\'(?P<chn>\w)\',\s\(\'(?P<het>\s|[\w-]+)'
-                            r'\',\s(?P<pos>\d+),\s\'(?P<icode>\s|\w)\'\)\)'
-                            r'\s(?P<res>[A-Z]{3})'
-                            r'\s\[(?P<segid>[a-zA-z\s]{4})\]'
-                            r'\s(?P<ndx>\d+)?'
-                            r'\s*$')
+    biop_id_re = re.compile(  # r'^\(\'(?P<pid>\w*)\',\s(?P<mdl>\d+),\s'
+        r"^\('(?P<pid>\w*)',\s(?P<mdl>\d+),\s"
+        # r'\'(?P<chn>\w)\',\s\(\'(?P<het>\s|[\w-]+)'
+        r"'(?P<chn>\w)',\s\('(?P<het>\s|[\w-]+)"
+        # r'\',\s(?P<pos>\d+),\s\'(?P<icode>\s|\w)\'\)\)'
+        r"',\s(?P<pos>\d+),\s'(?P<icode>\s|\w)'\)\)"
+        r'\s(?P<res>[A-Z]{3})'
+        r'\s\[(?P<segid>[a-zA-z\s]{4})\]'
+        r'\s(?P<ndx>\d+)?'
+        r'\s*$')
     pdb_atm_re = re.compile(r'^ATOM\s\s(?:\s*(?P<ser>\d+))\s(?P<atm>[\w\s]{4})'
                             r'(?P<alc>\w|\s)(?P<res>[A-Z]{3})\s(?P<chn>.)'
                             r'(?P<pos>[\s\-\d]{4})(?P<icode>[A-Za-z\s])\s\s\s'
@@ -591,7 +594,7 @@ class AtomKey(object):
     altloc_match(other)
         Returns True if this AtomKey matches other AtomKey excluding altloc
         and occupancy fields
-    #is_sidechain_gamma()
+    # is_sidechain_gamma()
     #    Returns True if atom name contains 'G', meaning it is gamma element
     #    of sidechain
 
@@ -686,6 +689,7 @@ class AtomKey(object):
         return self._hash
 
     _backbone_sort_keys = {'N': 0, 'CA': 1, 'C': 2, 'O': 3}
+
     _sidechain_sort_keys = {'CB': 1,
                             'CG': 2, 'CG1': 2, 'OG': 2, 'OG1': 2, 'SG': 2,
                             'CG2': 3,
@@ -700,14 +704,8 @@ class AtomKey(object):
                             'OXT': 12,
                             'H': 13
                             }
-    _proton_sort_keys = {'H1': 0, 'H2': 1, 'H3': 2, 'H': 3,
-                         'HA': 4, 'HA1': 5, 'HA2': 6,
-                         'HB': 7, 'HB2': 8, 'HB3': 9,
-                         'HG2': 10, 'HG3': 11,
-                         'HD2': 12, 'HD3': 13,
-                         'HE2': 14, 'HE3': 15,
-                         'HZ1': 16, 'HZ2': 17, 'HZ3': 18,
-                         }
+
+    _greek_sort_keys = {'A': 0, 'B': 1, 'G': 2, 'D': 3, 'E': 4, 'Z': 5, 'H': 6}
 
     def altloc_match(self, other):
         """Test AtomKey match other discounting occupancy and altloc."""
@@ -716,7 +714,7 @@ class AtomKey(object):
         else:
             return NotImplemented
 
-    #def is_sidechain_gamma(self):
+    # def is_sidechain_gamma(self):
     #    """Test atom name contains 'G', then it is sidechain gamma atom."""
     #    if 'G' in self.akl[3]:
     #        return True
@@ -756,7 +754,7 @@ class AtomKey(object):
                     return 1, 0
                 # finished backbone and backbone vs. sidechain atoms
                 # now hydrogens after sidechain
-                #s0, o0 = s[0], o[0]
+                # s0, o0 = s[0], o[0]
                 # if (s0 == 'H' and o0 != 'H'):
                 #    return 1, 0
                 # elif (s0 != 'H' and o0 == 'H'):
@@ -769,12 +767,19 @@ class AtomKey(object):
                     return 0, 1
                 elif (ss is None and os is not None):
                     return 1, 0
-                sh = self._proton_sort_keys.get(s, None)
-                oh = self._proton_sort_keys.get(o, None)
-                if (sh is not None and oh is not None):
-                    return sh, oh
-                else:
-                    return s, o  # raise exception?
+                s0, s1, o0, o1 = s[0], s[1], o[0], o[1]
+                s1d, o1d = s1.isdigit(), o1.isdigit()
+                if 'H' == s0 == o0:
+                    if (s1 == o1) or (s1d and o1d):
+                        return s, o
+                    elif s1d:
+                        return 0, 1
+                    elif o1d:
+                        return 1, 0
+                    else:
+                        return (self._greek_sort_keys[s1],
+                                self._greek_sort_keys[o1])
+                return s, o  # raise exception?
         return 1, 1
 
     def __eq__(self, other):
@@ -1596,10 +1601,14 @@ class PIC_Residue(object):
     accept_atoms = ('N', 'CA', 'C', 'O', 'H', 'CB', 'CG', 'CG1', 'OG1', 'SG',
                     'CG2', 'CD', 'CD1', 'SD', 'OD1', 'ND1', 'CD2', 'ND2', 'CE',
                     'CE1', 'NE', 'OE1', 'NE1', 'CE2', 'OE2', 'NE2', 'CE3',
-                    'CZ', 'NZ', 'CZ2', 'CZ3', 'OXT', 'H1', 'H2', 'H3', 'HA',
+                    'CZ', 'NZ', 'CZ2', 'CZ3', 'OD2', 'OH', 'CH2', 'OXT',
+                    'H1', 'H2', 'H3', 'HA', 'HA2', 'HA3',
                     'HB', 'HB1', 'HB2', 'HB3', 'HG2', 'HG3', 'HD2', 'HD3',
                     'HE2', 'HE3', 'HZ1', 'HZ2', 'HZ3', 'HG11', 'HG12', 'HG13',
-                    'HG21', 'HG22', 'HG23',
+                    'HG21', 'HG22', 'HG23', 'HZ', 'HD1', 'HE1', 'OG', 'HD11',
+                    'HD12', 'HD13', 'HG', 'HG1', 'HD21', 'HD22', 'HD23', 'NH1',
+                    'NH2', 'HE', 'HH11', 'HH12', 'HH21', 'HH22', 'HE21', 'HE22',
+                    'HE2', 'HH'
                     )
 
     @staticmethod
@@ -1661,7 +1670,7 @@ class PIC_Residue(object):
         for tpl in self.NCaCKey:
             newNCaCKey.extend(self._split_akl(tpl))
         self.NCaCKey = newNCaCKey
-        #self.NCaCKey = self._split_akl(self.NCaCKey)
+        # self.NCaCKey = self._split_akl(self.NCaCKey)
         pass
 
     def render_dihedra(self):
@@ -1739,7 +1748,7 @@ class PIC_Residue(object):
         if atomCoords is None:
             atomCoords = {}
             dlist = [self.id3_dh_index[akl] for akl in NCaCKey]
-            #dlist = self.id3_dh_index[NCaCKey]
+            # dlist = self.id3_dh_index[NCaCKey]
             for d in dlist:
                 for i, a in enumerate(d.aks):
                     atomCoords[a] = d.initial_coords[i]
@@ -1806,7 +1815,7 @@ class PIC_Residue(object):
         else:
             return atomCoords
 
-    #altloc_re = re.compile(r'-([A-Z])\Z')
+    # altloc_re = re.compile(r'-([A-Z])\Z')
 
     def _split_akl(self, lst):
         """Get AtomKeys for this residue (ak_set) given generic list of AtomKeys.
@@ -1938,36 +1947,36 @@ class PIC_Residue(object):
             self._gen_edra([nN, nCA, nC])
 
         # backbone O and C-beta hedra and dihedra within this residue
-        #self._gen_edra([sN, sCA, sC, sO])
-        #self._gen_edra([sO, sC, sCA, sCB])
+        # self._gen_edra([sN, sCA, sC, sO])
+        # self._gen_edra([sO, sC, sCA, sCB])
 
         if not self.rprev:
             self._gen_edra([sN, sCA, sC])
 
-        #self._gen_edra([sCA, sC, sO])
-        #self._gen_edra([sCB, sCA, sC])
+        # self._gen_edra([sCA, sC, sO])
+        # self._gen_edra([sCB, sCA, sC])
 
         # if res is not G or A
         # only needed for sidechain CG residues
         # (not gly or ala or any missing rest of side chain)
 
         # if 'G' != self.lc and 'A' != self.lc:  # need for CB h's
-        #if 'G' != self.lc:
-        ##    for ak in self.atom_coords:
+        # if 'G' != self.lc:
+        # for ak in self.atom_coords:
         #        if ak.is_sidechain_gamma():
         #            self._gen_edra([sN, sCA, sCB])
         #            break
 
         # terminal OXT if present
-        #sOXT = AK(S, 'OXT')
+        # sOXT = AK(S, 'OXT')
         # if sOXT in self.atom_coords:  # TODO: remove check done in gen_edra
         #    self._gen_edra([sCA, sC, sOXT])
         #    self._gen_edra([sN, sCA, sC, sOXT])
 
         # amide proton N H if present
-        #sH = AK(S, 'H')
-        #self._gen_edra([sH, sN, sCA])
-        #self._gen_edra([sC, sCA, sN, sH])
+        # sH = AK(S, 'H')
+        # self._gen_edra([sH, sN, sCA])
+        # self._gen_edra([sC, sCA, sN, sH])
 
         # standard backbone atoms independent of neighbours
         backbone = pic_data_backbone
