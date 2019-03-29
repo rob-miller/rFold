@@ -15,9 +15,11 @@ OpenSCAD code to generate STL output for printing protein structures on a
 from collections import deque, namedtuple
 import sys
 import re
+import itertools
 
 from Bio.File import as_handle
 from Bio.PDB.Polypeptide import three_to_one
+from Bio._py3k import StringIO
 
 # from Bio.PDB.Chain import Chain
 # from Bio.PDB.Residue import Residue
@@ -49,7 +51,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-03-27 17:15:24'
+__updated__ = '2019-03-29 16:59:18'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -92,17 +94,28 @@ def gen_Mtrans(xyz):
                         ], dtype=numpy.float64)
 
 
-def atom_to_internal_coordinates(struct):
+def _chn_atic(chn):
+    if not hasattr(chn, 'pic'):
+        chn.pic = PIC_Chain(chn)
+    chn.pic.dihedra_from_atoms()
+
+
+def atom_to_internal_coordinates(entity):
     """Create/update internal coordinates from Atom X,Y,Z coordinates.
 
     Internal coordinates are bond length, angle and dihedral angles.
 
-    :param Structure struct: Biopython PDB Structure object
+    :param Entity entity: Biopython PDB Entity object
     """
-    for chn in struct.get_chains():
-        if not hasattr(chn, 'pic'):
-            chn.pic = PIC_Chain(chn)
-        chn.pic.dihedra_from_atoms()
+    lev = entity.level
+    if 'A' == lev or 'R' == lev:
+        raise PDBException("Cannot generate internal coordinates for "
+                           "Residue or Atom alone")
+    elif 'C' == lev:
+        _chn_atic(entity)
+    else:
+        for chn in struct.get_chains():
+            _chn_atic(chn)
 
 
 def internal_to_atom_coordinates(struct):
@@ -152,7 +165,7 @@ def read_PIC(file):
                             r"'(?P<chn>\s|\w)',\s\('(?P<het>\s|[\w\s-]+)"
                             r"',\s(?P<pos>-?\d+),\s'(?P<icode>\s|\w)'\)\)"
                             r'\s+(?P<res>[\w]{2,3})'
-                            r'(\s\[(?P<segid>[a-zA-z\s]{4})\])?'
+                            r'(\s\[(?P<segid>[a-zA-z\s]+)\])?'
                             r'\s*$')
     pdb_atm_re = re.compile(r'^ATOM\s\s(?:\s*(?P<ser>\d+))\s(?P<atm>[\w\s]{4})'
                             r'(?P<alc>\w|\s)(?P<res>[\w]{3})\s(?P<chn>.)'
@@ -207,7 +220,7 @@ def read_PIC(file):
                 m = biop_id_re.match(aline)
                 if m:
                     # check SMCS = Structure, Model, Chain, SegID
-                    segid = m.group(8)
+                    segid = m.group(9)
                     if segid is None:
                         segid = '    '
                     this_SMCS = [m.group(1), int(m.group(2)),
@@ -294,7 +307,7 @@ def write_PIC(entity, file, pdbid=None, chainid=None):
 
     :param Entity entity: Biopython PDB Entity object: S, M, C or R
     :param Bio.File file: file name or handle
-    :param str pdbid: PDB idcode, set to 0PDB if cannot be determined
+    :param str pdbid: PDB idcode, read from entity if not supplied
     :param char chainid: PDB Chain ID, set from C level entity.id if needed
     :raises PDBException: if entity level not S, M, C, or R
     :raises Exception: if entity does not have .level attribute
@@ -311,7 +324,8 @@ def write_PIC(entity, file, pdbid=None, chainid=None):
                             chainid = chain.id
                         if not pdbid:
                             struct = chain.parent.parent
-                            pdbid = struct.header.get('idcode', '0PDB')
+                            pdbid = struct.header.get('idcode')
+
                     fp.write(entity.pic.write_PIC(pdbid, chainid))
                 else:
                     fp.write(PIC_Residue._residue_string(entity))
@@ -398,6 +412,90 @@ def report_PIC(entity, reportDict=None):
         raise Exception("write_PIC: argument is not a Biopython PDB Entity "
                         + str(entity))
     return reportDict
+
+
+def add_PIC(pdb_struct):
+    """Add PIC attribute data to input PDB Structure object."""
+    for chn in pdb_struct.get_chains():
+        chn.pic = PIC_Chain(chn)
+        chn.pic.dihedra_from_atoms()
+
+
+def PIC_duplicate(entity):
+    """Duplicate structure entity with PIC data, no atom coordinates.
+
+    Employs write_PIC(), read_PIC() with StringIO buffer.
+    Calls atom_to_internal_coordinates() if needed.
+
+    :param entity: Biopython PDB Entity
+    :returns: Biopython PDBStructure, no Atom objects
+    """
+
+    sp = StringIO()
+    hasInternalCoords = False
+    for res in entity.get_residues():
+        if hasattr(res, 'pic'):
+            if len(res.pic.hedra) > 0:
+                hasInternalCoords = True
+                break
+    if not hasInternalCoords:
+        atom_to_internal_coordinates(entity)
+
+    write_PIC(entity, sp)
+    sp.seek(0)
+    return read_PIC(sp)
+
+
+def compare_residues(e0, e1, verbose=False):
+    """Compare full IDs and atom coordinates for 2 Biopython PDB entities.
+
+    Skip DNA and HETATMs.
+
+    :param e0, e1: Biopython PDB Entity objects (S, M or C)
+        Structures, Models or Chains to be compared
+    :param verbose: Bool
+        whether to print mismatch info, default False
+    :returns: Dictionary
+        Result counts for Residues, Full ID match Residues, Atoms, 
+        Full ID match atoms, and Coordinate match atoms
+    """
+    cmpdict = {}
+    cmpdict['rCount'] = 0
+    cmpdict['rMatchCount'] = 0
+    cmpdict['aCount'] = 0
+    cmpdict['aCoordMatchCount'] = 0
+    cmpdict['aFullIdMatchCount'] = 0
+    for r0, r1 in itertools.zip_longest(e0.get_residues(), e1.get_residues()):
+        r0id, r0fid, r1fid = r0.id, r0.full_id, r1.full_id
+        cmpdict['rCount'] += 1
+        if r0fid == r1fid:
+            cmpdict['rMatchCount'] += 1
+        else:
+            print(r0fid)
+            print(r1fid)
+        if ' ' == r0id[0] and ' ' != r0.resname[0]:  # skip DNA for now
+            for a0, a1 in itertools.zip_longest(r0.get_atoms(),
+                                                r1.get_atoms()):
+                cmpdict['aCount'] += 1
+                if a0 is None:
+                    if verbose:
+                        print("compare atom0 is None, ", a1.get_full_id())
+                elif a1 is None:
+                    if verbose:
+                        print("compare atom1 is None, ", a0.get_full_id())
+                else:
+                    if a0.get_full_id() == a1.get_full_id():
+                        cmpdict['aFullIdMatchCount'] += 1
+                    else:
+                        print(a0.get_full_id())
+                        print(a1.get_full_id())
+                    a0c, a1c = a0.get_coord(), a1.get_coord()
+                    if numpy.allclose(a0c, a1c, rtol=1e-05, atol=1e-08):
+                        cmpdict['aCoordMatchCount'] += 1
+                    elif verbose:
+                        print('atom coords disagree:', a0c, a1c)
+
+    print(cmpdict)
 
 
 def genCBhamelryck(res):
@@ -863,7 +961,7 @@ class Edron_Base(object):
 
     edron_re = re.compile(
         # pdbid and chain id
-        r'^(?P<pdbid>\w+)\s(?P<chn>[\w|\s])\s'
+        r'^(?P<pdbid>\w+)?\s(?P<chn>[\w|\s])?\s'
         # 3 atom specifiers for hedron
         r'(?P<a1>[\w\-\.]+):(?P<a2>[\w\-\.]+):(?P<a3>[\w\-\.]+)'
         # 4th atom speicfier for dihedron
@@ -1536,7 +1634,7 @@ class PIC_Residue(object):
         Convert homogeneous atom_coords to Biopython cartesian Atom coords
 
     """
-    
+
     # add 3-letter residue name here for non-standard residues with
     # normal backbone.  Currently only CYG for test case 4LGY
     # (1305 residue contiguous chain)
@@ -1629,7 +1727,15 @@ class PIC_Residue(object):
             numpy.newaxis].transpose()
 
     def _add_atom(self, atm):
-        """Filter Biopython Atom with accept_atoms; set atom_coords, ak_set."""
+        """Filter Biopython Atom with accept_atoms; set atom_coords, ak_set.
+
+        Arbitrarily renames O' and O'' to O and OXT
+        """
+        if "O'" == atm.name:
+            atm.name = 'O'
+        if "O''" == atm.name:
+            atm.name = 'OXT'
+
         if atm.name not in self.accept_atoms:
             # print('skip:', atm.name)
             return
@@ -2054,7 +2160,7 @@ class PIC_Residue(object):
         :param res: Biopython Residue object reference
         """
         segid = res.get_segid()
-        if segid == '    ':
+        if segid.isspace() or '' == segid:
             segid = ''
         else:
             segid = ' [' + segid + ']'
@@ -2243,16 +2349,21 @@ class PIC_Chain:
         for res in self.chain.get_residues():
             # select only not hetero
             # if res.id[0] == ' ':  # and not res.disordered:
-            if not hasattr(res, 'pic'):
+            if 2 == res.is_disordered():
+                print('disordered res:', res.is_disordered(), res)
+                for r in res.child_dict:
+                    if not hasattr(r, 'pic'):
+                        r.pic = PIC_Residue(r)
+            elif not hasattr(res, 'pic'):
                 res.pic = PIC_Residue(res)  # , ndx)
-            # res.id[0] == ' ':  # TODO: in set of supported hetatms?
-            if res.id[0] == ' ' or res.pic.rbase[2] in res.pic.accept_resnames:
-                self.ordered_aa_pic_list.append(res.pic)
+            if (res.id[0] == ' '
+                    or res.pic.rbase[2] in res.pic.accept_resnames):
+                resOK = True
                 if last_res is not None and last_ord_res == last_res:
                     # no missing or hetatm
                     last_ord_res.pic.rnext = res.pic
                     res.pic.rprev = last_ord_res.pic
-                else:
+                elif all(atm in res.child_dict for atm in ('N', 'CA', 'C')):
                     # chain break, stash coords to restart
                     respos = str(res.id[1])
                     if ' ' != res.id[2]:
@@ -2263,11 +2374,17 @@ class PIC_Chain:
                         initNCaC[AtomKey(rpic, atm)] = PIC_Residue.atm241(
                             res[atm].coord)
                     self.initNCaC[respos] = initNCaC
-                last_ord_res = res
+                else:
+                    # chain start residue without N, CA, C - must skip
+                    self.ordered_aa_pic_list = self.ordered_aa_pic_list[:-1]
+                    resOK = False
+                if resOK:
+                    self.ordered_aa_pic_list.append(res.pic)
+                    last_ord_res = res
             else:
                 # print('skipping res ' + str(res.id) + ' ' + res.resname
-                #       + (' disordered'
-                #           if res.disordered else ' not disordered'))
+                #      + (' disordered'
+                #         if res.disordered else ' not disordered'))
                 pass
             last_res = res
 
