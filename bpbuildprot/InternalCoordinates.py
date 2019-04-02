@@ -46,13 +46,14 @@ except ImportError:
         "Install NumPy to build proteins from internal coordinates.")
 
 from PIC_Data import pic_data_sidechains, pic_data_backbone
+from PIC_Data import residue_atom_bond_state
 
 from Bio.PDB.PDBExceptions import PDBException
 
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-01 20:08:44'
+__updated__ = '2019-04-02 18:07:47'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -91,6 +92,18 @@ def gen_Mtrans(xyz):
     return numpy.array([[1, 0, 0, xyz[0]],
                         [0, 1, 0, xyz[1]],
                         [0, 0, 1, xyz[2]],
+                        [0, 0, 0, 1]
+                        ], dtype=numpy.float64)
+
+
+def gen_Mscale(scale):
+    """Generate a 4x4 numpy scaling matrix.
+
+    :param float scale: scale multiplier
+    """
+    return numpy.array([[scale, 0, 0, 0],
+                        [0, scale, 0, 0],
+                        [0, 0, scale, 0],
                         [0, 0, 0, 1]
                         ], dtype=numpy.float64)
 
@@ -407,6 +420,56 @@ def write_PDB(entity, file, pdbid=None, chainid=None):
                 + str(entity))
 
 
+def write_SCAD(entity, file, scale=None, pdbid=None, start=None, end=None,
+               backboneOnly=False):
+    # step one need PIC_Residue acom_coords loaded in order to scale
+    have_PIC_Atoms = False
+    if 'S' == entity.level or 'M' == entity.level:
+        for chn in entity.get_chains():
+            if not hasattr(chn, 'pic'):
+                chn.pic = PIC_Chain(chn)
+                have_PIC_Atoms = True
+    elif 'C' == entity.level:
+        if not hasattr(entity, 'pic'):
+            entity.pic = PIC_Chain(entity)
+            have_PIC_Atoms = True
+    elif 'R' == entity.level:
+        if not hasattr(entity, 'pic'):
+            entity.pic = PIC_Residue(entity)
+            have_PIC_Atoms = True
+    else:
+        raise PDBException("level not S, M. C or R: " + str(entity.level))
+
+    if not have_PIC_Atoms and scale is not None:
+        internal_to_atom_coordinates(entity)
+
+    if scale is not None:
+        scaleMtx = gen_Mscale(scale)
+        for res in entity.get_residues():
+            if hasattr(res, 'pic'):
+                res.pic.applyMtx(scaleMtx)
+
+    atom_to_internal_coordinates(entity)  # generate for scaled entity
+
+    with as_handle(file, 'w') as fp:
+        if not pdbid:
+            pdbid = entity.header.get('idcode', None)
+        if pdbid is None or '' == pdbid:
+            pdbid = '0PDB'
+        fp.write('protein = [ "' + pdbid + '", ' + str(scale) + '\n')
+        if 'S' == entity.level or 'M' == entity.level:
+            for chn in entity.get_chains():
+                fp.write(' [\n')
+                chn.pic.write_SCAD(fp, scale, start, end, backboneOnly)
+                fp.write(' ]\n')
+        elif 'C' == entity.level:
+            fp.write(' [\n')
+            entity.pic.write_SCAD(fp, scale, start, end, backboneOnly)
+            fp.write(' ]\n')
+        elif 'R' == entity.level:
+            raise NotImplementedError('Rob do residue writescad')
+
+
 def report_PIC(entity, reportDict=None):
     """Generate dict with counts of PIC data elements for each entity level.
 
@@ -479,7 +542,6 @@ def PIC_duplicate(entity):
     :param entity: Biopython PDB Entity
     :returns: Biopython PDBStructure, no Atom objects
     """
-
     sp = StringIO()
     hasInternalCoords = False
     for res in entity.get_residues():
@@ -900,7 +962,8 @@ class AtomKey(object):
                         tmp = s
                         s = o
                         o = tmp  # swap so higher occupancy comes first
-                    if s is None and o is not None:  # no insert code before named insert code
+                    if s is None and o is not None:
+                        # no insert code before named insert code
                         return 0, 1
                     elif o is None and s is not None:
                         return 1, 0
@@ -1387,18 +1450,18 @@ class Dihedron(Edron_Base):
         """
         self.dihedral1 = dangle_deg
         self.atoms_updated = False
-        
+
         # if self.atoms_updated:
-        #if self.hedron1 is not None:  # then we are updating
+        # if self.hedron1 is not None:  # then we are updating
         #    initial = list(self.initial_coords)
         #    mrz = gen_Mrot(numpy.deg2rad(dangle_deg, 'z'))
         #    # initial[3] = mrz @ self.a4_pre_rotation
         #    initial[3] = mrz.dot(self.a4_pre_rotation)
         #    self.initial_coords = tuple(initial)
         #    # self.atoms_updated = True still valid
-        #else:
+        # else:
         #    self.init_pos()
-            
+
     def get_angle(self):
         return self.dihedral1
 
@@ -1684,9 +1747,9 @@ class Hedron(Edron_Base):
         else:
             return
         self.atoms_updated = False
-         
 
-#xxx need to set update flags
+
+# xxx need to set update flags
 
 
 class PIC_Residue(object):
@@ -1754,7 +1817,14 @@ class PIC_Residue(object):
         Generate PIC format strings for this residue
     coords_to_residue() :
         Convert homogeneous atom_coords to Biopython cartesian Atom coords
-
+    pick_angle() :
+    get_angle() :
+    set_angle() :
+    pick_length() :
+    get_length() :
+    set_length():
+    applyMtx() :
+        multiply all atom_cords by passed matrix
     """
 
     # add 3-letter residue name here for non-standard residues with
@@ -1892,6 +1962,7 @@ class PIC_Residue(object):
 
     def link_dihedra(self):
         """Housekeeping after loading all residues and dihedra.
+
         - Link dihedra to this residue
         - form id3_dh_index
         - form ak_set
@@ -2387,7 +2458,11 @@ class PIC_Residue(object):
         return s
 
     def coords_to_residue(self):
-        """Convert homogeneous PIC atom coords to cartesian Atom coords."""
+        """Convert self.atom_coords to biopython Residue Atom coords.
+
+        Change homogeneous PIC_Residue atom_coords to self.residue cartesian
+        Biopython Atom coords.
+        """
         seqpos, icode = self.residue.id[1:3]
         seqpos = str(seqpos)
         spNdx, icNdx, resnNdx, atmNdx, altlocNdx, occNdx = AtomKey.fields
@@ -2530,13 +2605,13 @@ class PIC_Residue(object):
         if rval is not None:
             return rval.get_angle()
         return None
-        
+
     def set_angle(self, angle_key, v):
         rval = self.pick_angle(angle_key)
         if rval is not None:
             rval.set_angle(v)
 
-    def pick_len(self, ak_spec):
+    def pick_length(self, ak_spec):
         rlst = []
         if ':' in ak_spec:
             ak_spec = self._get_ak_tuple(ak_spec)
@@ -2546,7 +2621,7 @@ class PIC_Residue(object):
                 rlst.append(hed_val)
         return rlst, ak_spec
 
-    def get_len(self, ak_spec):
+    def get_length(self, ak_spec):
         hed_lst, ak_spec = self.pick_len(ak_spec)
         for hed in hed_lst:
             val = hed.get_length(ak_spec)
@@ -2554,10 +2629,14 @@ class PIC_Residue(object):
                 return val
         return None
 
-    def set_len(self, ak_spec, val):
+    def set_length(self, ak_spec, val):
         hed_lst, ak_spec = self.pick_len(ak_spec)
         for hed in hed_lst:
             hed.set_length(ak_spec, val)
+
+    def applyMtx(self, mtx):
+        for atmC in self.atom_coords.values():
+            atmC = mtx * atmC
 
 
 class PIC_Chain:
@@ -2760,6 +2839,56 @@ class PIC_Chain:
         """Calculate dihedrals, angles, bond lengths for Atom data."""
         for rpic in self.ordered_aa_pic_list:
             rpic.dihedra_from_atoms()
+
+    def write_SCAD(self, fp, scale, start, end, backboneOnly):
+        # generate dict for all hedra to eliminate redundant references
+        hedra = {}
+        for rpic in self.ordered_aa_pic_list:
+            respos, resicode = rpic.residue.id[1:]
+            for k, h in rpic.hedra.items():
+                hedra[k] = h
+        atomSet = set()
+        bondSet = set()
+        ndx = 0
+        hedraNdx = {}
+
+        for hk in sorted(hedra):
+            hedraNdx[hk] = ndx
+            hed = hedra[hk]
+            ndx += 1
+            fp.write('     [ ')
+            fp.write("{:9.5f}, {:9.5f}, {:9.5f}".format(hed.len1, hed.angle2, hed.len3))
+            atom_str = ''
+            atom_done_str = ''
+            for ak in hed.aks:
+                atm = ak.akl[ak.fields.atm]
+                res = ak.akl[ak.fields.resname]
+                ab_state_res = residue_atom_bond_state['X']
+                ab_state = ab_state_res.get(atm, None)
+                if ab_state is None:
+                    ab_state_res = residue_atom_bond_state.get(res, None)
+                    if ab_state_res is not None:
+                        ab_state = ab_state_res.get(atm, '')
+                    else:
+                        ab_state = ''
+                atom_str += ', "' + ab_state + '"'
+                if ak in atomSet:
+                    atom_done_str += ', 0'
+                else:
+                    atom_done_str += ', 1'
+                    atomSet.add(ak)
+            fp.write(atom_str)
+            fp.write(atom_done_str)
+            bond = []
+            bond.append(hed.aks[0].id + '-' + hed.aks[1].id)
+            bond.append(hed.aks[1].id + '-' + hed.aks[2].id)
+            for b in bond:
+                if b in bondSet:
+                    fp.write(', 0')
+                else:
+                    fp.write(', 1')
+                    bondSet.add(b)
+            fp.write(' ], // ' + str(hk) + '\n')
 
 
 # PIC  Exceptions
