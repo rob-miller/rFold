@@ -53,7 +53,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-02 18:07:47'
+__updated__ = '2019-04-04 20:51:16'
 print('ver: ' + __updated__)
 print(sys.version)
 
@@ -137,7 +137,7 @@ def atom_to_internal_coordinates(entity):
             _chn_atic(chn)
 
 
-def internal_to_atom_coordinates(struct):
+def internal_to_atom_coordinates(struct, start=False, fin=False):
     """Create/update atom coordinates from internal coordinates.
 
     :param Structure struct: Biopython PDB Structure object with .pic
@@ -145,9 +145,11 @@ def internal_to_atom_coordinates(struct):
         and dihedral angles)
     :raises Exception: if any chain does not have .pic attribute
     """
+    if start or fin:
+        print('foo')
     for chn in struct.get_chains():
         if hasattr(chn, 'pic'):
-            chn.pic.internal_to_atom_coordinates()
+            chn.pic.internal_to_atom_coordinates(start, fin)
         else:
             raise Exception(
                 'Structure %s Chain %s does not have internal coordinates set'
@@ -420,9 +422,11 @@ def write_PDB(entity, file, pdbid=None, chainid=None):
                 + str(entity))
 
 
-def write_SCAD(entity, file, scale=None, pdbid=None, start=None, end=None,
+def write_SCAD(entity, file, scale=None, pdbid=None, start=None, fin=None,
                backboneOnly=False):
     # step one need PIC_Residue acom_coords loaded in order to scale
+    if start or fin:
+        print('foo')
     have_PIC_Atoms = False
     if 'S' == entity.level or 'M' == entity.level:
         for chn in entity.get_chains():
@@ -449,25 +453,34 @@ def write_SCAD(entity, file, scale=None, pdbid=None, start=None, end=None,
             if hasattr(res, 'pic'):
                 res.pic.applyMtx(scaleMtx)
 
-    atom_to_internal_coordinates(entity)  # generate for scaled entity
+    # generate for scaled entity - hedron lengths have changed
+    atom_to_internal_coordinates(entity)
+    # clear initNCaC - want at origin, not match PDB file
+    for chn in entity.get_chains():
+        chn.pic.initNCaC = {}
+    
+    internal_to_atom_coordinates(entity, start, fin)
 
     with as_handle(file, 'w') as fp:
         if not pdbid:
             pdbid = entity.header.get('idcode', None)
         if pdbid is None or '' == pdbid:
             pdbid = '0PDB'
-        fp.write('protein = [ "' + pdbid + '", ' + str(scale) + '\n')
+        fp.write('protein = [ "' + pdbid + '", ' + str(scale) + ',\n')
+
         if 'S' == entity.level or 'M' == entity.level:
             for chn in entity.get_chains():
                 fp.write(' [\n')
-                chn.pic.write_SCAD(fp, scale, start, end, backboneOnly)
+                chn.pic.write_SCAD(fp, scale, start, fin, backboneOnly)
                 fp.write(' ]\n')
         elif 'C' == entity.level:
             fp.write(' [\n')
-            entity.pic.write_SCAD(fp, scale, start, end, backboneOnly)
+            entity.pic.write_SCAD(fp, scale, start, fin, backboneOnly)
             fp.write(' ]\n')
         elif 'R' == entity.level:
             raise NotImplementedError('Rob do residue writescad')
+
+        fp.write('\n];\n')
 
 
 def report_PIC(entity, reportDict=None):
@@ -825,13 +838,13 @@ class AtomKey(object):
 
     """
 
-    atom_re = re.compile(r'^(?P<respos>-?\d+)(?P<icode>[A-Za-z])?'
+    atom_re = re.compile(r'^(?P<resSeq>-?\d+)(?P<icode>[A-Za-z])?'
                          r'_(?P<resname>[a-zA-Z]+)_(?P<atm>[A-Za-z0-9]+)'
                          r'(?:_(?P<altloc>\w))?(?:_(?P<occ>\d\.\d?\d?))?$')
     # PDB altLoc = Character = [\w ] (any non-ctrl ASCII incl space)
     # PDB iCode = AChar = [A-Za-z]
-    fieldNames = ('respos', 'icode', 'resname', 'atm', 'altloc', 'occ')
-    fields = namedtuple('fieldsDef', 'respos, icode, resname, '
+    fieldNames = ('resSeq', 'icode', 'resname', 'atm', 'altloc', 'occ')
+    fields = namedtuple('fieldsDef', 'resSeq, icode, resname, '
                         'atm, altloc, occ')(0, 1, 2, 3, 4, 5)
 
     def __init__(self, *args, **kwargs):
@@ -842,8 +855,8 @@ class AtomKey(object):
             (<PIC_Residue>, <Atom>)       : PIC_Residue with Biopython Atom
             ([52, None, 'G', 'CA', ...])  : list of ordered data fields
             (52, None, 'G', 'CA', ...)    : multiple ordered arguments
-            ({respos: 52, icode: None, atm: 'CA', ...}) : dict with fieldNames
-            (respos: 52, icode: None, atm: 'CA', ...) : kwargs with fieldNames
+            ({resSeq: 52, icode: None, atm: 'CA', ...}) : dict with fieldNames
+            (resSeq: 52, icode: None, atm: 'CA', ...) : kwargs with fieldNames
             52_G_CA, 52B_G_CA, 52_G_CA_0.33, 52_G_CA_B_0.33  : id strings
         """
         akl = []
@@ -891,7 +904,7 @@ class AtomKey(object):
             akl[occNdx] = str(akl[occNdx])  # numeric occupancy to string
 
         # unused option:
-        # (self.respos, self.icode, self.resname, self.atm, self.occ,
+        # (self.resSeq, self.icode, self.resname, self.atm, self.occ,
         #    self.altloc) = akl
 
         self.id = '_'.join(
@@ -951,17 +964,20 @@ class AtomKey(object):
         akl_o = other.akl
         atmNdx = self.fields.atm
         occNdx = self.fields.occ
+        rsNdx = self.fields.resSeq
         for i in range(6):
             s, o = akl_s[i], akl_o[i]
             if s != o:
                 if atmNdx != i:
                     # only sorting complications at atom level, occ.
-                    # otherwise seqpos, insertion code will trigger
+                    # otherwise resSeq, insertion code will trigger
                     # before residue name
                     if occNdx == i:
-                        tmp = s
-                        s = o
+                        tmp = float(s)
+                        s = float(o)
                         o = tmp  # swap so higher occupancy comes first
+                    elif rsNdx == i:
+                        s, o = int(s), int(o)
                     if s is None and o is not None:
                         # no insert code before named insert code
                         return 0, 1
@@ -1084,6 +1100,8 @@ class Edron_Base(object):
         generate a ':'-joined string of AtomKey Ids
     gen_acs(atom_coords)
         generate tuple of atom coords for keys in self.aks
+    is_backbone()
+        Return True if all aks atoms are N, Ca, C or O
 
     """
 
@@ -1182,6 +1200,13 @@ class Edron_Base(object):
             raise MissingAtomError(
                 '%s missing coordinates for %s' % (self, estr))
         return tuple(acs)
+
+    def is_backbone(self):
+        atmNdx = AtomKey.fields.atm
+        if all(atm in ('N', 'C', 'CA', 'O', 'H')
+               for atm in (ak.akl[atmNdx] for ak in self.aks)):
+            return True
+        return False
 
     def __repr__(self):
         """Tuple of AtomKeys is default repr string."""
@@ -1830,7 +1855,7 @@ class PIC_Residue(object):
     # add 3-letter residue name here for non-standard residues with
     # normal backbone.  Currently only CYG for test case 4LGY
     # (1305 residue contiguous chain)
-    accept_resnames = ('CYG')
+    accept_resnames = ('CYG', 'YCM', )
 
     def __init__(self, parent, NO_ALTLOC=False):
         """Initialize PIC_Residue with parent Biopython Residue.
@@ -1984,9 +2009,9 @@ class PIC_Residue(object):
         newNCaCKey = []
         for tpl in self.NCaCKey:
             newNCaCKey.extend(self._split_akl(tpl))
-        self.NCaCKey = newNCaCKey
+        self.NCaCKey = tuple(newNCaCKey)
         # self.NCaCKey = self._split_akl(self.NCaCKey)
-        pass
+        # pass
 
     def render_dihedra(self):
         # TODO: check!
@@ -2009,13 +2034,27 @@ class PIC_Residue(object):
                     rpak = rp.atom_coords.get(ak, None)
                     if rpak is not None:
                         startPos[ak] = rpak
+            if 3 > len(startPos):
+                startPos = None  # interested if we hit this?
         else:
             # in theory the atom posns already added by load_structure
-            respos, icode = self.residue.id[1:]
-            # NCaCselect = str(respos) + icode
+            # resSeq, icode = self.residue.id[1:]
+            # NCaCselect = str(resSeq) + icode
             # stored in PIC_Chain object
             # NCaCselect]
-            startPos = self.residue.parent.pic.initNCaC[self.rbase]
+            startPos = self.residue.parent.pic.initNCaC.get(self.rbase, None)
+            #startPos = self.residue.parent.pic.initNCaC[self.rbase]
+        
+        if startPos is None:
+            # fallback: use N-CA-C initial coords from creating dihedral
+            startPos = {}
+            dlist0 = ([self.id3_dh_index[akl] for akl in self.NCaCKey])
+            # https://stackoverflow.com/questions/11264684/flatten-list-of-lists
+            dlist = [val for sublist in dlist0 for val in sublist]
+            # dlist = self.id3_dh_index[NCaCKey]
+            for d in dlist:
+                for i, a in enumerate(d.aks):
+                    startPos[a] = d.initial_coords[i]            
         return startPos
 
     def assemble(self, transforms=False, resetLocation=False):
@@ -2055,9 +2094,6 @@ class PIC_Residue(object):
         :param transforms: bool default False
             Option to return transformation matrices for each hedron instead
             of coordinates.
-        :param resetLocation: bool default False
-            if True then orient this residue at origin, else extend from
-            previous residue or Chain initNCaC coordinates
         :return: atomCoords for residue in protein space relative to
             acomCoordsIn OR table of transformation matrices according to
             transforms parameter
@@ -2081,16 +2117,19 @@ class PIC_Residue(object):
 
         q = deque(startLst)
 
+        # get initial coords from previous residue or PIC_Chain info
+        # or default coords
         if resetLocation:
             # use N-CA-C initial coords from creating dihedral
             atomCoords = {}
-            dlist = [self.id3_dh_index[akl] for akl in NCaCKey]
+            dlist0 = ([self.id3_dh_index[akl] for akl in NCaCKey])
+            # https://stackoverflow.com/questions/11264684/flatten-list-of-lists
+            dlist = [val for sublist in dlist0 for val in sublist]
             # dlist = self.id3_dh_index[NCaCKey]
             for d in dlist:
                 for i, a in enumerate(d.aks):
                     atomCoords[a] = d.initial_coords[i]
         else:
-            # get initial coords from previous residue or PIC_Chain info
             atomCoords = self.get_startpos()
 
 # TODO: optimise - need to check both len and not None????
@@ -2463,8 +2502,8 @@ class PIC_Residue(object):
         Change homogeneous PIC_Residue atom_coords to self.residue cartesian
         Biopython Atom coords.
         """
-        seqpos, icode = self.residue.id[1:3]
-        seqpos = str(seqpos)
+        resSeq, icode = self.residue.id[1:3]
+        resSeq = str(resSeq)
         spNdx, icNdx, resnNdx, atmNdx, altlocNdx, occNdx = AtomKey.fields
 
         Res = self.residue
@@ -2472,7 +2511,7 @@ class PIC_Residue(object):
 
         for ak in sorted(self.atom_coords):
             # print(ak)
-            if (seqpos == ak.akl[spNdx] and
+            if (resSeq == ak.akl[spNdx] and
                 ((icode == ' ' and ak.akl[icNdx] is None)
                  or icode == ak.akl[icNdx])):
 
@@ -2635,8 +2674,9 @@ class PIC_Residue(object):
             hed.set_length(ak_spec, val)
 
     def applyMtx(self, mtx):
-        for atmC in self.atom_coords.values():
-            atmC = mtx * atmC
+        for ak, ac in self.atom_coords.items():
+            # self.atom_coords[ak] = mtx @ ac
+            self.atom_coords[ak] = mtx.dot(ac)
 
 
 class PIC_Chain:
@@ -2799,16 +2839,18 @@ class PIC_Chain:
              sequence position, insert code for begin, end of subregion to
              process
         """
+        if start or fin:
+            print('foo')
         for rpic in self.ordered_aa_pic_list:
-            respos, resicode = rpic.residue.id[1:]
+            resSeq, resicode = rpic.residue.id[1:]
             go = True
             if (start and
-                (start[0] > respos or
-                    (start[0] == respos and start[1] < resicode))):
+                (start[0] > resSeq or
+                    (start[0] == resSeq and start[1] < resicode))):
                 go = False
             if (go and fin and
-                (fin[0] < respos or
-                    (fin[0] == respos and fin[1] > resicode))):
+                (fin[0] < resSeq or
+                    (fin[0] == resSeq and fin[1] > resicode))):
                 go = False
             if go:
                 rpic.atom_coords = rpic.assemble()
@@ -2828,11 +2870,13 @@ class PIC_Chain:
     # TODO: fix to allow only updating parts of structure
     # esp sidechain rotamers
 
-    def internal_to_atom_coordinates(self):
+    def internal_to_atom_coordinates(self, start=False, fin=False):
         """Complete process pic data to Residue/Atom coords."""
         # self.link_residues()
         # self.render_dihedra()
-        self.assemble_residues()
+        if start or fin:
+            print('foo')
+        self.assemble_residues(start, fin)
         self.coords_to_structure()
 
     def dihedra_from_atoms(self):
@@ -2840,11 +2884,48 @@ class PIC_Chain:
         for rpic in self.ordered_aa_pic_list:
             rpic.dihedra_from_atoms()
 
-    def write_SCAD(self, fp, scale, start, end, backboneOnly):
+    @staticmethod
+    def _write_mtx(fp, mtx):
+        fp.write('[ ')
+        rowsStarted = False
+        for row in mtx:
+            if rowsStarted:
+                fp.write(', [ ')
+            else:
+                fp.write('[ ')
+                rowsStarted = True
+            colsStarted = False
+            for col in row:
+                if colsStarted:
+                    fp.write(', ' + str(col))
+                else:
+                    fp.write(str(col))
+                    colsStarted = True
+            fp.write(' ]')  # close row
+        fp.write(' ]')
+
+    @staticmethod
+    def _writeSCAD_dihed(fp, d, transformations, hedraNdx):
+        fp.write('[ {:9.5f}, {}, {}, {}, '.format(d.dihedral1,
+                                                  hedraNdx[d.h1key], hedraNdx[d.h2key],
+                                                  (1 if d.reverse else 0)))
+        fp.write('    // {} [ {} -- {} ] {}\n'.format(d.id, d.hedron1.id,
+                                                      d.hedron2.id, ('reversed' if d.reverse else '')))
+        fp.write('        ')
+        mtx = transformations[d.id3]
+        PIC_Chain._write_mtx(fp, mtx)
+        fp.write(' ]')  # close residue array of dihedra entry
+
+    def write_SCAD(self, fp, scale, start, fin, backboneOnly):
+        fp.write('   "{}", // chain id\n'.format(self.chain.id))
+
+        fp.write('   [  //hedra\n')
+        if start or fin:
+            print('foo')
         # generate dict for all hedra to eliminate redundant references
         hedra = {}
         for rpic in self.ordered_aa_pic_list:
-            respos, resicode = rpic.residue.id[1:]
+            resSeq, resicode = rpic.residue.id[1:]
             for k, h in rpic.hedra.items():
                 hedra[k] = h
         atomSet = set()
@@ -2852,12 +2933,15 @@ class PIC_Chain:
         ndx = 0
         hedraNdx = {}
 
+        # write hedra table
+
         for hk in sorted(hedra):
             hedraNdx[hk] = ndx
             hed = hedra[hk]
             ndx += 1
             fp.write('     [ ')
-            fp.write("{:9.5f}, {:9.5f}, {:9.5f}".format(hed.len1, hed.angle2, hed.len3))
+            fp.write("{:9.5f}, {:9.5f}, {:9.5f}".format(
+                hed.len1, hed.angle2, hed.len3))
             atom_str = ''
             atom_done_str = ''
             for ak in hed.aks:
@@ -2889,6 +2973,72 @@ class PIC_Chain:
                     fp.write(', 1')
                     bondSet.add(b)
             fp.write(' ], // ' + str(hk) + '\n')
+        fp.write('   ],\n')  # end of hedra table
+
+        # write residue table
+
+        fp.write('   [  // residue array of dihedra')
+        resNdx = {}
+        dihedraNdx = {}
+        ndx = 0
+        chnStarted = False
+        for rpic in self.ordered_aa_pic_list:
+            # check start/fin
+            resNdx[rpic] = ndx
+            if chnStarted:
+                fp.write('\n     ],')
+            else:
+                chnStarted = True
+            fp.write('\n     [ // ' + str(ndx) + ' : ' + str(rpic.residue.id)
+                     + ' ' + rpic.lc + ' backbone\n')
+            ndx += 1
+            # assemble with no start position, return transform matrices
+            transformations = rpic.assemble(True, True)
+            ndx2 = 0
+            for i in range(1 if backboneOnly else 2):
+                if i == 1:
+                    fp.write(',\n       // ' + str(rpic.residue.id) +
+                             ' ' + rpic.lc + ' sidechain\n')
+                started = False
+                for dk, d in rpic.dihedra.items():
+                    if (d.h2key in hedraNdx and
+                        ((i == 0 and d.is_backbone())
+                            or (i == 1 and not d.is_backbone()))):
+                        if started:
+                            fp.write(',\n')
+                        else:
+                            started = True
+                        fp.write('      ')
+                        PIC_Chain._writeSCAD_dihed(
+                            fp, d, transformations, hedraNdx)
+                        dihedraNdx[dk] = ndx2
+                        ndx2 += 1
+        fp.write('   ],')  # end of residue entry dihedra table
+        fp.write('\n  ],\n')  # end of all dihedra table
+
+        # write chain table
+
+        fp.write('\n[  // chain - world transform for each residue\n')
+        chnStarted = False
+        for rpic in self.ordered_aa_pic_list:
+            # handle start / end
+            for NCaCKey in rpic.NCaCKey:
+                if 0 < len(rpic.rprev):
+                    for rpr in rpic.rprev:
+                        acl = [rpr.atom_coords[ak] for ak in NCaCKey]
+                        mt, mtr = coord_space(acl, True)
+                else:
+                    mtr = numpy.identity(4, dtype=numpy.float64)
+                if chnStarted:
+                    fp.write(',\n')
+                else:
+                    chnStarted = True
+                fp.write('     [ ' + str(resNdx[rpic]) +
+                         ', "' + str(rpic.residue.id[1]))
+                fp.write(rpic.lc + '",\n      ')
+                PIC_Chain._write_mtx(fp, mtr)
+                fp.write(' ]')
+        fp.write('\n   ]\n')
 
 
 # PIC  Exceptions

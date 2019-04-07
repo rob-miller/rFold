@@ -382,7 +382,7 @@ pic_data_sidechains = {
 # adding Ores between Osb and Odb for Asp and Glu, Nres between Nsb and Ndb for Arg, as PDB does not specify
 
 covalent_radii = {
-   'Csb': 0.77, 'Cres': 0.72, 'Cdb': 0.67, 'Osb': 0.67, 'Ores': 0.635, 'Odb': 0.60, 'Nsb': 0.70, 'Nres': 0.66, 'Ndb': 0.62, 'Hsb': 0.37, 'Ssb': 1.04
+    'Csb': 0.77, 'Cres': 0.72, 'Cdb': 0.67, 'Osb': 0.67, 'Ores': 0.635, 'Odb': 0.60, 'Nsb': 0.70, 'Nres': 0.66, 'Ndb': 0.62, 'Hsb': 0.37, 'Ssb': 1.04
 }
 
 # atom classes based on Heyrovska, Raji covalent radii paper
@@ -403,16 +403,15 @@ residue_atom_bond_state = {
     'W': {'CG': 'Cdb', 'CD1': 'Cdb', 'CD2': 'Cres', 'NE1': 'Nsb', 'CE2': 'Cdb', 'CE3': 'Cdb', 'CZ2': 'Cres', 'CZ3': 'Cres', 'CH2': 'Cdb'},
     'D': {'CG': 'Csb', 'OD1': 'Ores', 'OD2': 'Ores'},
     'E': {'CG': 'Csb', 'CD': 'Csb', 'OE1': 'Ores', 'OE2': 'Ores'},
-    'H': {'CG': 'Cdb', 'CD1': 'Cdb', 'ND1': 'Nsb', 'CE1': 'Cdb', 'NE2': 'Ndb'},
+    'H': {'CG': 'Cdb', 'CD2': 'Cdb', 'ND1': 'Nsb', 'CE1': 'Cdb', 'NE2': 'Ndb'},
     'K': {'CG': 'Csb', 'CD': 'Csb', 'CE': 'Csb', 'NZ': 'Nsb'},
     'R': {'CG': 'Csb', 'CD': 'Csb', 'NE': 'Nsb', 'CZ': 'Cdb', 'NH1': 'Nres', 'NH2': 'Nres'}
 }
 
 
 # atomic weights of C,O,N,H,S
-atomic_weight = { 'C': 12.0107, 'O': 15.9994, 'N': 14.0067, 'H': 1.0079, 'S': 32.065 }
+atomic_weight = {'C': 12.0107, 'O': 15.9994,
+                 'N': 14.0067, 'H': 1.0079, 'S': 32.065}
 
 # electronegativity values for C,O,N,H,S
-electronegativity = { 'C': 2.55, 'O': 3.44, 'N': 3.04, 'H': 2.20, 'S': 2.58 }
-
-
+electronegativity = {'C': 2.55, 'O': 3.44, 'N': 3.04, 'H': 2.20, 'S': 2.58}

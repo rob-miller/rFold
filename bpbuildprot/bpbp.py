@@ -14,17 +14,18 @@ import argparse
 import os
 import sys
 import re
-
+from io import StringIO
+# import itertools
 # print(sys.path)
 
 import gzip
 
 from Bio.PDB.PDBParser import PDBParser
-from Bio.PDB.PDBIO import PDBIO
 
-from InternalCoordinates import read_PIC, PIC_Chain, report_PIC
+from InternalCoordinates import read_PIC, report_PIC, compare_residues
 from InternalCoordinates import internal_to_atom_coordinates, write_PIC
-
+from InternalCoordinates import atom_to_internal_coordinates, PIC_Residue
+from InternalCoordinates import write_PDB, write_SCAD, PIC_Chain
 
 PDB_repository_base = None
 
@@ -33,6 +34,7 @@ if os.path.isdir('/media/data'):
 elif os.path.isdir('/Volumes/data'):
     PDB_repository_base = '/Volumes/data/pdb/'
 
+scale_val = 2
 
 arg_parser = argparse.ArgumentParser(
     description='Interconvert .pic (pprotein internal coordinates) and '
@@ -49,17 +51,53 @@ arg_parser.add_argument(
     help='a Dunbrack cullPDB pdb ID list to read from {0} as .ent.gz'
          .format((PDB_repository_base or '[PDB resource not defined - '
                   'please configure before use]')))
-arg_parser.add_argument('-wp', help='write pdb file with .pypdb extension',
+arg_parser.add_argument('-wp', help='write pdb file with .PyPDB extension',
                         action="store_true")
-arg_parser.add_argument('-wi', help='write pic file with .pypdb extension',
+arg_parser.add_argument('-wi', help='write pic file with .PyPIC extension',
                         action="store_true")
-arg_parser.add_argument('-ct', help='test conversion supplied pdb/pic to ',
+arg_parser.add_argument('-ws', help='write OpenSCAD file with .scad extension',
+                        action="store_true")
+arg_parser.add_argument('-scale', dest='scale',
+                        help='scale for OpenSCAD output default ' + str(scale_val))
+arg_parser.add_argument('-maxp', dest='maxp',
+                        help='max n-C peptide bond length for chain breaks, default ' + str(PIC_Chain.MaxPeptideBond))
+arg_parser.add_argument('-start', dest='start_val',
+                        help='first residue to process')
+arg_parser.add_argument('-end', dest='end_val',
+                        help='last residue to process')
+arg_parser.add_argument('-backbone',
+                        help='skip sidechains',
+                        action="store_true")
+arg_parser.add_argument('-t', help='test conversion pdb/pic to pic/pdb',
+                        action="store_true")
+arg_parser.add_argument('-tv', help='verbose test conversion pdb<>pic',
+                        action="store_true")
+arg_parser.add_argument('-nh', help='ignore hydrogens on PDB read',
+                        action="store_true")
+arg_parser.add_argument('-amide',
+                        help='only amide proton, skip other Hs on PDB read',
+                        action="store_true")
+arg_parser.add_argument('-gcb',
+                        help='generate GLY C-beta atoms',
+                        action="store_true")
+arg_parser.add_argument('-rama',
+                        help='print psi, phi, omega values',
                         action="store_true")
 
 args = arg_parser.parse_args()
 
-
 print(args)
+
+if args.nh:
+    PIC_Residue.accept_atoms = PIC_Residue.accept_backbone
+if args.amide:
+    PIC_Residue.accept_atoms = PIC_Residue.accept_backbone + ('H',)
+if args.gcb:
+    PIC_Residue.gly_Cbeta = True
+if args.maxp:
+    PIC_Chain.MaxPeptideBond = float(args.maxp)
+if args.scale:
+    scale_val = args.scale
 
 toProcess = args.file
 pdbidre = re.compile(r'(^\d(\w\w)\w)(\w)?$')
@@ -82,7 +120,7 @@ else:
     print("no files to process. use '-h' for help")
     sys.exit(0)
 
-PDB_parser = PDBParser(PERMISSIVE=False, QUIET=False)
+PDB_parser = PDBParser(PERMISSIVE=True, QUIET=False)
 
 for target in toProcess:
     pdb_input = False
@@ -143,24 +181,70 @@ for target in toProcess:
     #    for res in pdb_chain.get_residues():   # pdb_structure.get_residues():
     #        print(res.get_full_id(), res.resname,
     #              'disordered' if res.disordered else '')
-        for chn in pdb_structure.get_chains():
-            chn.pic = PIC_Chain(chn)
-            chn.pic.dihedra_from_atoms()
     else:
         print('parsed pic input ', filename)
         print(report_PIC(pdb_structure))
-        internal_to_atom_coordinates(pdb_structure)
 
     # print(pdb_structure.header['idcode'], pdb_chain.id, ':',
     #      pdb_structure.header['head'])
 
     if args.wp:
-        io = PDBIO()
-        io.set_structure(pdb_structure)
-        io.save(target + '.PyPDB')
+        if pic_input:
+            internal_to_atom_coordinates(pdb_structure)
+        write_PDB(pdb_structure, target + '.PyPDB')
         print('wrote pdb output for', target)
 
     if args.wi:
+        if pdb_input:
+            # add_PIC(pdb_structure)
+            atom_to_internal_coordinates(pdb_structure)
         write_PIC(pdb_structure, target + '.PyPIC')
         print('wrote pic output for', target)
+
+    if args.t or args.tv:
+        sp = StringIO()
+        if pdb_input:
+            atom_to_internal_coordinates(pdb_structure)
+            write_PIC(pdb_structure, sp)
+            sp.seek(0)
+            pdb2 = read_PIC(sp)
+            print(report_PIC(pdb2))
+            internal_to_atom_coordinates(pdb2)
+            compare_residues(pdb_structure, pdb2, verbose=args.tv)
+        elif pic_input:
+            internal_to_atom_coordinates(pdb_structure)
+            write_PDB(pdb_structure, sp)
+            sp.seek(0)
+            pdb2 = PDB_parser.get_structure(prot_id, sp)
+            atom_to_internal_coordinates(pdb2)
+            sp2 = StringIO()
+            write_PIC(pdb2, sp2)
+            sp2.seek(0)
+            inf = open(filename, 'r')
+            lineCount = 0
+            matchCount = 0
+            diffCount = 0
+            # for line1, line2 in itertools.zip_longest(inf, sp2):
+            for line1, line2 in zip(inf, sp2):
+                lineCount += 1
+                if line1 == line2:
+                    matchCount += 1
+                else:
+                    diffCount += 1
+                    if args.tv:
+                        print(line1, '!=', line2)
+            print(lineCount, matchCount, diffCount)
+    if args.rama:
+        if pdb_input:
+            atom_to_internal_coordinates(pdb_structure)
+        for r in pdb_structure.get_residues():
+            # print(r.pic.get_dihedral('N:CA:C:O'))
+            print(r, r.pic.get_angle('psi'), r.pic.get_angle('phi'),
+                  r.pic.get_angle('omg'), r.pic.get_angle('chi2'),
+                  r.pic.get_length('0C:1N'))
+
+    if args.ws:
+        write_SCAD(pdb_structure, target + '.scad', scale_val, pdbid=prot_id,
+                   backboneOnly=args.backbone)
+
 print('normal termination')
