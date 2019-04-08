@@ -253,6 +253,8 @@ pic_data_sidechains = {
         ('CG', 'CD2', 'CE2', 'CZ2'),
         ('CE2', 'CZ2', 'CH2'),
         ('CD2', 'CE2', 'CZ2', 'CH2'),
+        ('CE2', 'CZ2', 'HZ2'),
+        ('CD2', 'CE2', 'CZ2', 'HZ2'),
         ('CG', 'CD2', 'CE3'),
         ('CB', 'CG', 'CD2', 'CE3'),
         ('CD2', 'CE3', 'CZ3'),

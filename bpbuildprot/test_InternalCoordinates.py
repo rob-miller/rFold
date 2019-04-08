@@ -41,6 +41,8 @@ class test_InternalCoordinates(unittest.TestCase):
         self.assertGreater(ak2.id, ak.id, msg='gt sort test')
         # self.assertEqual(1, 1)
 
+    def test_Hstruct(self):
+        
 
 # if __name__ == '__main__':
 #    runner = unittest.TextTestRunner(verbosity=2)
