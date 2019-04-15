@@ -22,23 +22,25 @@ import gzip
 
 from Bio.PDB.PDBParser import PDBParser
 
-from InternalCoordinates import read_PIC, report_PIC, compare_residues
-from InternalCoordinates import internal_to_atom_coordinates, write_PIC
-from InternalCoordinates import atom_to_internal_coordinates, PIC_Residue
-from InternalCoordinates import write_PDB, write_SCAD, PIC_Chain
+from Bio.PDB.pic import read_PIC, report_PIC, compare_residues
+from Bio.PDB.pic import internal_to_atom_coordinates, write_PIC
+from Bio.PDB.pic import atom_to_internal_coordinates, PIC_Residue
+from Bio.PDB.pic import write_PDB, write_SCAD, PIC_Chain
 
 PDB_repository_base = None
 
-if os.path.isdir('/media/data'):
+if os.path.isdir('/media/data/pdb'):
     PDB_repository_base = '/media/data/pdb/'
-elif os.path.isdir('/Volumes/data'):
+elif os.path.isdir('/Volumes/data/pdb'):
     PDB_repository_base = '/Volumes/data/pdb/'
+
 
 scale_val = 2
 
 arg_parser = argparse.ArgumentParser(
     description='Interconvert .pic (pprotein internal coordinates) and '
-                '.pdb (protein data bank) files.')
+                '.pdb (protein data bank) files.  Please note that output'
+                'file is written to same dir as input file read from.')
 arg_parser.add_argument(
     'file', nargs='*',
     help='a .pdb or .pic path/filename to read (first model, first chain), '
@@ -51,6 +53,10 @@ arg_parser.add_argument(
     help='a Dunbrack cullPDB pdb ID list to read from {0} as .ent.gz'
          .format((PDB_repository_base or '[PDB resource not defined - '
                   'please configure before use]')))
+arg_parser.add_argument('-skip', dest='skip_count',
+                        help='count of pdb ID list entries to skip')
+arg_parser.add_argument('-limit', dest='limit_count',
+                        help='stop after this many pdb ID list entries')
 arg_parser.add_argument('-wp', help='write pdb file with .PyPDB extension',
                         action="store_true")
 arg_parser.add_argument('-wi', help='write pic file with .PyPIC extension',
@@ -58,15 +64,13 @@ arg_parser.add_argument('-wi', help='write pic file with .PyPIC extension',
 arg_parser.add_argument('-ws', help='write OpenSCAD file with .scad extension',
                         action="store_true")
 arg_parser.add_argument('-scale', dest='scale',
-                        help='scale for OpenSCAD output default ' + str(scale_val))
+                        help='OpenSCAD output: units (usually mm) per '
+                        'angstrom, default ' + str(scale_val))
 arg_parser.add_argument('-maxp', dest='maxp',
-                        help='max n-C peptide bond length for chain breaks, default ' + str(PIC_Chain.MaxPeptideBond))
-arg_parser.add_argument('-start', dest='start_val',
-                        help='first residue to process')
-arg_parser.add_argument('-end', dest='end_val',
-                        help='last residue to process')
+                        help='max N-C peptide bond length for chain breaks,'
+                        'default ' + str(PIC_Chain.MaxPeptideBond))
 arg_parser.add_argument('-backbone',
-                        help='skip sidechains',
+                        help='OpenSCAD output: skip sidechains',
                         action="store_true")
 arg_parser.add_argument('-t', help='test conversion pdb/pic to pic/pdb',
                         action="store_true")
@@ -86,7 +90,7 @@ arg_parser.add_argument('-rama',
 
 args = arg_parser.parse_args()
 
-print(args)
+# print(args)
 
 if args.nh:
     PIC_Residue.accept_atoms = PIC_Residue.accept_backbone
@@ -98,6 +102,10 @@ if args.maxp:
     PIC_Chain.MaxPeptideBond = float(args.maxp)
 if args.scale:
     scale_val = args.scale
+if args.skip_count:
+    args.skip_count = int(args.skip_count)
+if args.limit_count:
+    args.limit_count = int(args.limit_count)
 
 toProcess = args.file
 pdbidre = re.compile(r'(^\d(\w\w)\w)(\w)?$')
@@ -120,9 +128,18 @@ else:
     print("no files to process. use '-h' for help")
     sys.exit(0)
 
-PDB_parser = PDBParser(PERMISSIVE=True, QUIET=False)
+PDB_parser = PDBParser(PERMISSIVE=False, QUIET=True)
+
+fileNo = 1
 
 for target in toProcess:
+    if args.skip_count and fileNo <= args.skip_count:
+        fileNo += 1
+        continue
+    if args.limit_count is not None:
+        if args.limit_count <= 0:
+            sys.exit(0)
+        args.limit_count -= 1
     pdb_input = False
     pic_input = False
     pdb_structure = None
@@ -156,10 +173,14 @@ for target in toProcess:
 
     if pdb_structure is None:
         pdb_input = True
-        pdb_structure = PDB_parser.get_structure(
-            prot_id,
-            gzip.open(filename, mode='rt')
-            if filename.endswith('.gz') else filename)
+        try:
+            pdb_structure = PDB_parser.get_structure(
+                prot_id,
+                gzip.open(filename, mode='rt')
+                if filename.endswith('.gz') else filename)
+        except FileNotFoundError:
+            print(filename, "not found")
+            continue
 
     # get specified chain if given, else just pick first for now
     # count atoms to detect pic file if don't know already
@@ -177,16 +198,22 @@ for target in toProcess:
             continue
 
     if pdb_input:
-        print('parsed pdb input', prot_id, filename)
+        print(fileNo, 'parsed pdb input', prot_id, filename)
+        # print('header:', pdb_structure.header.get('head', 'NONE'))
+        # print('idcode:', pdb_structure.header.get('idcode', 'NONE'))
+        # print('deposition date:', pdb_structure.header.get(
+        #    'deposition_date', 'NONE'))
     #    for res in pdb_chain.get_residues():   # pdb_structure.get_residues():
     #        print(res.get_full_id(), res.resname,
     #              'disordered' if res.disordered else '')
     else:
-        print('parsed pic input ', filename)
-        print(report_PIC(pdb_structure))
+        print(fileNo, 'parsed pic input ', filename)
+        report_PIC(pdb_structure, verbose=True)
 
     # print(pdb_structure.header['idcode'], pdb_chain.id, ':',
     #      pdb_structure.header['head'])
+
+    fileNo += 1
 
     if args.wp:
         if pic_input:
@@ -204,13 +231,20 @@ for target in toProcess:
     if args.t or args.tv:
         sp = StringIO()
         if pdb_input:
-            atom_to_internal_coordinates(pdb_structure)
-            write_PIC(pdb_structure, sp)
-            sp.seek(0)
-            pdb2 = read_PIC(sp)
-            print(report_PIC(pdb2))
-            internal_to_atom_coordinates(pdb2)
-            compare_residues(pdb_structure, pdb2, verbose=args.tv)
+            try:
+                atom_to_internal_coordinates(pdb_structure)
+                write_PIC(pdb_structure, sp)
+                sp.seek(0)
+                pdb2 = read_PIC(sp)
+                if args.tv:
+                    report_PIC(pdb2, verbose=True)
+                internal_to_atom_coordinates(pdb2)
+                r = compare_residues(pdb_structure, pdb2, verbose=args.tv)
+                if args.t:
+                    print(r)
+            except Exception as e:
+                print('FAIL:', e)
+
         elif pic_input:
             internal_to_atom_coordinates(pdb_structure)
             write_PDB(pdb_structure, sp)
