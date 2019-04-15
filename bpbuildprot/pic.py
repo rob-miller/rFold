@@ -1,8 +1,11 @@
 #!/usr/local/bin/python3
-"""Interconversion between PDB atom and internal coordinates.
+"""PIC: Protein Internal Coordinates.
+
+Interconversion between PDB atom and internal coordinates.
 
 Atom coordinates are cartesian X, Y, Z coordinates as specified in a PDB file.
 Internal coordinates are dihedral angles, bond angles and bond lengths.
+
 These routines compute internal coordinates from atom coordinates, read/write
 them as files, and regenerate PDB atom coordinate files from internal
 coordinates.  Also supported is writing PDB internal coordinate data as
@@ -45,17 +48,17 @@ except ImportError:
     raise MissingPythonDependencyError(
         "Install NumPy to build proteins from internal coordinates.")
 
-from PIC_Data import pic_data_sidechains, pic_data_backbone
-from PIC_Data import residue_atom_bond_state
+from Bio.PDB.pic_data import pic_data_sidechains, pic_data_backbone
+from Bio.PDB.pic_data import residue_atom_bond_state
 
 from Bio.PDB.PDBExceptions import PDBException
 
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-08 19:52:36'
-print('ver: ' + __updated__)
-print(sys.version)
+__updated__ = '2019-04-09 14:27:47'
+# print('ver: ' + __updated__)
+# print(sys.version)
 
 
 def gen_Mrot(angle_rads, axis):
@@ -176,7 +179,7 @@ def read_PIC(file):
     pdb_hdr_re = re.compile(
         r'^HEADER\s{4}(?P<cf>.{1,40})'
         r'(?:\s+(?P<dd>\d\d\d\d-\d\d-\d\d|\d\d-\w\w\w-\d\d))?'
-        r'(?:\s+(?P<id>[1-9][0-9A-Z]{3}))?\s*$',
+        r'(?:\s+(?P<id>[0-9A-Z]{4}))?\s*$',
     )
     # ^\('(?P<pid>\w*)',\s(?P<mdl>\d+),\s'(?P<chn>\w)',\s\('(?P<het>\s|[\w-]+)',\s(?P<pos>\d+),\s'(?P<icode>\s|\w)'\)\)\s(?P<res>[A-Z]{3})\s(\[(?P<segid>[a-zA-z\s]{4})\])?\s*$
     pdb_ttl_re = re.compile(r'^TITLE\s{5}(?P<ttl>.+)\s*$')
@@ -425,10 +428,10 @@ def write_PDB(entity, file, pdbid=None, chainid=None):
 
 
 def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
-               backboneOnly=False):
+               backboneOnly=False, includeCode=True):
     """Write hedron assembly to file as OpenSCAD matrices.
 
-    Output format is primarily:
+    Output data format is primarily:
         matrix for each hedron: len1, angle2, len3, atom covalent bond class,
             flags toindicate atom/bond represented in previous hedron (OpenSCAD
             very slow for overlapping elements)
@@ -446,8 +449,12 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
     :param pdbid: str
         PDB idcode, written in output. Defaults to '0PDB' if not supplied
         and no 'idcode' set in entity
-    :param backboneOnly: bool
-        Do not outputside chain data if True
+    :param backboneOnly: bool default False
+        Do not output side chain data if True
+    :param includeCode: bool default True
+        Include Bio/PDB/peptide.scad so output file can be loaded into
+        OpenSCAD; if False, output data matrices only
+
     """
     # step one need PIC_Residue acom_coords loaded in order to scale
     have_PIC_Atoms = False
@@ -468,6 +475,7 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
         raise PDBException("level not S, M. C or R: " + str(entity.level))
 
     if not have_PIC_Atoms and scale is not None:
+        # if loaded pic file and need to scale, generate atom coords
         internal_to_atom_coordinates(entity)
 
     if scale is not None:
@@ -476,8 +484,10 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
             if hasattr(res, 'pic'):
                 res.pic.applyMtx(scaleMtx)
 
-    # generate for scaled entity - hedron lengths have changed
-    atom_to_internal_coordinates(entity)
+        # generate internal coords for scaled entity
+        # -- hedron bond lengths have changed
+        atom_to_internal_coordinates(entity)
+
     # clear initNCaC - want at origin, not match PDB file
     for chn in entity.get_chains():
         chn.pic.initNCaC = {}
@@ -485,7 +495,15 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
     internal_to_atom_coordinates(entity)
 
     with as_handle(file, 'w') as fp:
-        if not pdbid:
+
+        if includeCode:
+            fp.write('$fn=20;\nchain(protein);\n')
+            codeFile = re.sub(r"pic.py\Z", "peptide.scad", __file__)
+            with as_handle(codeFile, 'r') as cf:
+                for line in cf.readlines():
+                    fp.write(line)
+
+        if not pdbid and hasattr(entity, 'header'):
             pdbid = entity.header.get('idcode', None)
         if pdbid is None or '' == pdbid:
             pdbid = '0PDB'
@@ -710,8 +728,9 @@ def compare_residues(e0, e1, verbose=False):
                       cmpdict['aCount'],
                       cmpdict['disAtmCount'],
                       'ALL OK' if allOk else 'ERRORS'))
-    else:
-        print(cmpdict)
+    # else:
+    #    print(cmpdict)
+    return cmpdict
 
 
 def genCBhamelryck(res):
@@ -731,7 +750,7 @@ def genCBhamelryck(res):
     n = n - ca
     c = c - ca
     # find rotation matrix that rotates n -120 degrees along the ca-c vector
-    rot = rotaxis2m(-math.pi*120.0/180.0, c)
+    rot = rotaxis2m(-math.pi * 120.0 / 180.0, c)
     # apply rotation to ca-n vector
     cb_at_origin = n.left_multiply(rot)
     # put on top of ca atom
@@ -800,9 +819,9 @@ def get_spherical_coordinates(xyz):
     if 0 == r:
         return numpy.array([0, 0, 0])
     sign = -1.0 if xyz[1][0] < 0.0 else 1.0
-    theta = ((math.pi/2.0 * sign) if 0 == xyz[0][0]
+    theta = ((math.pi / 2.0 * sign) if 0 == xyz[0][0]
              else numpy.arctan2(xyz[1][0], xyz[0][0]))
-    phi = numpy.arccos(xyz[2][0]/r)
+    phi = numpy.arccos(xyz[2][0] / r)
     return (r, theta, phi)
 
 
@@ -856,7 +875,7 @@ def coord_space(acs, rev=False):
     # need theta of translated a0
     # sc2 = get_spherical_coordinates(p)
     sign = -1.0 if (p[1][0] < 0.0) else 1.0
-    theta2 = ((math.pi/2.0 * sign) if 0 == p[0][0]
+    theta2 = ((math.pi / 2.0 * sign) if 0 == p[0][0]
               else numpy.arctan2(p[1][0], p[0][0]))
     # rotate a0 -theta2 about Z to align with X
     mrz2 = gen_Mrot(-theta2, 'z')
@@ -1582,24 +1601,24 @@ class Dihedron(Edron_Base):
         a2 = acs[2].squeeze()
         a3 = acs[3].squeeze()
 
-        a0a1 = numpy.linalg.norm(a0-a1)
-        a1a2 = numpy.linalg.norm(a1-a2)
-        a2a3 = numpy.linalg.norm(a2-a3)
+        a0a1 = numpy.linalg.norm(a0 - a1)
+        a1a2 = numpy.linalg.norm(a1 - a2)
+        a2a3 = numpy.linalg.norm(a2 - a3)
 
-        a0a2 = numpy.linalg.norm(a0-a2)
-        a1a3 = numpy.linalg.norm(a1-a3)
+        a0a2 = numpy.linalg.norm(a0 - a2)
+        a1a3 = numpy.linalg.norm(a1 - a3)
 
         sqr_a1a2 = a1a2 * a1a2
 
         a0a1a2 = numpy.rad2deg(
             numpy.arccos(
-                ((a0a1*a0a1) + sqr_a1a2 - (a0a2*a0a2)) / (2*a0a1*a1a2)
+                ((a0a1 * a0a1) + sqr_a1a2 - (a0a2 * a0a2)) / (2 * a0a1 * a1a2)
             )
         )
 
         a1a2a3 = numpy.rad2deg(
             numpy.arccos(
-                (sqr_a1a2 + (a2a3*a2a3) - (a1a3*a1a3)) / (2*a1a2*a2a3)
+                (sqr_a1a2 + (a2a3 * a2a3) - (a1a3 * a1a3)) / (2 * a1a2 * a2a3)
             )
         )
 
@@ -1802,14 +1821,14 @@ class Hedron(Edron_Base):
         a1 = acs[1].squeeze()
         a2 = acs[2].squeeze()
 
-        a0a1 = numpy.linalg.norm(a0-a1)
-        a1a2 = numpy.linalg.norm(a1-a2)
+        a0a1 = numpy.linalg.norm(a0 - a1)
+        a1a2 = numpy.linalg.norm(a1 - a2)
 
-        a0a2 = numpy.linalg.norm(a0-a2)
+        a0a2 = numpy.linalg.norm(a0 - a2)
 
         a0a1a2 = numpy.rad2deg(
             numpy.arccos(
-                ((a0a1*a0a1) + (a1a2*a1a2) - (a0a2*a0a2)) / (2*a0a1*a1a2)
+                ((a0a1 * a0a1) + (a1a2 * a1a2) - (a0a2 * a0a2)) / (2 * a0a1 * a1a2)
             )
         )
         return a0a1, a0a1a2, a1a2
