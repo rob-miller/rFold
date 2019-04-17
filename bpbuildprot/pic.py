@@ -16,7 +16,7 @@ OpenSCAD code to generate STL output for printing protein structures on a
 # from Bio import PDB
 
 from collections import deque, namedtuple
-import sys
+# import sys
 import re
 import itertools
 
@@ -48,15 +48,15 @@ except ImportError:
     raise MissingPythonDependencyError(
         "Install NumPy to build proteins from internal coordinates.")
 
-from Bio.PDB.pic_data import pic_data_sidechains, pic_data_backbone
-from Bio.PDB.pic_data import residue_atom_bond_state
+from pic_data import pic_data_sidechains, pic_data_backbone
+from pic_data import residue_atom_bond_state
 
 from Bio.PDB.PDBExceptions import PDBException
 
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-09 14:27:47'
+__updated__ = '2019-04-17 08:49:38'
 # print('ver: ' + __updated__)
 # print(sys.version)
 
@@ -155,6 +155,28 @@ def internal_to_atom_coordinates(struct):
             raise Exception(
                 'Structure %s Chain %s does not have internal coordinates set'
                 % (struct, chn))
+
+
+def structure_rebuild_test(pdb_structure, verbose=False):
+    """Test rebuild PDB structure from internal coordinates.
+
+    :param pdb_structure: Biopython Structure
+        Structure to test
+    :param verbose: bool
+        print extra messages
+    :return: dict
+        comparison dict from compare_residues()
+    """
+    sp = StringIO()
+    atom_to_internal_coordinates(pdb_structure)
+    write_PIC(pdb_structure, sp)
+    sp.seek(0)
+    pdb2 = read_PIC(sp)
+    if verbose:
+        report_PIC(pdb2, verbose=True)
+    internal_to_atom_coordinates(pdb2)
+    r = compare_residues(pdb_structure, pdb2, verbose=verbose)
+    return r
 
 
 def read_PIC(file):
@@ -589,8 +611,9 @@ def report_PIC(entity, reportDict=None, verbose=False):
     if verbose:
         print("{} : {} models {} chains {} residue objects "
               "{} residues with {} dihedra {} hedra"
-              .format(reportDict['idcode'], reportDict['mdl'], reportDict['chn'],
-                      reportDict['res'], reportDict['res_e'], reportDict['dih'],
+              .format(reportDict['idcode'], reportDict['mdl'],
+                      reportDict['chn'], reportDict['res'],
+                      reportDict['res_e'], reportDict['dih'],
                       reportDict['hed'])
               )
 
@@ -634,18 +657,19 @@ def _cmp_atm(r0, r1, a0, a1, verbose, cmpdict):
     cmpdict['aCount'] += 1
     if a0 is None:
         if verbose:
-            print(r1.get_full_id(), a0.id, "atom0 is None, a1 is",
-                  a1.get_full_id())
+            print(r1.get_full_id(), "None !=",
+                  a1.get_full_id(), a1.parent.resname)
     elif a1 is None:
         if verbose:
-            print(r0.get_full_id(), a0.id, "atom1 is None, a0 is",
-                  a0.get_full_id())
+            print(r0.get_full_id(),
+                  a0.get_full_id(), a0.parent.resname,
+                  "!= None")
     else:
         if a0.get_full_id() == a1.get_full_id():
             cmpdict['aFullIdMatchCount'] += 1
         elif verbose:
-            print(r0.get_full_id(), a0.get_full_id,
-                  '!=', a1.get_full_id())
+            print(r0.get_full_id(), a0.get_full_id(),
+                  a0.parent.resname, '!=', a1.get_full_id())
         a0c = a0.get_coord()
         a1c = a1.get_coord()
         if numpy.allclose(a0c, a1c, rtol=1e-05, atol=1e-08):
@@ -667,7 +691,13 @@ def _cmp_res(r0, r1, verbose, cmpdict):
         longer = r0 if len(r0.child_dict) >= len(r1.child_dict) else r1
         for ak in longer.child_dict:
             a0 = r0.child_dict.get(ak, None)
+            if a0 is None:
+                aknd = re.sub('D', 'H', ak, count=1)
+                a0 = r0.child_dict.get(aknd, None)
             a1 = r1.child_dict.get(ak, None)
+            if a1 is None:
+                aknd = re.sub('D', 'H', ak, count=1)
+                a1 = r1.child_dict.get(aknd, None)
             if (a0 is None or a1 is None
                     or 0 == a0.is_disordered() == a1.is_disordered()):
                 _cmp_atm(r0, r1, a0, a1, verbose, cmpdict)
@@ -695,7 +725,8 @@ def compare_residues(e0, e1, verbose=False):
         whether to print mismatch info, default False
     :returns: Dictionary
         Result counts for Residues, Full ID match Residues, Atoms,
-        Full ID match atoms, and Coordinate match atoms
+        Full ID match atoms, and Coordinate match atoms; report string;
+        error status (bool)
     """
     cmpdict = {}
     cmpdict['rCount'] = 0
@@ -704,6 +735,11 @@ def compare_residues(e0, e1, verbose=False):
     cmpdict['disAtmCount'] = 0
     cmpdict['aCoordMatchCount'] = 0
     cmpdict['aFullIdMatchCount'] = 0
+    cmpdict['id0'] = e0.get_full_id()
+    cmpdict['id1'] = e1.get_full_id()
+    cmpdict['pass'] = None
+    cmpdict['report'] = None
+
     for r0, r1 in itertools.zip_longest(e0.get_residues(), e1.get_residues()):
         if 2 == r0.is_disordered() == r1.is_disordered():
             for dr0, dr1 in itertools.zip_longest(r0.child_dict.values(),
@@ -711,25 +747,33 @@ def compare_residues(e0, e1, verbose=False):
                 _cmp_res(dr0, dr1, verbose, cmpdict)
         else:
             _cmp_res(r0, r1, verbose, cmpdict)
-    if verbose:
-        if (cmpdict['rMatchCount'] == cmpdict['rCount']
-            and cmpdict['aCoordMatchCount'] == cmpdict['aCount']
-                and cmpdict['aFullIdMatchCount'] == cmpdict['aCount']):
-            allOk = True
-        else:
-            allOk = False
 
-        print("{} of {} residue IDs match; {} atom coords, {} full IDs of {} "
-              "atoms ({} disordered) match : {}"
-              .format(cmpdict['rMatchCount'],
-                      cmpdict['rCount'],
-                      cmpdict['aCoordMatchCount'],
-                      cmpdict['aFullIdMatchCount'],
-                      cmpdict['aCount'],
-                      cmpdict['disAtmCount'],
-                      'ALL OK' if allOk else 'ERRORS'))
-    # else:
-    #    print(cmpdict)
+    if (cmpdict['rMatchCount'] == cmpdict['rCount']
+        and cmpdict['aCoordMatchCount'] == cmpdict['aCount']
+            and cmpdict['aFullIdMatchCount'] == cmpdict['aCount']):
+        cmpdict['pass'] = True
+    else:
+        cmpdict['pass'] = False
+
+    rstr = ("{}:{} -- {} of {} residue IDs match; {} atom coords, {} full "
+            "IDs of {} atoms ({} disordered) match : {}"
+            .format(cmpdict['id0'], cmpdict['id1'],
+                    cmpdict['rMatchCount'],
+                    cmpdict['rCount'],
+                    cmpdict['aCoordMatchCount'],
+                    cmpdict['aFullIdMatchCount'],
+                    cmpdict['aCount'],
+                    cmpdict['disAtmCount'],
+                    'ERROR' if not cmpdict['pass'] else 'ALL OK'))
+    if not cmpdict['pass']:
+        if cmpdict['rMatchCount'] != cmpdict['rCount']:
+            rstr += ' -RESIDUE IDS-'
+        if cmpdict['aCoordMatchCount'] != cmpdict['aFullIdMatchCount']:
+            rstr += ' -COORDINATES-'
+        if cmpdict['aFullIdMatchCount'] != cmpdict['aCount']:
+            rstr += ' -ATOM IDS-'
+    cmpdict['report'] = rstr
+
     return cmpdict
 
 
@@ -923,6 +967,8 @@ class AtomKey(object):
         '_'-joined AtomKey fields, excluding 'None' fields
     atom_re : compiled regex (Class Attribute)
         A compiled regular expression matching the string form of the key
+    d2h : bool
+        Convert D atoms to H on input
 
     Methods
     -------
@@ -943,6 +989,7 @@ class AtomKey(object):
     fieldNames = ('resSeq', 'icode', 'resname', 'atm', 'altloc', 'occ')
     fields = namedtuple('fieldsDef', 'resSeq, icode, resname, '
                         'atm, altloc, occ')(0, 1, 2, 3, 4, 5)
+    d2h = False
 
     def __init__(self, *args, **kwargs):
         """Initialize AtomKey with residue and atom data.
@@ -1000,9 +1047,14 @@ class AtomKey(object):
         if akl[occNdx] is not None:
             akl[occNdx] = str(akl[occNdx])  # numeric occupancy to string
 
-        # unused option:
-        # (self.resSeq, self.icode, self.resname, self.atm, self.occ,
-        #    self.altloc) = akl
+        if self.d2h:
+            atmNdx = self.fields.atm
+            if akl[atmNdx][0] == 'D':
+                akl[atmNdx] = re.sub('D', 'H', akl[atmNdx], count=1)
+
+            # unused option:
+            # (self.resSeq, self.icode, self.resname, self.atm, self.occ,
+            #    self.altloc) = akl
 
         self.id = '_'.join(
             [''.join(filter(None, akl[:2])),
@@ -1828,7 +1880,8 @@ class Hedron(Edron_Base):
 
         a0a1a2 = numpy.rad2deg(
             numpy.arccos(
-                ((a0a1 * a0a1) + (a1a2 * a1a2) - (a0a2 * a0a2)) / (2 * a0a1 * a1a2)
+                ((a0a1 * a0a1) + (a1a2 * a1a2)
+                 - (a0a2 * a0a2)) / (2 * a0a1 * a1a2)
             )
         )
         return a0a1, a0a1a2, a1a2
@@ -1908,6 +1961,9 @@ class PIC_Residue(object):
     NCaCKey : List tuples of AtomKeys
         List of tuples of N, Ca, C backbone atom AtomKeys; usually only 1
         but more if backbone altlocs
+    is20AA : bool
+        True if residue is one of 20 standard amino acids, based on
+        Residue resname
     accept_atoms : tuple
         list of PDB atom names to use when generatiing internal coordinates.
         Default is:
@@ -2002,7 +2058,7 @@ class PIC_Residue(object):
             self.alt_ids = None
         else:
             self.alt_ids = []
-        is20AA = True
+        self.is20AA = True
         rid = parent.id
         rbase = [rid[1],
                  rid[2] if ' ' != rid[2] else None,
@@ -2010,12 +2066,12 @@ class PIC_Residue(object):
         try:
             rbase[2] = three_to_one(rbase[2]).upper()
         except KeyError:
-            is20AA = False
+            self.is20AA = False
 
         self.rbase = tuple(rbase)
         self.lc = rbase[2]
 
-        if is20AA or rbase[2] in self.accept_resnames:
+        if self.is20AA or rbase[2] in self.accept_resnames:
             # self.NCaCKey = []
             self.NCaCKey = [(AtomKey(self, 'N'),
                              AtomKey(self, 'CA'),
@@ -2033,7 +2089,7 @@ class PIC_Residue(object):
 
             # print(self.atom_coords)
 
-    accept_backbone = ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CG1', 'OG1',
+    accept_backbone = ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CG1', 'OG1', 'OG',
                        'SG', 'CG2', 'CD', 'CD1', 'SD', 'OD1', 'ND1', 'CD2',
                        'ND2', 'CE', 'CE1', 'NE', 'OE1', 'NE1', 'CE2', 'OE2',
                        'NE2', 'CE3', 'CZ', 'NZ', 'CZ2', 'CZ3', 'OD2', 'OH',
@@ -2042,11 +2098,19 @@ class PIC_Residue(object):
     accept_hydrogens = ('H', 'H1', 'H2', 'H3', 'HA', 'HA2', 'HA3', 'HB', 'HB1',
                         'HB2', 'HB3', 'HG2', 'HG3', 'HD2', 'HD3', 'HE2',
                         'HE3', 'HZ1', 'HZ2', 'HZ3', 'HG11', 'HG12', 'HG13',
-                        'HG21', 'HG22', 'HG23', 'HZ', 'HD1', 'HE1', 'OG',
+                        'HG21', 'HG22', 'HG23', 'HZ', 'HD1', 'HE1',
                         'HD11', 'HD12', 'HD13', 'HG', 'HG1', 'HD21', 'HD22',
                         'HD23', 'NH1', 'NH2', 'HE', 'HH11', 'HH12', 'HH21',
                         'HH22', 'HE21', 'HE22', 'HE2', 'HH', 'HH2'
                         )
+    accept_deuteriums = ('D', 'D1', 'D2', 'D3', 'DA', 'DA2', 'DA3', 'DB',
+                         'DB1', 'DB2', 'DB3', 'DG2', 'DG3', 'DD2', 'DD3',
+                         'DE2', 'DE3', 'DZ1', 'DZ2', 'DZ3', 'DG11', 'DG12',
+                         'DG13', 'DG21', 'DG22', 'DG23', 'DZ', 'DD1',
+                         'DE1', 'DD11', 'DD12', 'DD13', 'DG', 'DG1', 'DD21',
+                         'DD22', 'DD23', 'ND1', 'ND2', 'DE', 'DH11', 'DH12',
+                         'DH21', 'DH22', 'DE21', 'DE22', 'DE2', 'DH', 'DH2'
+                         )
     accept_atoms = accept_backbone + accept_hydrogens
 
     gly_Cbeta = False
@@ -2899,14 +2963,20 @@ class PIC_Chain:
 
         # both biopython Resdiues have Atoms, so check distance
         Natom = curr.child_dict.get('N', None)
-        Catom = prev.child_dict.get('C', None)
-        if Natom is None or Catom is None:
+        pCatom = prev.child_dict.get('C', None)
+        if Natom is None or pCatom is None:
+            return False
+
+        # confirm previous residue has all backbone atoms
+        pCAatom = prev.child_dict.get('CA', None)
+        pNatom = prev.child_dict.get('N', None)
+        if pNatom is None or pCAatom is None:
             return False
 
         if Natom.is_disordered():
             Natom = Natom.selected_child
-        if Catom.is_disordered():
-            Catom = Catom.selected_child
+        if pCatom.is_disordered():
+            pCatom = pCatom.selected_child
         diff = curr['N'].coord - prev['C'].coord
         sum = 0
         for axis in diff:
@@ -2921,7 +2991,7 @@ class PIC_Chain:
         """Set rprev, rnext, determine chain break."""
         if not hasattr(res, 'pic'):
             res.pic = PIC_Residue(res)
-        if (res.id[0] == ' '
+        if (res.pic.is20AA
                 or res.pic.rbase[2] in res.pic.accept_resnames):
             if (0 < len(last_res) and last_ord_res == last_res
                     and self._peptide_check(last_ord_res[0].residue, res)):

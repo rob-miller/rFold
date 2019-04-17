@@ -19,13 +19,14 @@ from io import StringIO
 # print(sys.path)
 
 import gzip
+import warnings
 
 from Bio.PDB.PDBParser import PDBParser
 
-from Bio.PDB.pic import read_PIC, report_PIC, compare_residues
-from Bio.PDB.pic import internal_to_atom_coordinates, write_PIC
-from Bio.PDB.pic import atom_to_internal_coordinates, PIC_Residue
-from Bio.PDB.pic import write_PDB, write_SCAD, PIC_Chain
+from pic import read_PIC, report_PIC, structure_rebuild_test
+from pic import internal_to_atom_coordinates, write_PIC
+from pic import atom_to_internal_coordinates, PIC_Residue
+from pic import write_PDB, write_SCAD, PIC_Chain, AtomKey
 
 PDB_repository_base = None
 
@@ -39,8 +40,7 @@ scale_val = 2
 
 arg_parser = argparse.ArgumentParser(
     description='Interconvert .pic (pprotein internal coordinates) and '
-                '.pdb (protein data bank) files.  Please note that output'
-                'file is written to same dir as input file read from.')
+                '.pdb (protein data bank) files.')
 arg_parser.add_argument(
     'file', nargs='*',
     help='a .pdb or .pic path/filename to read (first model, first chain), '
@@ -78,6 +78,8 @@ arg_parser.add_argument('-tv', help='verbose test conversion pdb<>pic',
                         action="store_true")
 arg_parser.add_argument('-nh', help='ignore hydrogens on PDB read',
                         action="store_true")
+arg_parser.add_argument('-dok', help='accept D (deuterium) for H on PDB read',
+                        action="store_true")
 arg_parser.add_argument('-amide',
                         help='only amide proton, skip other Hs on PDB read',
                         action="store_true")
@@ -96,6 +98,9 @@ if args.nh:
     PIC_Residue.accept_atoms = PIC_Residue.accept_backbone
 if args.amide:
     PIC_Residue.accept_atoms = PIC_Residue.accept_backbone + ('H',)
+if args.dok:
+    PIC_Residue.accept_atoms += PIC_Residue.accept_deuteriums
+    AtomKey.d2h = True
 if args.gcb:
     PIC_Residue.gly_Cbeta = True
 if args.maxp:
@@ -128,7 +133,7 @@ else:
     print("no files to process. use '-h' for help")
     sys.exit(0)
 
-PDB_parser = PDBParser(PERMISSIVE=False, QUIET=True)
+PDB_parser = PDBParser(PERMISSIVE=True, QUIET=True)
 
 fileNo = 1
 
@@ -145,6 +150,7 @@ for target in toProcess:
     pdb_structure = None
     # pdb_chain = None
     prot_id = ''
+    outfile = os.path.basename(target)
 
     pdbidMatch = pdbidre.match(target)
     if pdbidMatch is not None:
@@ -198,7 +204,8 @@ for target in toProcess:
             continue
 
     if pdb_input:
-        print(fileNo, 'parsed pdb input', prot_id, filename)
+        if not args.t:
+            print(fileNo, 'parsed pdb input', prot_id, filename)
         # print('header:', pdb_structure.header.get('head', 'NONE'))
         # print('idcode:', pdb_structure.header.get('idcode', 'NONE'))
         # print('deposition date:', pdb_structure.header.get(
@@ -213,37 +220,34 @@ for target in toProcess:
     # print(pdb_structure.header['idcode'], pdb_chain.id, ':',
     #      pdb_structure.header['head'])
 
-    fileNo += 1
-
     if args.wp:
         if pic_input:
             internal_to_atom_coordinates(pdb_structure)
-        write_PDB(pdb_structure, target + '.PyPDB')
-        print('wrote pdb output for', target)
+        write_PDB(pdb_structure, outfile + '.PyPDB')
+        print('wrote pdb output for', outfile)
 
     if args.wi:
         if pdb_input:
             # add_PIC(pdb_structure)
             atom_to_internal_coordinates(pdb_structure)
-        write_PIC(pdb_structure, target + '.PyPIC')
-        print('wrote pic output for', target)
+        write_PIC(pdb_structure, outfile + '.PyPIC')
+        print('wrote pic output for', outfile)
 
     if args.t or args.tv:
         sp = StringIO()
         if pdb_input:
-            try:
-                atom_to_internal_coordinates(pdb_structure)
-                write_PIC(pdb_structure, sp)
-                sp.seek(0)
-                pdb2 = read_PIC(sp)
-                if args.tv:
-                    report_PIC(pdb2, verbose=True)
-                internal_to_atom_coordinates(pdb2)
-                r = compare_residues(pdb_structure, pdb2, verbose=args.tv)
-                if args.t:
-                    print(r)
-            except Exception as e:
-                print('FAIL:', e)
+            with warnings.catch_warnings(record=True) as w:
+                # warnings.simplefilter("error")
+                try:
+                    r = structure_rebuild_test(pdb_structure, args.tv)
+                    warns = (len(w) > 0)
+                    if args.tv and warns:
+                        for wrn in w:
+                            print(wrn.message)
+                    print(prot_id, fileNo, r['report'],
+                          ('WARNINGS' if warns else ''))
+                except Exception as e:
+                    print(prot_id, fileNo, 'ERROR FAIL:', type(e), e)
 
         elif pic_input:
             internal_to_atom_coordinates(pdb_structure)
@@ -280,5 +284,7 @@ for target in toProcess:
     if args.ws:
         write_SCAD(pdb_structure, target + '.scad', scale_val, pdbid=prot_id,
                    backboneOnly=args.backbone)
+
+    fileNo += 1
 
 print('normal termination')

@@ -379,35 +379,45 @@ pic_data_sidechains = {
 # for naming of individual atoms
 
 
-# covalent radii from Heyrovska, Raji : 'Atomic Structures of all the Twenty Essential Amino Acids and a Tripeptide, with Bond Lengths as Sums of Atomic Covalent Radii'
+# covalent radii from Heyrovska, Raji : 'Atomic Structures of all the Twenty 
+# Essential Amino Acids and a Tripeptide, with Bond Lengths as Sums of Atomic 
+# Covalent Radii'
 # https://arxiv.org/pdf/0804.2488.pdf
-# adding Ores between Osb and Odb for Asp and Glu, Nres between Nsb and Ndb for Arg, as PDB does not specify
+# adding Ores between Osb and Odb for Asp and Glu, Nres between Nsb and Ndb
+# for Arg, as PDB does not specify
 
 covalent_radii = {
-    'Csb': 0.77, 'Cres': 0.72, 'Cdb': 0.67, 'Osb': 0.67, 'Ores': 0.635, 'Odb': 0.60, 'Nsb': 0.70, 'Nres': 0.66, 'Ndb': 0.62, 'Hsb': 0.37, 'Ssb': 1.04
+    'Csb': 0.77, 'Cres': 0.72, 'Cdb': 0.67, 'Osb': 0.67, 'Ores': 0.635,
+    'Odb': 0.60, 'Nsb': 0.70, 'Nres': 0.66, 'Ndb': 0.62, 'Hsb': 0.37,
+    'Ssb': 1.04
 }
 
 # atom classes based on Heyrovska, Raji covalent radii paper
 residue_atom_bond_state = {
-    'X': {'N': 'Nsb', 'CA': 'Csb', 'C': 'Cdb', 'O': 'Odb', 'OXT': 'Osb', 'CB': 'Csb', 'H': 'Hsb'},
+    'X': {'N': 'Nsb', 'CA': 'Csb', 'C': 'Cdb', 'O': 'Odb', 'OXT': 'Osb',
+          'CB': 'Csb', 'H': 'Hsb'},
     'V': {'CG1': 'Csb', 'CG2': 'Csb'},
     'L': {'CG': 'Csb', 'CD1': 'Csb', 'CD2': 'Csb'},
     'I': {'CG1': 'Csb', 'CG2': 'Csb', 'CD1': 'Csb'},
     'M': {'CG': 'Csb', 'SD': 'Ssb', 'CE': 'Csb'},
-    'F': {'CG': 'Cdb', 'CD1': 'Cres', 'CD2': 'Cres', 'CE1': 'Cdb', 'CE2': 'Cdb', 'CZ': 'Cres'},
+    'F': {'CG': 'Cdb', 'CD1': 'Cres', 'CD2': 'Cres', 'CE1': 'Cdb',
+          'CE2': 'Cdb', 'CZ': 'Cres'},
     'P': {'CG': 'Csb'},
     'S': {'OG': 'Osb'},
     'T': {'OG1': 'Osb', 'CG2': 'Csb'},
     'C': {'SG': 'Ssb'},
     'N': {'CG': 'Csb', 'OD1': 'Odb', 'ND2': 'Ndb'},
     'Q': {'CG': 'Csb', 'CD': 'Csb', 'OE1': 'Odb', 'NE2': 'Ndb'},
-    'Y': {'CG': 'Cdb', 'CD1': 'Cres', 'CD2': 'Cres', 'CE1': 'Cdb', 'CE2': 'Cdb', 'CZ': 'Cres', 'OH': 'Osb'},
-    'W': {'CG': 'Cdb', 'CD1': 'Cdb', 'CD2': 'Cres', 'NE1': 'Nsb', 'CE2': 'Cdb', 'CE3': 'Cdb', 'CZ2': 'Cres', 'CZ3': 'Cres', 'CH2': 'Cdb'},
+    'Y': {'CG': 'Cdb', 'CD1': 'Cres', 'CD2': 'Cres', 'CE1': 'Cdb',
+          'CE2': 'Cdb', 'CZ': 'Cres', 'OH': 'Osb'},
+    'W': {'CG': 'Cdb', 'CD1': 'Cdb', 'CD2': 'Cres', 'NE1': 'Nsb', 'CE2': 'Cdb',
+          'CE3': 'Cdb', 'CZ2': 'Cres', 'CZ3': 'Cres', 'CH2': 'Cdb'},
     'D': {'CG': 'Csb', 'OD1': 'Ores', 'OD2': 'Ores'},
     'E': {'CG': 'Csb', 'CD': 'Csb', 'OE1': 'Ores', 'OE2': 'Ores'},
     'H': {'CG': 'Cdb', 'CD2': 'Cdb', 'ND1': 'Nsb', 'CE1': 'Cdb', 'NE2': 'Ndb'},
     'K': {'CG': 'Csb', 'CD': 'Csb', 'CE': 'Csb', 'NZ': 'Nsb'},
-    'R': {'CG': 'Csb', 'CD': 'Csb', 'NE': 'Nsb', 'CZ': 'Cdb', 'NH1': 'Nres', 'NH2': 'Nres'}
+    'R': {'CG': 'Csb', 'CD': 'Csb', 'NE': 'Nsb', 'CZ': 'Cdb', 'NH1': 'Nres',
+          'NH2': 'Nres'}
 }
 
 
