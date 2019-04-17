@@ -928,6 +928,7 @@ function Chain:writeSCAD(scale,range,backboneOnly)
          local akl = r:NCaCKeySplit()
 
          if r['prev'] and r['prev']['ordered'] then
+            -- print('call coordSpace for ' .. r['resn'] .. r['res'])
             local atomCoords = r['prev']['atomCoords'] -- r['atomCoords'] -- r['prev']['atomCoords'] -- ... no difference ?????
             mt, mtr = geom3d.coordSpace( atomCoords[akl[1]], atomCoords[akl[2]], atomCoords[akl[3]], true ) -- get transforms to, from coord space of NCaC for this residue in world coords
          else

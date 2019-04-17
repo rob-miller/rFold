@@ -38,10 +38,10 @@ local utils = require 'rfold.utils'
 local chain = require 'rfold.chain'
 local chemdata = require 'rfold.chemdata'
 
-local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
-rfpg.dbReconnect(1)
+--local rfpg = require 'rfold.rfPostgresql'  -- autocommit false by default
+--rfpg.dbReconnect(1)
 
-local scaleDefault=10.0
+local scaleDefault=2.0 --10.0
 --datafileDefault='rFold.scad'
 
 local args = parsers.parseCmdLine(
@@ -140,7 +140,7 @@ for i,arg in ipairs(toProcess) do
       prot:internalToAtomCoords()
       
       --print('loaded:')
-      -- print(prot:tostring())
+      --print(prot:tostring())
 
       local scadData =  prot:writeSCAD(scale,(args['r'] and args['r'][1] or nil), (args['b'] and args['b'] or nil))
 

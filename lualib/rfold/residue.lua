@@ -846,9 +846,9 @@ function Residue:assemble( atomCoordsIn, genSCAD )
       if dihedra then
          for di, d in ipairs(dihedra) do
             if d['initialCoords'][4] then  -- (skip incomplete dihedron if don't have 4th atom due to missing input data)
-               --print('assemble: ' .. h1k .. ' -> ' .. d['key'])
                local dh2key = d['hedron2']['key']
                local akl = { d[1], d[2], d[3], d[4] }  -- utils.splitKey( d['key'] )
+               --print('assemble: ' .. h1k .. ' -> ' .. d['key'] .. ' h2key= ' .. dh2key)
                if atomCoords[akl[1]]
                   and atomCoords[akl[2]]
                   and atomCoords[akl[3]]
@@ -863,6 +863,8 @@ function Residue:assemble( atomCoordsIn, genSCAD )
                then
                   local mt, mtr = geom3d.coordSpace( atomCoords[akl[1]], atomCoords[akl[2]], atomCoords[akl[3]], true ) -- get transforms to take 1st hedron to dihedron coordinate space and back
                   atomCoords[akl[4]] = mtr * d['initialCoords'][4]  -- apply back transform to 4th atom's dihedron space coordinates
+                  --print('  initialCoords[4]= ' .. d['initialCoords'][4]:transpose():pretty())
+                  --print('  acak4= ' .. atomCoords[akl[4]]:transpose():pretty())
                   if genSCAD then
                      --print(h1k, mtr:transpose():pretty())
                      transformations[h1k] = mtr

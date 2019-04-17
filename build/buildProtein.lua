@@ -103,6 +103,8 @@ for i,arg in ipairs(toProcess) do
 
       prot:setStartCoords()            -- copy first residue N, CA, C coordinates from input data to each chain residue 1 initCoords list
 
+      -- print('countDihedra: ' .. prot:countDihedra())
+      
       if prot:countDihedra() > 0 then  -- did read internal coordinates (pic format data), so generate PDB
 
          --prot:setStartCoords()               -- copy residue 1 N, CA, C coordinates from input data to each chain residue 1 initCoords list

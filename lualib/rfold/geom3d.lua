@@ -226,7 +226,8 @@ function geom3d.coordSpace(a1,a2,a3, r)
    -- return transform matrix 
    -- a's need to be 4x1 matrices
    -- if r then also generate reverse transformation matrix to bring back 
-
+   
+   --print('enter coordspace\n')
    local dbg=nil
    if dbg then
       print(a1:transpose():pretty())
