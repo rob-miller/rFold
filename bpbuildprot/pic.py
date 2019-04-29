@@ -1,4 +1,9 @@
-#!/usr/local/bin/python3
+# Copyright 2019 by Robert T. Miller.  All rights reserved.
+# This file is part of the Biopython distribution and governed by your
+# choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
+# Please see the LICENSE file that should have been included as part of this
+# package.
+
 """PIC: Protein Internal Coordinates.
 
 Interconversion between PDB atom and internal coordinates.
@@ -49,14 +54,14 @@ except ImportError:
         "Install NumPy to build proteins from internal coordinates.")
 
 from pic_data import pic_data_sidechains, pic_data_backbone
-from pic_data import residue_atom_bond_state
+from pic_data import residue_atom_bond_state, pic_data_sidechain_extras
 
 from Bio.PDB.PDBExceptions import PDBException
 
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-17 08:49:38'
+__updated__ = '2019-04-29 15:41:39'
 # print('ver: ' + __updated__)
 # print(sys.version)
 
@@ -111,18 +116,20 @@ def gen_Mscale(scale):
                         ], dtype=numpy.float64)
 
 
-def _chn_atic(chn):
+def _chn_atic(chn, allBonds=False):
     if not hasattr(chn, 'pic'):
         chn.pic = PIC_Chain(chn)
-    chn.pic.dihedra_from_atoms()
+    chn.pic.dihedra_from_atoms(allBonds)
 
 
-def atom_to_internal_coordinates(entity):
+def atom_to_internal_coordinates(entity, allBonds=False):
     """Create/update internal coordinates from Atom X,Y,Z coordinates.
 
     Internal coordinates are bond length, angle and dihedral angles.
 
     :param Entity entity: Biopython PDB Entity object
+    :param allBonds bool: default False
+        include hedra and dihedra to close sidechain rings
     """
     lev = entity.level
     if 'A' == lev:
@@ -132,12 +139,12 @@ def atom_to_internal_coordinates(entity):
         # works better at chain level but leave option here
         if not hasattr(entity, 'pic'):
             entity.pic = PIC_Residue(entity)
-        entity.pic.dihedra_from_atoms()
+        entity.pic.dihedra_from_atoms(allBonds)
     elif 'C' == lev:
-        _chn_atic(entity)
+        _chn_atic(entity, allBonds)
     else:
         for chn in entity.get_chains():
-            _chn_atic(chn)
+            _chn_atic(chn, allBonds)
 
 
 def internal_to_atom_coordinates(struct):
@@ -478,7 +485,7 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
         OpenSCAD; if False, output data matrices only
 
     """
-    # step one need PIC_Residue acom_coords loaded in order to scale
+    # step one need PIC_Residue atom_coords loaded in order to scale
     have_PIC_Atoms = False
     if 'S' == entity.level or 'M' == entity.level:
         for chn in entity.get_chains():
@@ -505,10 +512,14 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
         for res in entity.get_residues():
             if hasattr(res, 'pic'):
                 res.pic.applyMtx(scaleMtx)
+                if res.pic.gly_Cbeta:
+                    res.pic.scale = scale
 
-        # generate internal coords for scaled entity
-        # -- hedron bond lengths have changed
-        atom_to_internal_coordinates(entity)
+    # generate internal coords for scaled entity
+    # -- hedron bond lengths have changed
+    # if not scaling, still need to generate internal coordinate
+    # bonds for ring sidechains
+    atom_to_internal_coordinates(entity, allBonds=True)
 
     # clear initNCaC - want at origin, not match PDB file
     for chn in entity.get_chains():
@@ -518,6 +529,7 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
 
     with as_handle(file, 'w') as fp:
 
+        fp.write('protein_scale=' + str(scale) + ';\n')
         if includeCode:
             fp.write('$fn=20;\nchain(protein);\n')
             codeFile = re.sub(r"pic.py\Z", "peptide.scad", __file__)
@@ -529,7 +541,7 @@ def write_SCAD(entity, file, scale=None, handle='protein', pdbid=None,
             pdbid = entity.header.get('idcode', None)
         if pdbid is None or '' == pdbid:
             pdbid = '0PDB'
-        fp.write('protein = [ "' + pdbid + '", ' + str(scale) + ',\n')
+        fp.write('protein = [ "' + pdbid + '", protein_scale,\n')
 
         if 'S' == entity.level or 'M' == entity.level:
             for chn in entity.get_chains():
@@ -1981,10 +1993,11 @@ class PIC_Residue(object):
         sidechain, add appropriate entries to pic_data_sidechains in
         PIC_Data.py
     gly_Cbeta : bool default False
-        override class variable to True to generate glycine CB atoms
-        by Hazes and Dijkstra method when generating atoms from internal
-        coordinates:
+        override class variable to True to generate internal coordinates for
+        glycine CB atoms in dihedra_from_atoms().
           PIC_Residue.gly_Cbeta = True
+    scale : optional float
+        added for OpenSCAD output, required to generate gly_Cbeta
 
     Methods
     -------
@@ -2479,7 +2492,7 @@ class PIC_Residue(object):
             if len(nlst) == lenLst:
                 dct[tuple(nlst)] = obj(nlst)
 
-    def dihedra_from_atoms(self):
+    def dihedra_from_atoms(self, allBonds=False):
         """Create hedra and dihedra for atom coordinates."""
         AK = AtomKey
         S = self
@@ -2544,16 +2557,21 @@ class PIC_Residue(object):
         # self._gen_edra([sH, sN, sCA])
         # self._gen_edra([sC, sCA, sN, sH])
 
-        if (self.gly_Cbeta and 'G' == self.lc and sCB not in self.atom_coords):
-            # add C-beta for Gly
-            cb = numpy.append(genCBjones(self.residue), [1])
-            self.atom_coords[sCB] = numpy.array(cb, dtype=numpy.float64)[
-                numpy.newaxis].transpose()
+        # if (self.gly_Cbeta and 'G' == self.lc and sCB not in self.atom_coords):
+        #    # add C-beta for Gly
+        #    sO = AK(S, 'O')
+        #    self.atom_coords[sCB] = None
+        #    self._gen_edra([sCB, sCA, sC])
+        #    self._gen_edra([sO, sC, sCA, sCB])
+
+            #cb = numpy.append(genCBjones(self.residue), [1])
+            # self.atom_coords[sCB] = numpy.array(cb, dtype=numpy.float64)[
+            #    numpy.newaxis].transpose()
             # rest is just to print bfactor in pic file so testing works well
-            ac = self.atom_coords[sCB]
-            ac = ac[:3].transpose()[0]
-            newAtom = Atom('CB', ac, 0.0, 1.00, ' ', 'CB', 0, 'C')
-            self.residue.add(newAtom)
+            #ac = self.atom_coords[sCB]
+            #ac = ac[:3].transpose()[0]
+            #newAtom = Atom('CB', ac, 0.0, 1.00, ' ', 'CB', 0, 'C')
+            # self.residue.add(newAtom)
 
         # standard backbone atoms independent of neighbours
         backbone = pic_data_backbone
@@ -2568,6 +2586,11 @@ class PIC_Residue(object):
                 r_edra = [AK(S, atom) for atom in edra]
                 # [4] is label on some table entries
                 self._gen_edra(r_edra[0:4])
+            if allBonds:
+                sidechain = pic_data_sidechain_extras.get(self.lc, [])
+                for edra in sidechain:
+                    r_edra = [AK(S, atom) for atom in edra]
+                    self._gen_edra(r_edra[0:4])
 
         # testing C-beta generation against Ala:
         # if 'A' == self.lc:
@@ -2589,6 +2612,28 @@ class PIC_Residue(object):
             if h.len1 is None:
                 # print(h)
                 h.hedron_from_atoms(self.atom_coords)
+
+        if (self.gly_Cbeta and 'G' == self.lc
+                and sCB not in self.atom_coords):
+            # add C-beta for Gly
+            sO = AK(S, 'O')
+            self.atom_coords[sCB] = None  # so _gen_edra will complete
+            htpl = (sCB, sCA, sC)
+            self._gen_edra(htpl)
+            h = self.hedra[htpl]
+            h.len3 = self.hedra[(sN, sCA, sC)].len3
+            # TODO: databse work to generate constants
+            h.angle2 = 112.81236
+            h.len1 = 1.53908 * (self.scale if hasattr(self, 'scale') else 1.0)
+            dtpl = (sO, sC, sCA, sCB)
+            self._gen_edra(dtpl)
+            d = self.dihedra[dtpl]
+            d.pic_residue = self
+            d._set_hedra()
+            d.dihedral1 = 121.51471
+            del self.atom_coords[sCB]  # remove None so now must populate
+
+        print('hello')
 
     @staticmethod
     def _pdb_atom_string(atm):
@@ -3108,10 +3153,10 @@ class PIC_Chain:
         self.assemble_residues()
         self.coords_to_structure()
 
-    def dihedra_from_atoms(self):
+    def dihedra_from_atoms(self, allBonds=False):
         """Calculate dihedrals, angles, bond lengths for Atom data."""
         for rpic in self.ordered_aa_pic_list:
-            rpic.dihedra_from_atoms()
+            rpic.dihedra_from_atoms(allBonds)
 
     @staticmethod
     def _write_mtx(fp, mtx):
@@ -3181,9 +3226,11 @@ class PIC_Chain:
             for ak in hed.aks:
                 atm = ak.akl[ak.fields.atm]
                 res = ak.akl[ak.fields.resname]
+                # try first for generic backbone/Cbeta atoms
                 ab_state_res = residue_atom_bond_state['X']
                 ab_state = ab_state_res.get(atm, None)
                 if ab_state is None:
+                    # not found above, must be sidechain atom
                     ab_state_res = residue_atom_bond_state.get(res, None)
                     if ab_state_res is not None:
                         ab_state = ab_state_res.get(atm, '')
