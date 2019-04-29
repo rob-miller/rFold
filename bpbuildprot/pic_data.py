@@ -1,5 +1,13 @@
-# per residue sidechain hedra and dihedra definitions, in order of output for
-# internal coordinates specification file
+# Copyright 2019 by Robert T. Miller.  All rights reserved.
+# This file is part of the Biopython distribution and governed by your
+# choice of the "Biopython License Agreement" or the "BSD 3-Clause License".
+# Please see the LICENSE file that should have been included as part of this
+# package.
+
+"""Per residue sidechain hedra and dihedra definitions.
+
+Listed in order of output for internal coordinates (.pic) specification file
+"""
 
 pic_data_backbone = (
     ('N', 'CA', 'C', 'O'),   # locate backbone O
@@ -10,12 +18,12 @@ pic_data_backbone = (
     ('N', 'CA', 'C', 'OXT'),
     ('H', 'N', 'CA'),        # amide proton if present
     ('C', 'CA', 'N', 'H'),
-    ('HA', 'N', 'CA'),       # CA proton
-    ('C', 'CA', 'N', 'HA'),
-    ('HA2', 'N', 'CA'),      # CA protons GLY
-    ('C', 'CA', 'N', 'HA2'),
-    ('HA3', 'N', 'CA'),
-    ('C', 'CA', 'N', 'HA3'),
+    ('HA', 'CA', 'C'),       # CA proton
+    ('O', 'C', 'CA', 'HA'),
+    ('HA2', 'CA', 'C'),       # gly CA proton
+    ('O', 'C', 'CA', 'HA2'),
+    ('HA3', 'CA', 'C'),       # gly CA proton
+    ('O', 'C', 'CA', 'HA3'),
     ('N', 'CA', 'CB'),
     ('N', 'CA', 'CB', 'HB'),  # CB protons
     ('N', 'CA', 'CB', 'HB1'),
@@ -257,16 +265,16 @@ pic_data_sidechains = {
         ('CD2', 'CE2', 'CZ2', 'HZ2'),
         ('CG', 'CD2', 'CE3'),
         ('CB', 'CG', 'CD2', 'CE3'),
-        ('CD2', 'CE3', 'CZ3'),
-        ('CG', 'CD2', 'CE3', 'CZ3'),
+        ('CZ2', 'CH2', 'CZ3'),
+        ('CE2', 'CZ2', 'CH2', 'CZ3'),
         ('CG', 'CD1', 'HD1'),
         ('CB', 'CG', 'CD1', 'HD1'),
         ('CD1', 'NE1', 'HE1'),
         ('CG', 'CD1', 'NE1', 'HE1'),
         ('CD2', 'CE3', 'HE3'),
         ('CG', 'CD2', 'CE3', 'HE3'),
-        ('CE2', 'CZ2', 'HZ3'),
-        ('CD2', 'CE2', 'CZ2', 'HZ3'),
+        ('CH2', 'CZ3', 'HZ3'),
+        ('CZ2', 'CH2', 'CZ3', 'HZ3'),
         ('CZ2', 'CH2', 'HH2'),
         ('CE2', 'CZ2', 'CH2', 'HH2'),
     ),
@@ -375,12 +383,38 @@ pic_data_sidechains = {
     )
 }
 
+# complete the ring bond sets for OpenSCAD output
+pic_data_sidechain_extras = {
+    'F': (
+        ('CE1', 'CZ', 'CE2'),
+        ('CD1', 'CE1', 'CZ', 'CE2'),
+
+    ),
+    'P': (
+        ('CG', 'CD', 'N'),
+        ('CB', 'CG', 'CD', 'N'),
+    ),
+    'Y': (
+        ('CE1', 'CZ', 'CE2'),
+        ('CD1', 'CE1', 'CZ', 'CE2'),
+    ),
+    'W': (
+        ('CD2', 'CE3', 'CZ3'),
+        ('CG', 'CD2', 'CE3', 'CZ3'),
+        ('CD1', 'NE1', 'CE2'),
+        ('CG', 'CD1', 'NE1', 'CE2'),
+    ),
+    'H': (
+        ('ND1', 'CE1', 'NE2'),
+        ('CG', 'ND1', 'CE1', 'NE2')
+    )
+}
 # http://www.imgt.org/IMGTeducation/Aide-memoire/_UK/aminoacids/formuleAA/
 # for naming of individual atoms
 
 
-# covalent radii from Heyrovska, Raji : 'Atomic Structures of all the Twenty 
-# Essential Amino Acids and a Tripeptide, with Bond Lengths as Sums of Atomic 
+# covalent radii from Heyrovska, Raji : 'Atomic Structures of all the Twenty
+# Essential Amino Acids and a Tripeptide, with Bond Lengths as Sums of Atomic
 # Covalent Radii'
 # https://arxiv.org/pdf/0804.2488.pdf
 # adding Ores between Osb and Odb for Asp and Glu, Nres between Nsb and Ndb
