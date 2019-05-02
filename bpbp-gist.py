@@ -1,4 +1,6 @@
 #!/usr/local/bin/python3
+# Copyright(c) 2019 Robert T. Miller.  All rights reserved.
+
 # -*- coding: latin-1 -*-
 """Interconvert PDB internal and external coordinates.
 
@@ -26,7 +28,7 @@ from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.pic import read_PIC, report_PIC, structure_rebuild_test
 from Bio.PDB.pic import internal_to_atom_coordinates, write_PIC
 from Bio.PDB.pic import atom_to_internal_coordinates, PIC_Residue
-from Bio.PDB.pic import write_PDB, write_SCAD, PIC_Chain
+from Bio.PDB.pic import write_PDB, write_SCAD, PIC_Chain, AtomKey
 
 PDB_repository_base = None
 
@@ -35,6 +37,7 @@ if os.path.isdir('/media/data/pdb'):
 elif os.path.isdir('/Volumes/data/pdb'):
     PDB_repository_base = '/Volumes/data/pdb/'
 
+print(sys.version)
 
 scale_val = 2
 
@@ -78,6 +81,8 @@ arg_parser.add_argument('-tv', help='verbose test conversion pdb<>pic',
                         action="store_true")
 arg_parser.add_argument('-nh', help='ignore hydrogens on PDB read',
                         action="store_true")
+arg_parser.add_argument('-d2h', help='swap D (deuterium) for H on PDB read',
+                        action="store_true")
 arg_parser.add_argument('-amide',
                         help='only amide proton, skip other Hs on PDB read',
                         action="store_true")
@@ -96,6 +101,9 @@ if args.nh:
     PIC_Residue.accept_atoms = PIC_Residue.accept_backbone
 if args.amide:
     PIC_Residue.accept_atoms = PIC_Residue.accept_backbone + ('H',)
+if args.d2h:
+    PIC_Residue.accept_atoms += PIC_Residue.accept_deuteriums
+    AtomKey.d2h = True
 if args.gcb:
     PIC_Residue.gly_Cbeta = True
 if args.maxp:
@@ -277,7 +285,7 @@ for target in toProcess:
                   r.pic.get_length('0C:1N'))
 
     if args.ws:
-        write_SCAD(pdb_structure, target + '.scad', scale_val, pdbid=prot_id,
+        write_SCAD(pdb_structure, outfile + '.scad', scale_val, pdbid=prot_id,
                    backboneOnly=args.backbone)
 
     fileNo += 1
