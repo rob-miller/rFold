@@ -61,7 +61,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-29 15:41:39'
+__updated__ = '2019-04-30 16:37:49'
 # print('ver: ' + __updated__)
 # print(sys.version)
 
@@ -2001,6 +2001,8 @@ class PIC_Residue(object):
 
     Methods
     -------
+    rak(atom info) :
+        Residue AtomKey - per residue AtomKey result cache
     atm241(coord) :
         Convert 1x3 cartesian coords to 4x1 homogeneous coords
     load_PIC(edron) :
@@ -2053,6 +2055,8 @@ class PIC_Residue(object):
         # map of dihedron key (first 3 atom keys) to dihedron
         # for all dihedra in Residue
         # set by Residue.link_dihedra()
+        self.akc = {}
+        # cache of AtomKey results for rak()
         self.id3_dh_index = {}
         # set of AtomKeys involved in dihedra, used by split_akl
         self.ak_set = set()
@@ -2086,9 +2090,9 @@ class PIC_Residue(object):
 
         if self.is20AA or rbase[2] in self.accept_resnames:
             # self.NCaCKey = []
-            self.NCaCKey = [(AtomKey(self, 'N'),
-                             AtomKey(self, 'CA'),
-                             AtomKey(self, 'C'))]
+            self.NCaCKey = [(self.rak('N'),
+                             self.rak('CA'),
+                             self.rak('C'))]
 
             for atom in parent.get_atoms():
                 if hasattr(atom, 'child_dict'):
@@ -2101,7 +2105,14 @@ class PIC_Residue(object):
                     self._add_atom(atom)
 
             # print(self.atom_coords)
-
+            
+    def rak(self, atm):
+        """Cache calls to AtomKey for this residue."""
+        ak = self.akc.get(atm, None)
+        if ak is None:
+            ak = self.akc[atm] = AtomKey(self, atm)
+        return ak
+    
     accept_backbone = ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CG1', 'OG1', 'OG',
                        'SG', 'CG2', 'CD', 'CD1', 'SD', 'OD1', 'ND1', 'CD2',
                        'ND2', 'CE', 'CE1', 'NE', 'OE1', 'NE1', 'CE2', 'OE2',
@@ -2148,7 +2159,7 @@ class PIC_Residue(object):
         if atm.name not in self.accept_atoms:
             # print('skip:', atm.name)
             return
-        ak = AtomKey(self, atm)
+        ak = self.rak(atm)
         self.atom_coords[ak] = PIC_Residue.atm241(atm.coord)
         self.ak_set.add(ak)
         # self.bp_atoms[ak] = atm
@@ -2294,9 +2305,9 @@ class PIC_Residue(object):
 
         startLst = []
         for lst in [
-            (AtomKey(self, 'C'), AtomKey(self, 'CA'), AtomKey(self, 'N')),
-            (AtomKey(self, 'N'), AtomKey(self, 'CA'), AtomKey(self, 'CB')),
-                (AtomKey(self, 'O'), AtomKey(self, 'C'), AtomKey(self, 'CA'))]:
+            (self.rak('C'), self.rak('CA'), self.rak('N')),
+            (self.rak('N'), self.rak('CA'), self.rak('CB')),
+                (self.rak('O'), self.rak('C'), self.rak('CA'))]:
             startLst.extend(self._split_akl(lst))
         startLst.extend(NCaCKey)
 
@@ -2494,11 +2505,9 @@ class PIC_Residue(object):
 
     def dihedra_from_atoms(self, allBonds=False):
         """Create hedra and dihedra for atom coordinates."""
-        AK = AtomKey
-        S = self
-
-        sN, sCA, sC, sCB = AK(S, 'N'), AK(S, 'CA'), AK(S, 'C'), AK(S, 'CB')
-        # sO, sCB = AK(S, 'O'), AK(S, 'CB')
+        sN, sCA, sC = self.rak('N'), self.rak('CA'), self.rak('C')
+        sCB = self.rak('CB')
+        # sO, sCB = self.rak('O'), self.rak('CB')
         # sN = AtomKey(self, 'N')
 
         if 0 < len(self.rnext):
@@ -2506,7 +2515,7 @@ class PIC_Residue(object):
             # which reach into next residue
             # rn = self.rnext
             for rn in self.rnext:
-                nN, nCA, nC = AK(rn, 'N'), AK(rn, 'CA'), AK(rn, 'C')
+                nN, nCA, nC = rn.rak('N'), rn.rak('CA'), rn.rak('C')
 
                 for ak in (nN, nCA, nC):
                     if ak in rn.atom_coords:
@@ -2547,49 +2556,50 @@ class PIC_Residue(object):
         #            break
 
         # terminal OXT if present
-        # sOXT = AK(S, 'OXT')
+        # sOXT = self.rak('OXT')
         # if sOXT in self.atom_coords:  # TODO: remove check done in gen_edra
         #    self._gen_edra([sCA, sC, sOXT])
         #    self._gen_edra([sN, sCA, sC, sOXT])
 
         # amide proton N H if present
-        # sH = AK(S, 'H')
+        # sH = self.rak('H')
         # self._gen_edra([sH, sN, sCA])
         # self._gen_edra([sC, sCA, sN, sH])
 
-        # if (self.gly_Cbeta and 'G' == self.lc and sCB not in self.atom_coords):
+        # if (self.gly_Cbeta and 'G' == self.lc and sCB not in 
+        # self.atom_coords):
         #    # add C-beta for Gly
-        #    sO = AK(S, 'O')
+        #    sO = self.rak('O')
         #    self.atom_coords[sCB] = None
         #    self._gen_edra([sCB, sCA, sC])
         #    self._gen_edra([sO, sC, sCA, sCB])
 
-            #cb = numpy.append(genCBjones(self.residue), [1])
+            # cb = numpy.append(genCBjones(self.residue), [1])
             # self.atom_coords[sCB] = numpy.array(cb, dtype=numpy.float64)[
             #    numpy.newaxis].transpose()
             # rest is just to print bfactor in pic file so testing works well
-            #ac = self.atom_coords[sCB]
-            #ac = ac[:3].transpose()[0]
-            #newAtom = Atom('CB', ac, 0.0, 1.00, ' ', 'CB', 0, 'C')
+            # ac = self.atom_coords[sCB]
+            # ac = ac[:3].transpose()[0]
+            # newAtom = Atom('CB', ac, 0.0, 1.00, ' ', 'CB', 0, 'C')
             # self.residue.add(newAtom)
 
         # standard backbone atoms independent of neighbours
         backbone = pic_data_backbone
         for edra in backbone:
-            r_edra = [AK(S, atom) for atom in edra]
+            r_edra = [self.rak(atom) for atom in edra]
             self._gen_edra(r_edra[0:4])  # [4] is label on some table entries
 
         # sidechain hedra and dihedra
         if self.lc is not None:
             sidechain = pic_data_sidechains.get(self.lc, [])
             for edra in sidechain:
-                r_edra = [AK(S, atom) for atom in edra]
+                r_edra = [self.rak(atom) for atom in edra]
                 # [4] is label on some table entries
                 self._gen_edra(r_edra[0:4])
             if allBonds:
                 sidechain = pic_data_sidechain_extras.get(self.lc, [])
                 for edra in sidechain:
-                    r_edra = [AK(S, atom) for atom in edra]
+                    r_edra = [self.rak(atom) for atom in edra]
                     self._gen_edra(r_edra[0:4])
 
         # testing C-beta generation against Ala:
@@ -2616,7 +2626,7 @@ class PIC_Residue(object):
         if (self.gly_Cbeta and 'G' == self.lc
                 and sCB not in self.atom_coords):
             # add C-beta for Gly
-            sO = AK(S, 'O')
+            sO = self.rak('O')
             self.atom_coords[sCB] = None  # so _gen_edra will complete
             htpl = (sCB, sCA, sC)
             self._gen_edra(htpl)
@@ -2632,8 +2642,6 @@ class PIC_Residue(object):
             d._set_hedra()
             d.dihedral1 = 121.51471
             del self.atom_coords[sCB]  # remove None so now must populate
-
-        print('hello')
 
     @staticmethod
     def _pdb_atom_string(atm):
@@ -2677,7 +2685,7 @@ class PIC_Residue(object):
                 + '\n')
 
     def _write_pic_bfac(self, atm, s, col):
-        ak = AtomKey(self, atm)
+        ak = self.rak(atm)
         if (0 == col % 5):
             s += 'BFAC:'
         s += ' ' + ak.id + ' ' + "{:6.2f}".format(atm.get_bfactor())
@@ -2821,9 +2829,9 @@ class PIC_Residue(object):
                     if 0 < len(S.rnext):
                         angle_key2.append(AK(S.rnext[0], m.group(2)))
                 elif m.group(1) == '0':
-                    angle_key2.append(AK(S, m.group(2)))
+                    angle_key2.append(self.rak(m.group(2)))
             else:
-                angle_key2.append(AK(S, a))
+                angle_key2.append(self.rak(a))
         return tuple(angle_key2)
 
     relative_atom_re = re.compile(r'^(-?[10])([A-Z]+)$')
@@ -2841,8 +2849,8 @@ class PIC_Residue(object):
 
         :return: Matching Hedron, Dihedron, or None.
         """
-        AK = AtomKey
-        S = self
+        # AK = AtomKey
+
         rval = None
         if isinstance(angle_key, tuple):
             len_mkey = len(angle_key)
@@ -2857,20 +2865,22 @@ class PIC_Residue(object):
             if 0 == len(self.rnext):
                 return None
             rn = self.rnext[0]
-            sN, sCA, sC, nN = AK(S, 'N'), AK(S, 'CA'), AK(S, 'C'), AK(rn, 'N')
+            sN, sCA, sC = self.rak('N'), self.rak('CA'), self.rak('C')
+            nN = rn.rak('N')
             rval = self.dihedra.get((sN, sCA, sC, nN), None)
         elif 'phi' == angle_key:
             if 0 == len(self.rprev):
                 return None
             rp = self.rprev[0]
-            pC, sN, sCA, sC = AK(rp, 'C'), AK(S, 'N'), AK(S, 'CA'), AK(S, 'C')
+            pC, sN, sCA = rp.rak('C'), self.rak('N'), self.rak('CA')
+            sC = self.rak('C')
             rval = rp.dihedra.get((pC, sN, sCA, sC), None)
         elif 'omg' == angle_key or 'omega' == angle_key:
             if 0 == len(self.rprev):
                 return None
             rp = self.rprev[0]
-            pCA, pC, sN = AK(rp, 'CA'), AK(rp, 'C'), AK(S, 'N')
-            sCA = AK(S, 'CA')
+            pCA, pC, sN = rp.rak('CA'), rp.rak('C'), self.rak('N')
+            sCA = self.rak('CA')
             rval = rp.dihedra.get((pCA, pC, sN, sCA), None)
         elif angle_key.startswith('chi'):
             sclist = pic_data_sidechains.get(self.lc, None)
@@ -2879,7 +2889,7 @@ class PIC_Residue(object):
             for akl in sclist:
                 if 5 == len(akl):
                     if akl[4] == angle_key:
-                        klst = [AK(S, a) for a in akl[0:4]]
+                        klst = [self.rak(a) for a in akl[0:4]]
                         rval = self.dihedra.get(tuple(klst), None)
 
         return rval
@@ -3200,7 +3210,6 @@ class PIC_Chain:
         """
         fp.write('   "{}", // chain id\n'.format(self.chain.id))
 
-        fp.write('   [  //hedra\n')
         # generate dict for all hedra to eliminate redundant references
         hedra = {}
         for rpic in self.ordered_aa_pic_list:
@@ -3209,52 +3218,13 @@ class PIC_Chain:
                 hedra[k] = h
         atomSet = set()
         bondSet = set()
+        hedraSet = set()
         ndx = 0
         hedraNdx = {}
 
-        # write hedra table
-
         for hk in sorted(hedra):
             hedraNdx[hk] = ndx
-            hed = hedra[hk]
             ndx += 1
-            fp.write('     [ ')
-            fp.write("{:9.5f}, {:9.5f}, {:9.5f}".format(
-                hed.len1, hed.angle2, hed.len3))
-            atom_str = ''
-            atom_done_str = ''
-            for ak in hed.aks:
-                atm = ak.akl[ak.fields.atm]
-                res = ak.akl[ak.fields.resname]
-                # try first for generic backbone/Cbeta atoms
-                ab_state_res = residue_atom_bond_state['X']
-                ab_state = ab_state_res.get(atm, None)
-                if ab_state is None:
-                    # not found above, must be sidechain atom
-                    ab_state_res = residue_atom_bond_state.get(res, None)
-                    if ab_state_res is not None:
-                        ab_state = ab_state_res.get(atm, '')
-                    else:
-                        ab_state = ''
-                atom_str += ', "' + ab_state + '"'
-                if ak in atomSet:
-                    atom_done_str += ', 0'
-                else:
-                    atom_done_str += ', 1'
-                    atomSet.add(ak)
-            fp.write(atom_str)
-            fp.write(atom_done_str)
-            bond = []
-            bond.append(hed.aks[0].id + '-' + hed.aks[1].id)
-            bond.append(hed.aks[1].id + '-' + hed.aks[2].id)
-            for b in bond:
-                if b in bondSet:
-                    fp.write(', 0')
-                else:
-                    fp.write(', 1')
-                    bondSet.add(b)
-            fp.write(' ], // ' + str(hk) + '\n')
-        fp.write('   ],\n')  # end of hedra table
 
         # write residue table
 
@@ -3292,10 +3262,56 @@ class PIC_Chain:
                         PIC_Chain._writeSCAD_dihed(
                             fp, d, transformations, hedraNdx)
                         dihedraNdx[dk] = ndx2
+                        hedraSet.add(d.h1key)
+                        hedraSet.add(d.h2key)
                         ndx2 += 1
         fp.write('   ],')  # end of residue entry dihedra table
         fp.write('\n  ],\n')  # end of all dihedra table
 
+        # write hedra table
+        fp.write('   [  //hedra\n')
+        for hk in sorted(hedra):
+            #hedraNdx[hk] = ndx
+            hed = hedra[hk]
+            #ndx += 1
+            fp.write('     [ ')
+            fp.write("{:9.5f}, {:9.5f}, {:9.5f}".format(
+                hed.len1, hed.angle2, hed.len3))
+            atom_str = ''
+            atom_done_str = ''
+            for ak in hed.aks:
+                atm = ak.akl[ak.fields.atm]
+                res = ak.akl[ak.fields.resname]
+                # try first for generic backbone/Cbeta atoms
+                ab_state_res = residue_atom_bond_state['X']
+                ab_state = ab_state_res.get(atm, None)
+                if ab_state is None:
+                    # not found above, must be sidechain atom
+                    ab_state_res = residue_atom_bond_state.get(res, None)
+                    if ab_state_res is not None:
+                        ab_state = ab_state_res.get(atm, '')
+                    else:
+                        ab_state = ''
+                atom_str += ', "' + ab_state + '"'
+                if ak in atomSet:
+                    atom_done_str += ', 0'
+                elif hk in hedraSet:
+                    atom_done_str += ', 1'
+                    atomSet.add(ak)
+            fp.write(atom_str)
+            fp.write(atom_done_str)
+            bond = []
+            bond.append(hed.aks[0].id + '-' + hed.aks[1].id)
+            bond.append(hed.aks[1].id + '-' + hed.aks[2].id)
+            for b in bond:
+                if b in bondSet:
+                    fp.write(', 0')
+                elif  hk in hedraSet:
+                    fp.write(', 1')
+                    bondSet.add(b)
+            fp.write(' ], // ' + str(hk) + '\n')
+        fp.write('   ],\n')  # end of hedra table
+        
         # write chain table
 
         fp.write('\n[  // chain - world transform for each residue\n')
