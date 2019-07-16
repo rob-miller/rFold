@@ -61,7 +61,7 @@ from Bio.PDB.PDBExceptions import PDBException
 # __updated__ is specifically for the python-coding-tools Visual Studio Code
 # extension, which updates the variable on each file save
 
-__updated__ = '2019-04-30 16:37:49'
+__updated__ = '2019-05-21 11:54:54'
 # print('ver: ' + __updated__)
 # print(sys.version)
 
@@ -937,8 +937,9 @@ def coord_space(acs, rev=False):
     mrz2 = gen_Mrot(-theta2, 'z')
 
     # mt = mrz2 @ mt
-    mt = mrz2.dot(mt)
-
+    #mt = mrz2.dot(mt)
+    mt = numpy.dot(mrz2, mt)
+    
     if not rev:
         return mt
 
@@ -3298,6 +3299,8 @@ class PIC_Chain:
                 elif hk in hedraSet:
                     atom_done_str += ', 1'
                     atomSet.add(ak)
+                else:
+                    atom_done_str += ', 0'
             fp.write(atom_str)
             fp.write(atom_done_str)
             bond = []
@@ -3309,6 +3312,8 @@ class PIC_Chain:
                 elif  hk in hedraSet:
                     fp.write(', 1')
                     bondSet.add(b)
+                else:
+                    fp.write(', 0')
             fp.write(' ], // ' + str(hk) + '\n')
         fp.write('   ],\n')  # end of hedra table
         
