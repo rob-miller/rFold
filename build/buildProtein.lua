@@ -87,7 +87,7 @@ for i,a in ipairs(toProcess) do
       if (chn) then
          toProcess[i] = toProcess[i] .. ' ' .. chn
       end
-      print(a,toProcess[i])
+      --print(a,toProcess[i])
    end
 end
 
