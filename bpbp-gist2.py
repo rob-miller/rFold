@@ -22,15 +22,16 @@ from io import StringIO
 
 import gzip
 import warnings
+from distutils.util import strtobool
 
 from Bio.PDB.PDBParser import PDBParser
 from Bio.File import as_handle
 from Bio.PDB.PDBIO import PDBIO
 from Bio._py3k import StringIO
 
-from Bio.PDB.internal_coords import internal_to_atom_coordinates
+from Bio.PDB.Structure import Structure
 from Bio.PDB.internal_coords import report_PIC, structure_rebuild_test
-from Bio.PDB.internal_coords import atom_to_internal_coordinates
+
 from Bio.PDB.PICIO import write_PIC, read_PIC
 from Bio.PDB.ic_classes import IC_Residue, AtomKey, IC_Chain
 from Bio.PDB.SCADIO import write_SCAD
@@ -78,6 +79,7 @@ elif os.path.isdir('/Volumes/data/pdb'):
 print(sys.version)
 
 scale_val = 2
+scadCode_val = True
 
 arg_parser = argparse.ArgumentParser(
     description='Interconvert .pic (pprotein internal coordinates) and '
@@ -107,6 +109,15 @@ arg_parser.add_argument('-ws', help='write OpenSCAD file with .scad extension',
 arg_parser.add_argument('-scale', dest='scale',
                         help='OpenSCAD output: units (usually mm) per '
                         'angstrom, default ' + str(scale_val))
+arg_parser.add_argument('-sc', dest='scadCode',
+                        help='OpenSCAD output: include OpenSCAD progam '
+                        'not just arrays, default ' + str(scadCode_val))
+arg_parser.add_argument('-flex',
+                        help='OpenSCAD output: rotatable backbone CA bonds',
+                        action="store_true")
+arg_parser.add_argument('-hb',
+                        help='OpenSCAD output: magnetic backbone H bonds',
+                        action="store_true")
 arg_parser.add_argument('-maxp', dest='maxp',
                         help='max N-C peptide bond length for chain breaks,'
                         'default ' + str(IC_Chain.MaxPeptideBond))
@@ -147,7 +158,9 @@ if args.gcb:
 if args.maxp:
     IC_Chain.MaxPeptideBond = float(args.maxp)
 if args.scale:
-    scale_val = args.scale
+    scale_val = float(args.scale)
+if args.scadCode:
+    scadCode_val = bool(strtobool(args.scadCode))
 if args.skip_count:
     args.skip_count = int(args.skip_count)
 if args.limit_count:
@@ -263,14 +276,14 @@ for target in toProcess:
 
     if args.wp:
         if pic_input:
-            internal_to_atom_coordinates(pdb_structure)
+            pdb_structure.internal_to_atom_coordinates()
         write_PDB(pdb_structure, outfile + '.PyPDB')
         print('wrote pdb output for', outfile)
 
     if args.wi:
         if pdb_input:
             # add_PIC(pdb_structure)
-            atom_to_internal_coordinates(pdb_structure)
+            pdb_structure.atom_to_internal_coordinates()
         write_PIC(pdb_structure, outfile + '.PyPIC')
         print('wrote pic output for', outfile)
 
@@ -291,11 +304,11 @@ for target in toProcess:
                     print(prot_id, fileNo, 'ERROR FAIL:', type(e), e)
 
         elif pic_input:
-            internal_to_atom_coordinates(pdb_structure)
+            pdb_structure.internal_to_atom_coordinates()
             write_PDB(pdb_structure, sp)
             sp.seek(0)
             pdb2 = PDB_parser.get_structure(prot_id, sp)
-            atom_to_internal_coordinates(pdb2)
+            pdb2.atom_to_internal_coordinates()
             sp2 = StringIO()
             write_PIC(pdb2, sp2)
             sp2.seek(0)
@@ -315,17 +328,25 @@ for target in toProcess:
             print(lineCount, matchCount, diffCount)
     if args.rama:
         if pdb_input:
-            atom_to_internal_coordinates(pdb_structure)
+            pdb_structure.atom_to_internal_coordinates()
         for r in pdb_structure.get_residues():
             # print(r.internal_coord.get_dihedral('N:CA:C:O'))
-            print(r, r.internal_coord.get_angle('psi'), r.internal_coord.get_angle('phi'),
-                  r.internal_coord.get_angle(
-                      'omg'), r.internal_coord.get_angle('chi2'),
-                  r.internal_coord.get_length('0C:1N'))
+            if r.internal_coord:
+                print(r, r.internal_coord.get_angle('psi'), r.internal_coord.get_angle('phi'),
+                    r.internal_coord.get_angle(
+                        'omg'), r.internal_coord.get_angle('chi2'),
+                    r.internal_coord.get_length('0C:1N'))
 
     if args.ws:
+        if args.flex:
+            for r in pdb_structure.get_residues():
+                r.internal_coord.set_flexible()
+        if args.hb:
+            for r in pdb_structure.get_residues():
+                r.internal_coord.set_hbond()
+
         write_SCAD(pdb_structure, outfile + '.scad', scale_val, pdbid=prot_id,
-                   backboneOnly=args.backbone)
+                   backboneOnly=args.backbone, includeCode=scadCode_val)
 
     fileNo += 1
 
