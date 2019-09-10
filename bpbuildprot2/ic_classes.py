@@ -1314,6 +1314,27 @@ class IC_Residue(object):
             # if d.atoms_updated:
             d.init_pos()
 
+    def set_flexible(self):
+        """For OpenSCAD, mark N-CA and CA-C bonds to be flexible joints."""
+        for h in self.hedra.values():
+            if h.dh_class == 'NCAC':
+                h.flex_female_1 = True
+                h.flex_female_2 = True
+            elif h.dh_class.endswith('NCA'):
+                h.flex_male_2 = True
+            elif h.dh_class.startswith('CAC') and h.aks[1].akl[3] == 'C':
+                h.flex_male_1 = True
+            elif h.dh_class == 'CBCAC':
+                h.skinny_1 = True  # CA-CB bond interferes with flex join
+
+    def set_hbond(self):
+        """For OpenSCAD, mark H-N and C-O bonds to be hbonds (magnets)."""
+        for h in self.hedra.values():
+            if h.dh_class == 'HNCA':
+                h.hbond_1 = True
+            elif h.dh_class == 'CACO':
+                h.hbond_2 = True
+
     def get_startpos(self):
         """Find N-Ca-C coordinates to build this residue from."""
         if 0 < len(self.rprev):
@@ -1598,8 +1619,12 @@ class IC_Residue(object):
             hl = self._split_akl(lst)
 
         for nlst in hl:
+            # do not add edron if split_akl() made something shorter
             if len(nlst) == lenLst:
-                dct[tuple(nlst)] = obj(nlst)
+                # if edron already exists, then update not replace with new
+                tnlst = tuple(nlst)
+                if tnlst not in dct:
+                    dct[tnlst] = obj(nlst)
 
     def dihedra_from_atoms(self, allBonds=False):
         """Create hedra and dihedra for atom coordinates."""
@@ -2244,7 +2269,7 @@ class IC_Chain:
                 go = False
             if go:
                 rpic.atom_coords = rpic.assemble()
-                rpic.ak_set = rpic.atom_coords.keys()
+                rpic.ak_set = set(rpic.atom_coords.keys())
 
     def coords_to_structure(self):
         """All pic atom_coords to Biopython Residue/Atom coords."""
@@ -2293,11 +2318,13 @@ class IC_Chain:
         fp.write(' ]')
 
     @staticmethod
-    def _writeSCAD_dihed(fp, d, transformations, hedraNdx):
+    def _writeSCAD_dihed(fp, d, transformations, hedraNdx, hedraSet):
         fp.write('[ {:9.5f}, {}, {}, {}, '.format(d.dihedral1,
                                                   hedraNdx[d.h1key],
                                                   hedraNdx[d.h2key],
                                                   (1 if d.reverse else 0)))
+        fp.write('{}, {}, '.format((0 if d.h1key in hedraSet else 1),
+                                   (0 if d.h2key in hedraSet else 1)))
         fp.write('    // {} [ {} -- {} ] {}\n'.format(d.id, d.hedron1.id,
                                                       d.hedron2.id,
                                                       ('reversed' if d.reverse
@@ -2310,7 +2337,7 @@ class IC_Chain:
     def write_SCAD(self, fp, scale, backboneOnly):
         """Write self to file as OpenSCAD data matrices.
 
-        See standalone write_SCAD() for details.
+        See standalone write_SCAD() in SCADIO.py for details.
         """
         fp.write('   "{}", // chain id\n'.format(self.chain.id))
 
@@ -2321,7 +2348,7 @@ class IC_Chain:
             for k, h in rpic.hedra.items():
                 hedra[k] = h
         atomSet = set()
-        bondSet = set()
+        bondSet = {}  # set()
         hedraSet = set()
         ndx = 0
         hedraNdx = {}
@@ -2364,7 +2391,7 @@ class IC_Chain:
                             started = True
                         fp.write('      ')
                         IC_Chain._writeSCAD_dihed(
-                            fp, d, transformations, hedraNdx)
+                            fp, d, transformations, hedraNdx, hedraSet)
                         dihedraNdx[dk] = ndx2
                         hedraSet.add(d.h1key)
                         hedraSet.add(d.h2key)
@@ -2381,6 +2408,7 @@ class IC_Chain:
                 hed.len1, hed.angle2, hed.len3))
             atom_str = ''
             atom_done_str = ''
+            akndx = 0
             for ak in hed.aks:
                 atm = ak.akl[ak.fields.atm]
                 res = ak.akl[ak.fields.resname]
@@ -2398,27 +2426,71 @@ class IC_Chain:
                 if ak in atomSet:
                     atom_done_str += ', 0'
                 elif hk in hedraSet:
-                    atom_done_str += ', 1'
-                    atomSet.add(ak)
+                    if ((hasattr(hed, "flex_female_1")
+                            or hasattr(hed, "flex_male_1"))
+                            and akndx != 2):
+                        if akndx == 0:
+                            atom_done_str += ', 0'
+                        elif akndx == 1:
+                            atom_done_str += ', 1'
+                            atomSet.add(ak)
+                    elif ((hasattr(hed, "flex_female_2")
+                           or hasattr(hed, "flex_male_2"))
+                          and akndx != 0):
+                        if akndx == 2:
+                            atom_done_str += ', 0'
+                        elif akndx == 1:
+                            atom_done_str += ', 1'
+                            atomSet.add(ak)
+                    else:
+                        atom_done_str += ', 1'
+                        atomSet.add(ak)
                 else:
                     atom_done_str += ', 0'
+                akndx += 1
             fp.write(atom_str)
             fp.write(atom_done_str)
             bond = []
             bond.append(hed.aks[0].id + '-' + hed.aks[1].id)
             bond.append(hed.aks[1].id + '-' + hed.aks[2].id)
+            b0 = True
             for b in bond:
-                if b in bondSet:
-                    fp.write(', 0')
+                wstr = ''
+                if b in bondSet and bondSet[b] == 1:
+                    wstr = ', 0'
                 elif hk in hedraSet:
-                    fp.write(', 1')
-                    bondSet.add(b)
+                    bondType = 1
+                    if b0:
+                        if hasattr(hed, 'flex_female_1'):
+                            bondType = 2
+                        elif hasattr(hed, 'flex_male_1'):
+                            bondType = 3
+                        elif hasattr(hed, 'skinny_1'):
+                            bondType = 4
+                        elif hasattr(hed, 'hbond_1'):
+                            bondType = 5
+                    else:
+                        if hasattr(hed, 'flex_female_2'):
+                            bondType = 2
+                        elif hasattr(hed, 'flex_male_2'):
+                            bondType = 3
+#                        elif hasattr(hed, 'skinny_2'):  # unused
+#                            bondType = 4
+                        elif hasattr(hed, 'hbond_2'):
+                            bondType = 5
+                    if b in bondSet:
+                        bondSet[b] = 1
+                    else:
+                        bondSet[b] = bondType
+                    wstr = ', ' + str(bondType)
                 else:
-                    fp.write(', 0')
-            # fp.write(' ], // ' + str(hk) + '\n')
+                    wstr = ', 0'
+                fp.write(wstr)
+                b0 = False
             akl = hed.aks[0].akl
             fp.write(', "' + akl[ak.fields.resname] + '", ' +
-                     akl[ak.fields.resSeq] + ', "' + hed.dh_class + '"],\n')
+                     akl[ak.fields.resSeq] + ', "' + hed.dh_class + '"')
+            fp.write(' ], // ' + str(hk) + '\n')
         fp.write('   ],\n')  # end of hedra table
 
         # write chain table
